@@ -17,6 +17,7 @@ export function TagSelector({ tags, activeTagId, onSelect }: Props) {
             <button
               className={`${styles.button} ${activeTagId === tag.id ? styles.active : ''}`}
               onClick={() => onSelect(tag.id)}
+              title={tag.hotkey ? `${tag.label}  [${tag.hotkey}]` : tag.label}
             >
               <span
                 className={styles.swatch}

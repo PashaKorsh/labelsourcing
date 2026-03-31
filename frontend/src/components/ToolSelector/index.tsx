@@ -17,7 +17,7 @@ export function ToolSelector({ tools, activeTool, onSelect }: Props) {
             <button
               className={`${styles.button} ${activeTool === tool.id ? styles.active : ''}`}
               onClick={() => onSelect(tool.id)}
-              title={tool.label}
+              title={tool.hotkey ? `${tool.label}  [${tool.hotkey.toUpperCase()}]` : tool.label}
             >
               <span className={styles.icon}>{tool.icon}</span>
               {tool.label}

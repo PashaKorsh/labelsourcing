@@ -51,19 +51,27 @@ export function AnnotationCanvas({
     setOriginalSize(null);
 
     const measure = () => {
-      // naturalWidth > 0 означает, что изображение загружено и имеет размер
-      if (img.naturalWidth > 0) {
-        setOriginalSize({ w: img.offsetWidth, h: img.offsetHeight });
-        obs.disconnect();
-      }
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      if (nw === 0 || nh === 0) return;
+      // Вычисляем CSS-ограниченный размер (max-width: 80vw; max-height: 80vh) программно —
+      // это безопасно в любой момент, не зависит от текущего layout/displayStyle.
+      const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
+      setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
+      obs.disconnect();
     };
 
     const obs = new ResizeObserver(measure);
     obs.observe(img);
-    // Для изображений из кэша браузера — они уже загружены до старта наблюдения
+    // load — гарантированный триггер для незакэшированных изображений
+    img.addEventListener('load', measure);
+    // Для кэшированных изображений naturalWidth уже доступен синхронно
     measure();
 
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      img.removeEventListener('load', measure);
+    };
   }, [imageUrl]);
 
   // Явные размеры передаются на <img>, чтобы Annotorious увидел изменение

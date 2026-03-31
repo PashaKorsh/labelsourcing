@@ -1,20 +1,17 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import type { AnnotationTask } from '../types/task';
 
-/**
- * Manages the queue of annotation tasks and persists per-task annotation state.
- *
- * Navigation (current index) is intentionally kept in the React component —
- * the service is stateless w.r.t. which task is "current" so it can be used
- * in different UI contexts (list view, workspace, review, etc.).
- */
+// Управляет очередью задач разметки и хранит аннотации для каждой задачи.
+// Навигация (текущий индекс) намеренно оставлена в React-компоненте —
+// сервис не знает, какая задача «текущая», чтобы его можно было использовать
+// в разных контекстах (список, рабочее пространство, ревью и т.д.).
 export interface TaskService {
   getTasks(): readonly AnnotationTask[];
   getAnnotations(taskId: string): ImageAnnotation[];
   saveAnnotations(taskId: string, annotations: ImageAnnotation[]): void;
 }
 
-// ─── Mock implementation ──────────────────────────────────────────────────────
+// ─── Mock-реализация ──────────────────────────────────────────────────────────
 
 class MockTaskService implements TaskService {
   private readonly tasks: AnnotationTask[] = [
@@ -50,7 +47,7 @@ class MockTaskService implements TaskService {
     },
   ];
 
-  // In-memory store. A real implementation would call your backend API here.
+  // Хранилище в памяти. Реальная реализация будет вызывать API бэкенда.
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
 
   getTasks(): readonly AnnotationTask[] {

@@ -10,10 +10,10 @@ import type { Tag } from '../../types/annotation';
 import styles from './WorkspacePage.module.css';
 
 const TAGS: Tag[] = [
-  { id: 'person', label: 'Person', color: '#ef4444' },
-  { id: 'vehicle', label: 'Vehicle', color: '#3b82f6' },
-  { id: 'animal', label: 'Animal', color: '#22c55e' },
-  { id: 'object', label: 'Object', color: '#f59e0b' },
+  { id: 'person', label: 'Человек', color: '#ef4444' },
+  { id: 'vehicle', label: 'Транспорт', color: '#3b82f6' },
+  { id: 'animal', label: 'Животное', color: '#22c55e' },
+  { id: 'object', label: 'Объект', color: '#f59e0b' },
 ];
 
 export function WorkspacePage() {
@@ -25,14 +25,13 @@ export function WorkspacePage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
-  // Keeps a live reference to the current annotations so we can save them
-  // before navigating away without causing re-renders on every change.
+  // Актуальные аннотации без лишних ре-рендеров — для сохранения перед навигацией
   const annotationsRef = useRef<ImageAnnotation[]>([]);
 
   const task = tasks[taskIndex] ?? null;
   const activeTag = TAGS.find(t => t.id === activeTagId) ?? null;
 
-  // Resolve the image URL whenever the task changes.
+  // Получаем URL изображения при смене задачи
   useEffect(() => {
     if (!task) return;
     setImageUrl(null);
@@ -50,7 +49,7 @@ export function WorkspacePage() {
       .catch(err => setImageError(String(err)));
 
     return () => {
-      // Release blob: URLs created by clients that implement revoke().
+      // Освобождаем blob: URL, если клиент их создаёт
       if (resolvedUrl && client.revoke) {
         client.revoke(resolvedUrl);
       }
@@ -64,7 +63,7 @@ export function WorkspacePage() {
   const navigateTo = useCallback(
     (nextIndex: number) => {
       if (!task) return;
-      // Persist current annotations before leaving.
+      // Сохраняем аннотации перед уходом
       taskService.saveAnnotations(task.id, annotationsRef.current);
       setTaskIndex(nextIndex);
     },
@@ -84,12 +83,12 @@ export function WorkspacePage() {
             className={styles.navButton}
             onClick={() => navigateTo(taskIndex - 1)}
             disabled={!canGoPrev}
-            title="Previous task"
+            title="Предыдущая задача"
           >
-            ← Prev
+            ← Пред
           </button>
           <span className={styles.taskCounter}>
-            {task?.name ?? `Task ${taskIndex + 1}`}
+            {task?.name ?? `Задача ${taskIndex + 1}`}
             <span className={styles.taskIndex}>
               {taskIndex + 1} / {tasks.length}
             </span>
@@ -98,9 +97,9 @@ export function WorkspacePage() {
             className={styles.navButton}
             onClick={() => navigateTo(taskIndex + 1)}
             disabled={!canGoNext}
-            title="Next task"
+            title="Следующая задача"
           >
-            Next →
+            След →
           </button>
         </nav>
       </header>
@@ -122,12 +121,12 @@ export function WorkspacePage() {
 
         <main className={styles.canvasArea}>
           {imageError ? (
-            <div className={styles.status}>Failed to load image: {imageError}</div>
+            <div className={styles.status}>Не удалось загрузить изображение: {imageError}</div>
           ) : !imageUrl ? (
-            <div className={styles.status}>Loading…</div>
+            <div className={styles.status}>Загрузка…</div>
           ) : (
-            // key={task.id} remounts AnnotationCanvas on task switch,
-            // giving Annotorious a fresh instance (and empty undo stack).
+            // key={task.id} пересоздаёт AnnotationCanvas при смене задачи,
+            // давая Annotorious чистый экземпляр (и пустой стек undo).
             <AnnotationCanvas
               key={task!.id}
               imageUrl={imageUrl}

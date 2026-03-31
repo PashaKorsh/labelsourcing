@@ -115,12 +115,6 @@ export function AnnotationCanvas({
         )}
       </div>
 
-      {/*
-        Только translate (не scale!) — центрирующий контейнер смещается
-        от своего flex-центра на (panX, panY). CSS translate не влияет
-        на event.offsetX, поэтому координаты Annotorious остаются верными.
-        Масштабирование — через явный width/height на <img> (displayStyle).
-      */}
       <div
         className={styles.scene}
         style={{ transform: `translate(${panX}px, ${panY}px)` }}

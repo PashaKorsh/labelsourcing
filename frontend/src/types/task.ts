@@ -1,8 +1,6 @@
-/**
- * Describes WHERE an image lives, without containing the image data itself.
- * `source` matches an ImageClient.sourceId (e.g. 'mock', 's3', 'minio', 'http').
- * `params` are source-specific (e.g. bucket + key for S3, path for HTTP).
- */
+// Описывает, ГДЕ находится изображение, без самих данных.
+// `source` совпадает с ImageClient.sourceId (например, 'mock', 's3', 'minio').
+// `params` специфичны для источника (например, bucket + key для S3).
 export interface ImageLocator {
   source: string;
   params: Record<string, string>;

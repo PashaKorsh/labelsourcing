@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   useAnnotator,
@@ -19,11 +19,13 @@ import styles from './AnnotationCanvas.module.css';
 
 interface ContextMenuPortalProps {
   state: ContextMenuState;
+  tags: Tag[];
   onClose: () => void;
 }
 
-export function ContextMenuPortal({ state, onClose }: ContextMenuPortalProps) {
+export function ContextMenuPortal({ state, tags, onClose }: ContextMenuPortalProps) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
+  const [tagListOpen, setTagListOpen] = useState(false);
 
   // Закрыть при клике вне меню
   useEffect(() => {
@@ -31,11 +33,24 @@ export function ContextMenuPortal({ state, onClose }: ContextMenuPortalProps) {
     return () => window.removeEventListener('mousedown', onClose);
   }, [onClose]);
 
+  const currentTag = tags.find(t =>
+    state.annotation.bodies.some(b => b.purpose === 'classifying' && b.value === t.id)
+  ) ?? null;
+
+  const changeTag = (tag: Tag) => {
+    const bodies = [
+      ...state.annotation.bodies.filter(b => b.purpose !== 'classifying'),
+      { id: crypto.randomUUID(), annotation: state.annotation.id, purpose: 'classifying' as const, value: tag.id },
+    ];
+    anno.updateAnnotation({ ...state.annotation, bodies });
+    onClose();
+  };
+
   return createPortal(
     <div
       className={styles.contextMenu}
       style={{ left: state.x, top: state.y }}
-      onMouseDown={e => e.stopPropagation()} // не закрывать при клике внутри
+      onMouseDown={e => e.stopPropagation()}
     >
       <button
         className={styles.contextMenuItem}
@@ -43,6 +58,30 @@ export function ContextMenuPortal({ state, onClose }: ContextMenuPortalProps) {
       >
         Удалить
       </button>
+
+      <div className={styles.contextMenuDivider} />
+
+      <button
+        className={styles.contextMenuTagRow}
+        onClick={() => setTagListOpen(v => !v)}
+      >
+        <span className={styles.contextMenuTagDot} style={{ background: currentTag?.color ?? '#666' }} />
+        <span className={styles.contextMenuTagLabel}>{currentTag?.label ?? 'Без тега'}</span>
+        <span className={styles.contextMenuTagArrow}>{tagListOpen ? '▴' : '▾'}</span>
+      </button>
+
+      {tagListOpen && tags.map(tag => (
+        <button
+          key={tag.id}
+          className={styles.contextMenuTagItem}
+          data-active={tag.id === currentTag?.id}
+          onClick={() => changeTag(tag)}
+        >
+          <span className={styles.contextMenuTagDot} style={{ background: tag.color }} />
+          {tag.label}
+          {tag.id === currentTag?.id && <span className={styles.contextMenuTagCheck}>✓</span>}
+        </button>
+      ))}
     </div>,
     document.body,
   );
@@ -55,6 +94,7 @@ export function ContextMenuPortal({ state, onClose }: ContextMenuPortalProps) {
 export interface AnnotatorControllerProps {
   activeTool: string;
   activeTag: Tag | null;
+  tags: Tag[];
   initialAnnotations: ImageAnnotation[];
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
   /** Колбэк для синхронизации hover-состояния с родительским компонентом */
@@ -66,6 +106,7 @@ export interface AnnotatorControllerProps {
 export function AnnotatorController({
   activeTool,
   activeTag,
+  tags,
   initialAnnotations,
   onAnnotationsChange,
   onHoverChange,
@@ -156,6 +197,6 @@ export function AnnotatorController({
   }, [anno]);
 
   return contextMenu ? (
-    <ContextMenuPortal state={contextMenu} onClose={onContextMenuClose} />
+    <ContextMenuPortal state={contextMenu} tags={tags} onClose={onContextMenuClose} />
   ) : null;
 }

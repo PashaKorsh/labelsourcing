@@ -134,6 +134,7 @@ export function AnnotationCanvas({
           <AnnotatorController
             activeTool={activeTool}
             activeTag={activeTag}
+            tags={tags}
             initialAnnotations={initialAnnotations}
             onAnnotationsChange={onAnnotationsChange}
             onHoverChange={handleHoverChange}

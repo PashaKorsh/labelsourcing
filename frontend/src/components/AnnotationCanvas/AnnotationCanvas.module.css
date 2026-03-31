@@ -125,3 +125,73 @@
   background: rgba(239, 68, 68, 0.15);
   color: #f87171;
 }
+
+.contextMenuDivider {
+  height: 1px;
+  background: #2e2e2e;
+  margin: 3px 0;
+}
+
+.contextMenuTagRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.contextMenuTagRow:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.contextMenuTagLabel {
+  flex: 1;
+}
+
+.contextMenuTagArrow {
+  font-size: 9px;
+  opacity: 0.5;
+}
+
+.contextMenuTagDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.contextMenuTagItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 14px 6px 20px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: #ccc;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+
+.contextMenuTagItem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.contextMenuTagItem[data-active='true'] {
+  color: #fff;
+}
+
+.contextMenuTagCheck {
+  margin-left: auto;
+  font-size: 11px;
+  color: #4ade80;
+}

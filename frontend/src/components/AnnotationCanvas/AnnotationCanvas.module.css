@@ -47,6 +47,7 @@
   max-width: 80vw;
   max-height: 80vh;
   object-fit: contain;
+  image-rendering: pixelated;
   /* Transparent image checkerboard — makes PNG alpha areas visible. */
   background-image:
     linear-gradient(45deg, #3a3a3a 25%, transparent 25%),

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { AnnotationCanvas } from '../../components/AnnotationCanvas';
 import { ToolSelector } from '../../components/ToolSelector';
@@ -7,6 +7,8 @@ import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService } from '../../services/taskService';
 import { getImageClient } from '../../services/imageClient';
 import type { Tag } from '../../types/annotation';
+import { useHotkeys } from '../../hooks/useHotkeys';
+import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
 
 const TAGS: Tag[] = [
@@ -72,6 +74,16 @@ export function WorkspacePage() {
 
   const canGoPrev = taskIndex > 0;
   const canGoNext = taskIndex < tasks.length - 1;
+
+  // Горячие клавиши для инструментов — берём из определений в IMAGE_DRAWING_TOOLS
+  const toolHotkeys = useMemo<HotkeyMap>(() => {
+    const map: HotkeyMap = {};
+    for (const tool of IMAGE_DRAWING_TOOLS) {
+      if (tool.hotkey) map[tool.hotkey] = () => setActiveTool(tool.id);
+    }
+    return map;
+  }, []);
+  useHotkeys(toolHotkeys);
 
   return (
     <div className={styles.page}>

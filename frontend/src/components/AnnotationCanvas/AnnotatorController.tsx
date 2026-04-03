@@ -101,6 +101,8 @@ export interface AnnotatorControllerProps {
   onHoverChange: (annotation: ImageAnnotation | null) => void;
   contextMenu: ContextMenuState | null;
   onContextMenuClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
 }
 
 export function AnnotatorController({
@@ -112,6 +114,8 @@ export function AnnotatorController({
   onHoverChange,
   contextMenu,
   onContextMenuClose,
+  onPrev,
+  onNext,
 }: AnnotatorControllerProps) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
 
@@ -119,9 +123,13 @@ export function AnnotatorController({
   const activeTagRef = useRef(activeTag);
   const onChangeRef = useRef(onAnnotationsChange);
   const onHoverRef = useRef(onHoverChange);
+  const onPrevRef = useRef(onPrev);
+  const onNextRef = useRef(onNext);
   useEffect(() => { activeTagRef.current = activeTag; }, [activeTag]);
   useEffect(() => { onChangeRef.current = onAnnotationsChange; }, [onAnnotationsChange]);
   useEffect(() => { onHoverRef.current = onHoverChange; }, [onHoverChange]);
+  useEffect(() => { onPrevRef.current = onPrev; }, [onPrev]);
+  useEffect(() => { onNextRef.current = onNext; }, [onNext]);
 
   // Передаём наружу, какая аннотация под курсором (нужно для контекстного меню)
   const hovered = useHover<ImageAnnotation>();
@@ -134,7 +142,12 @@ export function AnnotatorController({
   // Переключение инструмента рисования
   useEffect(() => {
     if (!anno) return;
-    anno.setDrawingTool(activeTool);
+    if (activeTool === 'cursor') {
+      anno.setDrawingEnabled(false);
+    } else {
+      anno.setDrawingEnabled(true);
+      anno.setDrawingTool(activeTool as Parameters<typeof anno.setDrawingTool>[0]);
+    }
   }, [anno, activeTool]);
 
   // Восстановление сохранённых аннотаций при монтировании (смена таски)
@@ -169,27 +182,54 @@ export function AnnotatorController({
   // Горячие клавиши
   useEffect(() => {
     if (!anno) return;
+
+    // Флаг: следующий keydown — синтетический Delete для вершины полигона,
+    // наш обработчик должен его пропустить (dispatchEvent синхронный).
+    let skipNextDelete = false;
+
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
 
-      // Delete / Backspace — удалить выделенные аннотации
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Синтетический Delete от S-клавиши — пропускаем, Annotorious обработает сам
+      if (skipNextDelete) { skipNextDelete = false; return; }
+
+      // Delete / Backspace / A — удалить выделенные аннотации целиком
+      if (e.key === 'Delete' || e.key === 'Backspace' || e.code === 'KeyA' && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault();
         selectionRef.current.selected.forEach(({ annotation }) => anno.removeAnnotation(annotation));
         return;
       }
 
-      // Ctrl+Z (layout-независимо через event.code — физическое положение клавиши)
-      if (e.ctrlKey && e.code === 'KeyZ' && !e.shiftKey && e.key !== 'z' && e.key !== 'Z') {
+      // S — удалить вершину полигона (только если активен редактор вершин)
+      // dispatchEvent синхронный: флаг выставляем до диспатча, сбрасываем внутри обработчика
+      if (e.code === 'KeyS' && !e.ctrlKey && !e.shiftKey) {
+        const layer = document.querySelector('.a9s-annotationlayer');
+        if (layer && document.querySelector('.a9s-polygon-editor-mask')) {
+          e.preventDefault();
+          skipNextDelete = true;
+          layer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
+        }
+        return;
+      }
+
+      // Z — отмена (+ Ctrl+Z как алиас)
+      if ((e.code === 'KeyZ' && !e.ctrlKey && !e.shiftKey) || (e.ctrlKey && e.code === 'KeyZ' && !e.shiftKey)) {
         e.preventDefault(); anno.undo(); return;
       }
-      // Ctrl+Shift+Z или Ctrl+Y — повтор
-      if (e.ctrlKey && e.code === 'KeyZ' && e.shiftKey && e.key !== 'z' && e.key !== 'Z') {
+      // X — повтор (+ Ctrl+Shift+Z / Ctrl+Y как алиасы)
+      if ((e.code === 'KeyX' && !e.ctrlKey && !e.shiftKey)
+        || (e.ctrlKey && e.code === 'KeyZ' && e.shiftKey)
+        || (e.ctrlKey && e.code === 'KeyY')) {
         e.preventDefault(); anno.redo(); return;
       }
-      if (e.ctrlKey && e.code === 'KeyY' && e.key !== 'y' && e.key !== 'Y') {
-        e.preventDefault(); anno.redo(); return;
+
+      // D — предыдущая задача, F — следующая
+      if (e.code === 'KeyD' && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault(); onPrevRef.current?.(); return;
+      }
+      if (e.code === 'KeyF' && !e.ctrlKey && !e.shiftKey) {
+        e.preventDefault(); onNextRef.current?.(); return;
       }
     };
     document.addEventListener('keydown', onKeyDown);

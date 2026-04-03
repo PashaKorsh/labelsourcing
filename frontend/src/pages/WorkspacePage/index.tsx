@@ -3,6 +3,7 @@ import type { ImageAnnotation } from '@annotorious/annotorious';
 import { AnnotationCanvas } from '../../components/AnnotationCanvas';
 import { ToolSelector } from '../../components/ToolSelector';
 import { TagSelector } from '../../components/TagSelector';
+import { HintsBar } from '../../components/HintsBar';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService } from '../../services/taskService';
 import { getImageClient } from '../../services/imageClient';
@@ -135,23 +136,28 @@ export function WorkspacePage() {
         </aside>
 
         <main className={styles.canvasArea}>
-          {imageError ? (
-            <div className={styles.status}>Не удалось загрузить изображение: {imageError}</div>
-          ) : !imageUrl ? (
-            <div className={styles.status}>Загрузка…</div>
-          ) : (
-            // key={task.id} пересоздаёт AnnotationCanvas при смене задачи,
-            // давая Annotorious чистый экземпляр (и пустой стек undo).
-            <AnnotationCanvas
-              key={task!.id}
-              imageUrl={imageUrl}
-              activeTool={activeTool}
-              activeTag={activeTag}
-              tags={TAGS}
-              initialAnnotations={taskService.getAnnotations(task!.id)}
-              onAnnotationsChange={handleAnnotationsChange}
-            />
-          )}
+          <div className={styles.canvasContent}>
+            {imageError ? (
+              <div className={styles.status}>Не удалось загрузить изображение: {imageError}</div>
+            ) : !imageUrl ? (
+              <div className={styles.status}>Загрузка…</div>
+            ) : (
+              // key={task.id} пересоздаёт AnnotationCanvas при смене задачи,
+              // давая Annotorious чистый экземпляр (и пустой стек undo).
+              <AnnotationCanvas
+                key={task!.id}
+                imageUrl={imageUrl}
+                activeTool={activeTool}
+                activeTag={activeTag}
+                tags={TAGS}
+                initialAnnotations={taskService.getAnnotations(task!.id)}
+                onAnnotationsChange={handleAnnotationsChange}
+                onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
+                onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
+              />
+            )}
+          </div>
+          <HintsBar activeTool={activeTool} />
         </main>
       </div>
     </div>

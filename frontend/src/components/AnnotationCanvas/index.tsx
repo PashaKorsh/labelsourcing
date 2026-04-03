@@ -26,6 +26,8 @@ export interface AnnotationCanvasProps {
   tags: Tag[];
   initialAnnotations: ImageAnnotation[];
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
+  onPrev?: () => void;
+  onNext?: () => void;
 }
 
 export function AnnotationCanvas({
@@ -35,10 +37,14 @@ export function AnnotationCanvas({
   tags,
   initialAnnotations,
   onAnnotationsChange,
+  onPrev,
+  onNext,
 }: AnnotationCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const { zoom, panX, panY, reset } = useZoomPan(wrapperRef);
+  const leftButtonPanRef = useRef(activeTool === 'cursor');
+  useEffect(() => { leftButtonPanRef.current = activeTool === 'cursor'; }, [activeTool]);
+  const { zoom, panX, panY, reset } = useZoomPan(wrapperRef, leftButtonPanRef);
 
   // Исходный размер изображения при zoom=1 (с учётом CSS-ограничений max-width/height).
   // Фиксируется при загрузке, используется для вычисления displayStyle.
@@ -106,6 +112,7 @@ export function AnnotationCanvas({
     <div
       ref={wrapperRef}
       className={styles.wrapper}
+      style={activeTool === 'cursor' ? { cursor: 'grab' } : undefined}
       onContextMenu={handleContextMenu}
     >
       <div className={styles.zoomIndicator}>
@@ -140,6 +147,8 @@ export function AnnotationCanvas({
             onHoverChange={handleHoverChange}
             contextMenu={contextMenu}
             onContextMenuClose={() => setContextMenu(null)}
+            onPrev={onPrev}
+            onNext={onNext}
           />
         </Annotorious>
       </div>

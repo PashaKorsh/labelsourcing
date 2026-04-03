@@ -27,7 +27,10 @@ export interface ZoomPanState {
 // panX/panY отсчитываются от ЦЕНТРА wrapper'а (где находится изображение
 // при zoom=1, pan=0 благодаря flexbox-центрированию). При zoom-к-курсору
 // это гарантирует, что точка под курсором остаётся на месте.
-export function useZoomPan(wrapperRef: React.RefObject<HTMLDivElement | null>) {
+export function useZoomPan(
+  wrapperRef: React.RefObject<HTMLDivElement | null>,
+  leftButtonPanRef: React.RefObject<boolean>,
+) {
   const [state, setState] = useState<ZoomPanState>({ zoom: 1, panX: 0, panY: 0 });
   // Ref нужен, чтобы обработчики событий всегда видели актуальное состояние
   // без перерегистрации при каждом рендере.
@@ -61,7 +64,7 @@ export function useZoomPan(wrapperRef: React.RefObject<HTMLDivElement | null>) {
     return () => el.removeEventListener('wheel', onWheel);
   }, [wrapperRef, apply]);
 
-  // Пан средней кнопкой мыши
+  // Пан средней кнопкой мыши (всегда) или левой (в режиме курсора)
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -70,8 +73,10 @@ export function useZoomPan(wrapperRef: React.RefObject<HTMLDivElement | null>) {
     let drag: DragStart | null = null;
 
     const onDown = (e: MouseEvent) => {
-      if (e.button !== 1) return;
-      e.preventDefault(); // отключить автоскролл браузера
+      const isMiddle = e.button === 1;
+      const isLeft = e.button === 0 && leftButtonPanRef.current;
+      if (!isMiddle && !isLeft) return;
+      e.preventDefault();
       drag = { x: e.clientX, y: e.clientY, panX: stateRef.current.panX, panY: stateRef.current.panY };
     };
     const onMove = (e: MouseEvent) => {
@@ -82,7 +87,9 @@ export function useZoomPan(wrapperRef: React.RefObject<HTMLDivElement | null>) {
         panY: drag.panY + (e.clientY - drag.y),
       });
     };
-    const onUp = (e: MouseEvent) => { if (e.button === 1) drag = null; };
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 0 || e.button === 1) drag = null;
+    };
 
     el.addEventListener('mousedown', onDown);
     window.addEventListener('mousemove', onMove);
@@ -92,7 +99,7 @@ export function useZoomPan(wrapperRef: React.RefObject<HTMLDivElement | null>) {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [wrapperRef, apply]);
+  }, [wrapperRef, leftButtonPanRef, apply]);
 
   const reset = useCallback(() => apply({ zoom: 1, panX: 0, panY: 0 }), [apply]);
 

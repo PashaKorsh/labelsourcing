@@ -163,6 +163,7 @@ export function AnnotatorController({
     const handleCreate = (annotation: ImageAnnotation) => {
       const tag = activeTagRef.current;
       if (!tag) return;
+      if (annotation.bodies.some(b => b.purpose === 'classifying')) return;
       const body: AnnotationBody = {
         id: crypto.randomUUID(),
         annotation: annotation.id,
@@ -171,6 +172,9 @@ export function AnnotatorController({
       };
       anno.updateAnnotation({ ...annotation, bodies: [...annotation.bodies, body] });
     };
+    // Проверка нужна: Annotorious стреляет createAnnotation и при redo,
+    // восстанавливая уже помеченную аннотацию. Без проверки updateAnnotation
+    // создаёт новую запись в истории и обнуляет redo-стек.
     anno.on('createAnnotation', handleCreate);
     return () => anno.off('createAnnotation', handleCreate);
   }, [anno]);

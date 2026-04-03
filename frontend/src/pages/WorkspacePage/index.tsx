@@ -30,6 +30,7 @@ export function WorkspacePage() {
 
   // Актуальные аннотации без лишних ре-рендеров — для сохранения перед навигацией
   const annotationsRef = useRef<ImageAnnotation[]>([]);
+  const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
 
   const task = tasks[taskIndex] ?? null;
   const activeTag = TAGS.find(t => t.id === activeTagId) ?? null;
@@ -63,15 +64,23 @@ export function WorkspacePage() {
     annotationsRef.current = annotations;
   }, []);
 
+  const handleImageSizeChange = useCallback((size: { w: number; h: number }) => {
+    imageSizeRef.current = size;
+  }, []);
+
   const navigateTo = useCallback(
     (nextIndex: number) => {
       if (!task) return;
-      // Сохраняем аннотации перед уходом
-      taskService.saveAnnotations(task.id, annotationsRef.current);
+      taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
       setTaskIndex(nextIndex);
     },
     [task],
   );
+
+  const handleSave = useCallback(() => {
+    if (task) taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
+    taskService.exportAllAnnotations();
+  }, [task]);
 
   const canGoPrev = taskIndex > 0;
   const canGoNext = taskIndex < tasks.length - 1;
@@ -133,6 +142,11 @@ export function WorkspacePage() {
             activeTagId={activeTagId}
             onSelect={setActiveTagId}
           />
+          <div className={styles.sidebarBottom}>
+            <button className={styles.saveButton} onClick={handleSave} title="Сохранить разметку">
+              Сохранить
+            </button>
+          </div>
         </aside>
 
         <main className={styles.canvasArea}>
@@ -152,6 +166,7 @@ export function WorkspacePage() {
                 tags={TAGS}
                 initialAnnotations={taskService.getAnnotations(task!.id)}
                 onAnnotationsChange={handleAnnotationsChange}
+                onImageSizeChange={handleImageSizeChange}
                 onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
                 onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
               />

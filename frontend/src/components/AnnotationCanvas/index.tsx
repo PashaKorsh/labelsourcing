@@ -26,6 +26,7 @@ export interface AnnotationCanvasProps {
   tags: Tag[];
   initialAnnotations: ImageAnnotation[];
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
+  onImageSizeChange?: (size: { w: number; h: number }) => void;
   onPrev?: () => void;
   onNext?: () => void;
 }
@@ -37,6 +38,7 @@ export function AnnotationCanvas({
   tags,
   initialAnnotations,
   onAnnotationsChange,
+  onImageSizeChange,
   onPrev,
   onNext,
 }: AnnotationCanvasProps) {
@@ -64,6 +66,7 @@ export function AnnotationCanvas({
       // это безопасно в любой момент, не зависит от текущего layout/displayStyle.
       const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
       setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
+      onImageSizeChange?.({ w: nw, h: nh });
       obs.disconnect();
     };
 

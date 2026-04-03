@@ -1,5 +1,6 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import type { AnnotationTask } from '../types/task';
+import { serializeTaskAnnotations } from './annotationSerializer';
 
 // Управляет очередью задач разметки и хранит аннотации для каждой задачи.
 // Навигация (текущий индекс) намеренно оставлена в React-компоненте —
@@ -8,7 +9,9 @@ import type { AnnotationTask } from '../types/task';
 export interface TaskService {
   getTasks(): readonly AnnotationTask[];
   getAnnotations(taskId: string): ImageAnnotation[];
-  saveAnnotations(taskId: string, annotations: ImageAnnotation[]): void;
+  saveAnnotations(taskId: string, annotations: ImageAnnotation[], imageSize?: { w: number; h: number }): void;
+  /** Сериализует все размеченные задачи в JSON и выводит в консоль. */
+  exportAllAnnotations(): void;
 }
 
 // ─── Mock-реализация ──────────────────────────────────────────────────────────
@@ -47,8 +50,8 @@ class MockTaskService implements TaskService {
     },
   ];
 
-  // Хранилище в памяти. Реальная реализация будет вызывать API бэкенда.
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
+  private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
   getTasks(): readonly AnnotationTask[] {
     return this.tasks;
@@ -58,8 +61,26 @@ class MockTaskService implements TaskService {
     return this.annotationsMap.get(taskId) ?? [];
   }
 
-  saveAnnotations(taskId: string, annotations: ImageAnnotation[]): void {
+  saveAnnotations(taskId: string, annotations: ImageAnnotation[], imageSize?: { w: number; h: number }): void {
     this.annotationsMap.set(taskId, annotations);
+    if (imageSize) this.imageSizeMap.set(taskId, imageSize);
+  }
+
+  exportAllAnnotations(): void {
+    const output = this.tasks
+      .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)
+      .map(task => {
+        const annotations = this.annotationsMap.get(task.id)!;
+        const size = this.imageSizeMap.get(task.id);
+        if (!size) {
+          // Размер изображения неизвестен — координаты будут в пикселях
+          console.warn(`[taskService] Размер изображения для задачи ${task.id} неизвестен, координаты не нормализованы`);
+          return serializeTaskAnnotations(task.id, annotations, 1, 1);
+        }
+        return serializeTaskAnnotations(task.id, annotations, size.w, size.h);
+      });
+
+    console.log('[taskService] exportAllAnnotations:', JSON.stringify(output, null, 2));
   }
 }
 

@@ -8,6 +8,7 @@ import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService } from '../../services/taskService';
 import { getImageClient } from '../../services/imageClient';
 import type { Tag } from '../../types/annotation';
+import type { AppMode } from '../../types/appMode';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
@@ -19,7 +20,11 @@ const TAGS: Tag[] = [
   { id: 'object', label: 'Объект', color: '#f59e0b', hotkey: '4' },
 ];
 
-export function WorkspacePage() {
+export interface WorkspacePageProps {
+  onModeChange: (mode: AppMode) => void;
+}
+
+export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
   const tasks = taskService.getTasks();
 
   const [taskIndex, setTaskIndex] = useState(0);
@@ -102,6 +107,15 @@ export function WorkspacePage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
+
+        <div className={styles.modeSwitcher}>
+          <button className={styles.modeButton} data-active="true">
+            Разметка
+          </button>
+          <button className={styles.modeButton} onClick={() => onModeChange('validation')}>
+            Валидация
+          </button>
+        </div>
 
         <nav className={styles.taskNav}>
           <button

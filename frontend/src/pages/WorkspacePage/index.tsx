@@ -8,9 +8,11 @@ import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService } from '../../services/taskService';
 import { getImageClient } from '../../services/imageClient';
 import type { Tag } from '../../types/annotation';
+import type { AppMode } from '../../types/appMode';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
+import { ModeSwitcher } from '../../components/ModeSwitcher';
 
 const TAGS: Tag[] = [
   { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
@@ -19,7 +21,11 @@ const TAGS: Tag[] = [
   { id: 'object', label: 'Объект', color: '#f59e0b', hotkey: '4' },
 ];
 
-export function WorkspacePage() {
+export interface WorkspacePageProps {
+  onModeChange: (mode: AppMode) => void;
+}
+
+export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
   const tasks = taskService.getTasks();
 
   const [taskIndex, setTaskIndex] = useState(0);
@@ -35,25 +41,33 @@ export function WorkspacePage() {
   const task = tasks[taskIndex] ?? null;
   const activeTag = TAGS.find(t => t.id === activeTagId) ?? null;
 
-  // Получаем URL изображения при смене задачи
+  // Получаем URL изображения при смене задачи.
+  // cancelled-флаг исключает гонку, когда Promise от предыдущей задачи
+  // разрешается после того, как мы уже перешли к следующей.
   useEffect(() => {
     if (!task) return;
+    let cancelled = false;
+    let resolvedUrl: string | null = null;
+
     setImageUrl(null);
     setImageError(null);
 
     const client = getImageClient(task.locator.source);
-    let resolvedUrl: string | null = null;
 
     client
       .resolve(task.locator)
       .then(url => {
+        if (cancelled) return;
         resolvedUrl = url;
         setImageUrl(url);
       })
-      .catch(err => setImageError(String(err)));
+      .catch(err => {
+        if (cancelled) return;
+        setImageError(String(err));
+      });
 
     return () => {
-      // Освобождаем blob: URL, если клиент их создаёт
+      cancelled = true;
       if (resolvedUrl && client.revoke) {
         client.revoke(resolvedUrl);
       }
@@ -103,6 +117,8 @@ export function WorkspacePage() {
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
 
+        <ModeSwitcher currentMode='annotation' onModeChange={onModeChange} />
+        
         <nav className={styles.taskNav}>
           <button
             className={styles.navButton}

@@ -1,1 +1,1 @@
-export type AppMode = 'annotation' | 'validation';
+export type AppMode = 'auth' | 'annotation' | 'validation';

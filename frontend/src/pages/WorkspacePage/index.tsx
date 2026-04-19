@@ -12,6 +12,7 @@ import type { AppMode } from '../../types/appMode';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
+import { ModeSwitcher } from '../../components/ModeSwitcher';
 
 const TAGS: Tag[] = [
   { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
@@ -116,15 +117,8 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
 
-        <div className={styles.modeSwitcher}>
-          <button className={styles.modeButton} data-active="true">
-            Разметка
-          </button>
-          <button className={styles.modeButton} onClick={() => onModeChange('validation')}>
-            Валидация
-          </button>
-        </div>
-
+        <ModeSwitcher currentMode='annotation' onModeChange={onModeChange} />
+        
         <nav className={styles.taskNav}>
           <button
             className={styles.navButton}

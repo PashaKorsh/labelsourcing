@@ -8,6 +8,7 @@ import type { ValidationVerdict } from '../../types/validationTask';
 import type { Tag } from '../../types/annotation';
 import type { AppMode } from '../../types/appMode';
 import styles from './ValidationPage.module.css';
+import { ModeSwitcher } from '../../components/ModeSwitcher';
 
 // TODO: вынести в общий конфиг, получать с сервера вместе с задачами
 const TAGS: Tag[] = [
@@ -152,7 +153,7 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
       <div className={styles.page}>
         <header className={styles.header}>
           <h1 className={styles.headerTitle}>Label Sourcing</h1>
-          <ModeSwitcherInline onModeChange={onModeChange} />
+          <ModeSwitcher currentMode='validation' onModeChange={onModeChange} />
           <div className={styles.headerRight} />
         </header>
         <div className={styles.doneScreen}>
@@ -170,7 +171,7 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
-        <ModeSwitcherInline onModeChange={onModeChange} />
+        <ModeSwitcher currentMode='validation' onModeChange={onModeChange} />
         <nav className={styles.taskNav}>
           <button
             className={styles.navButton}
@@ -251,19 +252,6 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function ModeSwitcherInline({ onModeChange }: { onModeChange: (mode: AppMode) => void }) {
-  return (
-    <div className={styles.modeSwitcher}>
-      <button className={styles.modeButton} onClick={() => onModeChange('annotation')}>
-        Разметка
-      </button>
-      <button className={styles.modeButton} data-active="true">
-        Валидация
-      </button>
     </div>
   );
 }

@@ -40,25 +40,33 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
   const task = tasks[taskIndex] ?? null;
   const activeTag = TAGS.find(t => t.id === activeTagId) ?? null;
 
-  // Получаем URL изображения при смене задачи
+  // Получаем URL изображения при смене задачи.
+  // cancelled-флаг исключает гонку, когда Promise от предыдущей задачи
+  // разрешается после того, как мы уже перешли к следующей.
   useEffect(() => {
     if (!task) return;
+    let cancelled = false;
+    let resolvedUrl: string | null = null;
+
     setImageUrl(null);
     setImageError(null);
 
     const client = getImageClient(task.locator.source);
-    let resolvedUrl: string | null = null;
 
     client
       .resolve(task.locator)
       .then(url => {
+        if (cancelled) return;
         resolvedUrl = url;
         setImageUrl(url);
       })
-      .catch(err => setImageError(String(err)));
+      .catch(err => {
+        if (cancelled) return;
+        setImageError(String(err));
+      });
 
     return () => {
-      // Освобождаем blob: URL, если клиент их создаёт
+      cancelled = true;
       if (resolvedUrl && client.revoke) {
         client.revoke(resolvedUrl);
       }

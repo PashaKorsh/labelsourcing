@@ -17,41 +17,40 @@ function buildTagStyler(tags: Tag[]) {
   };
 }
 
-// Живёт внутри <Annotorious>. Загружает аннотации и отключает рисование.
-function ReadOnlyController({ annotations }: { annotations: ImageAnnotation[] }) {
+// Живёт внутри <Annotorious>. Устанавливает аннотации однократно при инициализации
+// anno — так же, как AnnotatorController в AnnotationCanvas. Это гарантирует,
+// что setAnnotations вызывается после того, как Annotorious обработал
+// ResizeObserver изображения и зафиксировал систему координат.
+function ReadOnlyController({ initialAnnotations }: { initialAnnotations: ImageAnnotation[] }) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
 
   useEffect(() => {
     if (!anno) return;
     anno.setDrawingEnabled(false);
-  }, [anno]);
-
-  // Перезагружаем аннотации когда anno инициализирован или изменился набор аннотаций
-  useEffect(() => {
-    if (!anno) return;
-    anno.setAnnotations(annotations);
-  }, [anno, annotations]);
+    if (initialAnnotations.length > 0) {
+      anno.setAnnotations(initialAnnotations);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anno]); // только при инициализации anno; initialAnnotations стабильны благодаря key
 
   return null;
 }
 
 export interface ReadOnlyAnnotationCanvasProps {
   imageUrl: string;
-  annotations: ImageAnnotation[];
+  /** Аннотации, вычисленные до монтирования компонента; устанавливаются однократно. */
+  initialAnnotations: ImageAnnotation[];
   tags: Tag[];
-  onImageSizeChange?: (size: { w: number; h: number }) => void;
 }
 
 export function ReadOnlyAnnotationCanvas({
   imageUrl,
-  annotations,
+  initialAnnotations,
   tags,
-  onImageSizeChange,
 }: ReadOnlyAnnotationCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  // В режиме просмотра всегда паним левой кнопкой
-  const panRef = useRef(true);
+  const panRef = useRef(true); // всегда паним левой кнопкой — режима рисования нет
   const { zoom, panX, panY, reset } = useZoomPan(wrapperRef, panRef);
 
   const [originalSize, setOriginalSize] = useState<{ w: number; h: number } | null>(null);
@@ -67,7 +66,6 @@ export function ReadOnlyAnnotationCanvas({
       if (nw === 0 || nh === 0) return;
       const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
       setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
-      onImageSizeChange?.({ w: nw, h: nh });
       obs.disconnect();
     };
 
@@ -80,7 +78,7 @@ export function ReadOnlyAnnotationCanvas({
       obs.disconnect();
       img.removeEventListener('load', measure);
     };
-  }, [imageUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [imageUrl]);
 
   const displayStyle = originalSize
     ? {
@@ -126,7 +124,7 @@ export function ReadOnlyAnnotationCanvas({
               crossOrigin="anonymous"
             />
           </ImageAnnotator>
-          <ReadOnlyController annotations={annotations} />
+          <ReadOnlyController initialAnnotations={initialAnnotations} />
         </Annotorious>
       </div>
     </div>

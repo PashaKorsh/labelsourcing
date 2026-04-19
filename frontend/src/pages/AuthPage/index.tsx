@@ -24,7 +24,7 @@ export function AuthPage({ onModeChange }: AuthPageProps) {
         {
           client_id: '347188b760b2420baacfa596cbc8ce57',
           response_type: 'token',
-          redirect_uri: `${window.location.origin}/suggest/token`,
+          redirect_uri: `${window.location.origin}/suggest/token.html`,
         },
         window.location.origin,
         {
@@ -36,11 +36,12 @@ export function AuthPage({ onModeChange }: AuthPageProps) {
           buttonBorderRadius: 8,
         }
       )
-        .then((result: any) => result.handler())
-        .then((data: any) => {
-          console.log('Успешный вход:', data);
+        .then((result) => result.handler())
+        .then((data) => {
+          console.log('Токен от Яндекса получен');
+          // TODO: отправить data.access_token на бэкенд для валидации
         })
-        .catch((error: any) => {
+        .catch((error: unknown) => {
           console.error('Ошибка входа через Яндекс:', error);
         });
     };

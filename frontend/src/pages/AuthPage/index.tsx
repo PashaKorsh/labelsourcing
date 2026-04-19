@@ -1,67 +1,69 @@
 import React, { useEffect, useRef } from 'react';
 import styles from './AuthPage.module.css';
 import type { AppMode } from '../../types/appMode';
+import { ModeSwitcher } from '../../components/ModeSwitcher';
+
+const CONTAINER_ID = 'yandex-passport-button';
 
 export interface AuthPageProps {
   onModeChange: (mode: AppMode) => void;
 }
 
 export function AuthPage({ onModeChange }: AuthPageProps) {
-  const containerId = 'yandex-passport-button';
   const isInitialized = useRef(false);
 
   useEffect(() => {
-    if (window.YaAuthSuggest && !isInitialized.current) {
+    const script = document.createElement('script');
+    script.src = 'https://yastatic.net/s3/passport-sdk/autofill/v1/sdk-suggest-with-polyfills-latest.js';
+
+    script.onload = () => {
+      if (!window.YaAuthSuggest || isInitialized.current) return;
       isInitialized.current = true;
 
       window.YaAuthSuggest.init(
         {
-          client_id: 'c46f0c53093440c39f12eff95a9f2f93',
+          client_id: '347188b760b2420baacfa596cbc8ce57',
           response_type: 'token',
-          redirect_uri: 'https://examplesite.com/suggest/token',
+          redirect_uri: `${window.location.origin}/suggest/token.html`,
         },
-        'https://examplesite.com',
+        window.location.origin,
         {
           view: 'button',
-          parentId: containerId,
+          parentId: CONTAINER_ID,
           buttonView: 'main',
           buttonTheme: 'light',
           buttonSize: 'm',
-          buttonBorderRadius: 8, // можно подправить под свой дизайн
+          buttonBorderRadius: 8,
         }
       )
-      .then((result: any) => result.handler())
-      .then((data: any) => {
-        console.log('Успешный вход:', data);
-        
-        // Пример использования твоего пропса:
-        // После получения токена меняем режим приложения
-        // onModeChange(AppMode.AUTHORIZED); 
-      })
-      .catch((error: any) => {
-        console.error('Ошибка Яндекса:', error);
-      });
-    }
+        .then((result) => result.handler())
+        .then((data) => {
+          console.log('Токен от Яндекса получен');
+          // TODO: отправить data.access_token на бэкенд для валидации
+        })
+        .catch((error: unknown) => {
+          console.error('Ошибка входа через Яндекс:', error);
+        });
+    };
 
-    // Очистка при уходе со страницы
+    document.head.appendChild(script);
+
     return () => {
+      document.head.removeChild(script);
       isInitialized.current = false;
-      const container = document.getElementById(containerId);
+      const container = document.getElementById(CONTAINER_ID);
       if (container) container.innerHTML = '';
     };
-  }, [onModeChange]); // Добавляем пропс в зависимости для порядка
+  }, []);
 
   return (
-    <div className="validation-page-container">
-      <h1>Вход в систему</h1>
-      
-      {/* 3. Вставляем контейнер туда, где должна быть кнопка */}
-      <div id={containerId} style={{ marginBottom: '20px' }} />
-
-      {/* Твой остальной UI */}
-      {/* <button onClick={() => onModeChange()}>
-        Вернуться назад
-      </button> */}
+    <div className={styles.page}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>Добро пожаловать</h1>
+        <p className={styles.subtitle}>Войдите, чтобы начать разметку</p>
+        <div id={CONTAINER_ID} className={styles.yandexButton} />
+      </div>
+      <ModeSwitcher currentMode='auth' onModeChange={onModeChange} />
     </div>
   );
 }

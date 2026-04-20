@@ -16,7 +16,7 @@ backend/.ruff_cache/
 backend/.venv/
 backend/venv/
 backend/.env
-backend/.env.*
+backend/.env
 
 **/.DS_Store
 **/*.log

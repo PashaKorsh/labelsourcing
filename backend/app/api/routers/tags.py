@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models import Tag, User
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.tag import TagCreate, TagResponse
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/tags", tags=["Tags"])
 
@@ -25,12 +26,18 @@ async def create_tag(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(require_roles(["admin"]))
 ):
-    """Создать новый тег (только для Админов)"""
-    new_tag = Tag(name=tag_in.name)
-    db.add(new_tag)
-    await db.commit()
-    await db.refresh(new_tag)
-    return new_tag
+    try:
+        new_tag = Tag(name=tag_in.name)
+        db.add(new_tag)
+        await db.commit()
+        await db.refresh(new_tag)
+        return new_tag
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Тег с именем '{tag_in.name}' уже существует"
+        )
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tag(

@@ -18,15 +18,27 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Создать новый набор данных (роль: Админ/Менеджер)"""
+    """Создать новый набор данных"""
     new_dataset = Dataset(
         owner_id=current_user.id,
         description=dataset_in.description
     )
     db.add(new_dataset)
+
     await db.commit()
-    await db.refresh(new_dataset)
-    return new_dataset
+
+    stmt = (
+        select(Dataset)
+        .options(selectinload(Dataset.tags))
+        .where(Dataset.id == new_dataset.id)
+    )
+    result = await db.execute(stmt)
+    db_dataset = result.scalar_one()
+
+    db_dataset.tasks_count = 0
+    db_dataset.labeled_count = 0
+
+    return db_dataset
 
 
 @router.get("/", response_model=list[DatasetResponse])

@@ -11,3 +11,7 @@ class TaskResponse(TaskCreate):
     id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+class TaskBatchCreate(BaseModel):
+    dataset_id: uuid.UUID
+    urls: list[str]

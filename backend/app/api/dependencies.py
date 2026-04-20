@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from jose import JWTError, jwt
 
@@ -39,3 +40,25 @@ async def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def require_roles(allowed_roles: list[str]):
+    async def role_checker(
+            current_user: User = Depends(get_current_user),
+            db: AsyncSession = Depends(get_db)
+    ) -> User:
+        stmt = select(User).options(selectinload(User.roles)).where(User.id == current_user.id)
+        result = await db.execute(stmt)
+        user_with_roles = result.scalar_one()
+
+        user_role_names = [role.name for role in user_with_roles.roles]
+
+        # Проверяем пересечение списков
+        if not any(role in allowed_roles for role in user_role_names):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="У вас нет прав для выполнения этой операции"
+            )
+        return user_with_roles
+
+    return role_checker

@@ -78,6 +78,7 @@ class Label(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     data: Mapped[Dict[str, Any]] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String, server_default="pending")
 
     task: Mapped["Task"] = relationship(back_populates="labels")
     user: Mapped["User"] = relationship(back_populates="labels")

@@ -11,3 +11,6 @@ class LabelResponse(LabelCreate):
     user_id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+class LabelStatusUpdate(BaseModel):
+    status: str

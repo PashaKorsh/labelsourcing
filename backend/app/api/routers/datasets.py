@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 import uuid
 
 from app.database import get_db
-from app.models import Dataset, User, Tag
+from app.models import Dataset, User, Tag, Dataset, Task, Label
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 
@@ -46,14 +46,30 @@ async def get_datasets(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Dataset).options(
-        selectinload(Dataset.tags),
-        selectinload(Dataset.tasks)
-    )
-    result = await db.execute(stmt)
-    datasets = result.scalars().all()
+    """Список всех датасетов с актуальными счётчиками"""
 
-    return datasets
+    stmt = (
+        select(
+            Dataset,
+            func.count(Task.id).label("tasks_count"),
+            func.count(Label.id.distinct()).label("labeled_count")
+        )
+        .outerjoin(Task, Dataset.id == Task.dataset_id)
+        .outerjoin(Label, Task.id == Label.task_id)
+        .group_by(Dataset.id)
+        .options(selectinload(Dataset.tags))  # Не забываем подгружать теги
+    )
+
+    result = await db.execute(stmt)
+
+    datasets_with_counts = []
+    for row in result.all():
+        dataset = row[0]
+        dataset.tasks_count = row[1]
+        dataset.labeled_count = row[2]
+        datasets_with_counts.append(dataset)
+
+    return datasets_with_counts
 
 
 @router.get("/{dataset_id}", response_model=DatasetResponse)
@@ -62,11 +78,30 @@ async def get_dataset_detail(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Dataset).options(selectinload(Dataset.tags)).where(Dataset.id == dataset_id)
+    """Деталка датасета со счётчиками"""
+    stmt = (
+        select(
+            Dataset,
+            func.count(Task.id).label("tasks_count"),
+            func.count(Label.id.distinct()).label("labeled_count")
+        )
+        .outerjoin(Task, Dataset.id == Task.dataset_id)
+        .outerjoin(Label, Task.id == Label.task_id)
+        .where(Dataset.id == dataset_id)
+        .group_by(Dataset.id)
+        .options(selectinload(Dataset.tags))
+    )
+
     result = await db.execute(stmt)
-    dataset = result.scalar_one_or_none()
-    if not dataset:
+    row = result.first()
+
+    if not row:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    dataset = row[0]
+    dataset.tasks_count = row[1]
+    dataset.labeled_count = row[2]
+
     return dataset
 
 

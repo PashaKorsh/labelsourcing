@@ -1,0 +1,164 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 48px;
+  background: #141414;
+  border-bottom: 1px solid #2a2a2a;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.headerTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* ── Task navigation ─────────────────────────────── */
+
+.taskNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navButton {
+  padding: 4px 12px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.navButton:hover:not(:disabled) {
+  background: #383838;
+  color: #fff;
+}
+
+.navButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.taskCounter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 13px;
+  color: #ddd;
+  min-width: 160px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.taskIndex {
+  font-size: 10px;
+  color: #888;
+  margin-top: 1px;
+}
+
+/* ── Body layout ─────────────────────────────────── */
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0; /* required: prevents flex children from overflowing */
+}
+
+/* ── Sidebar ─────────────────────────────────────── */
+
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: #141414;
+  border-right: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.divider {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 4px 0;
+}
+
+/* ── Sidebar bottom ──────────────────────────────── */
+
+.sidebarBottom {
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.saveButton {
+  width: 100%;
+  padding: 0;
+  height: 48px;
+  font-size: 15px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 6px;
+  color: #a5b4fc;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.saveButton:hover {
+  background: rgba(99, 102, 241, 0.35);
+  border-color: rgba(99, 102, 241, 0.6);
+  color: #c7d2fe;
+}
+
+.saveButton:active {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* ── Canvas area ─────────────────────────────────── */
+
+.canvasArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.canvasContent {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Loading / error ─────────────────────────────── */
+
+.status {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #888;
+}

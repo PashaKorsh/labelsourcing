@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import styles from './AuthPage.module.css';
 import type { AppMode } from '../../types/appMode';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
@@ -37,7 +37,7 @@ export function AuthPage({ onModeChange }: AuthPageProps) {
         }
       )
         .then((result) => result.handler())
-        .then((data) => {
+        .then((_data) => {
           console.log('Токен от Яндекса получен');
           // TODO: отправить data.access_token на бэкенд для валидации
         })

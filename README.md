@@ -1,5 +1,11 @@
 Запуск docker compose up -d --build
 
-Как тестировать по отдельности хз надо поискать
+Тест frontend:
+cd frontend
+npm install
+npm run dev
+
+Тест backend:
+Хз, так как надо базу тож поднимать
 
 Удачи нам всем!

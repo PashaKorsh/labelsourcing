@@ -1,0 +1,86 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run'
+        required: true
+        type: choice
+        options:
+          - build-and-push
+          - deploy
+
+jobs:
+  build-and-push:
+    name: Build & Push to Registry
+    if: ${{ github.event.inputs.job == 'build-and-push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Yandex Cloud Container Registry
+        uses: yc-actions/yc-cr-login@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-backend:latest
+          cache-from: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-backend:cache
+          cache-to: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-backend:cache,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:latest
+          cache-from: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:cache
+          cache-to: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:cache,mode=max
+
+  # deploy:
+  #   name: Deploy to Server
+  #   if: ${{ github.event.inputs.job == 'deploy' }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+
+  #     - name: Copy docker-compose and configs to server
+  #       uses: appleboy/scp-action@v0.1.7
+  #       with:
+  #         host: ${{ secrets.SSH_HOST }}
+  #         username: ${{ secrets.SSH_USER }}
+  #         key: ${{ secrets.SSH_PRIVATE_KEY }}
+  #         port: 22
+  #         source: "docker-compose.prod.yml,nginx/"
+  #         target: ${{ secrets.DEPLOY_PATH }}
+
+  #     - name: Deploy via SSH
+  #       uses: appleboy/ssh-action@v1.0.3
+  #       with:
+  #         host: ${{ secrets.SSH_HOST }}
+  #         username: ${{ secrets.SSH_USER }}
+  #         key: ${{ secrets.SSH_PRIVATE_KEY }}
+  #         port: 22
+  #         script: |
+  #           cd ${{ secrets.DEPLOY_PATH }}
+
+  #           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} \
+  #             -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+
+  #           docker compose -f docker-compose.prod.yml down --remove-orphans
+
+  #           docker compose -f docker-compose.prod.yml pull
+
+  #           docker compose -f docker-compose.prod.yml up -d
+
+  #           docker image prune -f

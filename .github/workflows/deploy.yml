@@ -46,41 +46,50 @@ jobs:
           cache-from: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:cache
           cache-to: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:cache,mode=max
 
-  # deploy:
-  #   name: Deploy to Server
-  #   if: ${{ github.event.inputs.job == 'deploy' }}
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
+  deploy:
+    name: Deploy to Server
+    if: ${{ github.event.inputs.job == 'deploy' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  #     - name: Copy docker-compose and configs to server
-  #       uses: appleboy/scp-action@v0.1.7
-  #       with:
-  #         host: ${{ secrets.SSH_HOST }}
-  #         username: ${{ secrets.SSH_USER }}
-  #         key: ${{ secrets.SSH_PRIVATE_KEY }}
-  #         port: 22
-  #         source: "docker-compose.prod.yml,nginx/"
-  #         target: ${{ secrets.DEPLOY_PATH }}
+      - name: Copy docker-compose and configs to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          source: "docker-compose.prod.yml,nginx/"
+          target: ${{ secrets.DEPLOY_PATH }}
 
-  #     - name: Deploy via SSH
-  #       uses: appleboy/ssh-action@v1.0.3
-  #       with:
-  #         host: ${{ secrets.SSH_HOST }}
-  #         username: ${{ secrets.SSH_USER }}
-  #         key: ${{ secrets.SSH_PRIVATE_KEY }}
-  #         port: 22
-  #         script: |
-  #           cd ${{ secrets.DEPLOY_PATH }}
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          YC_SA_JSON: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          YC_REGISTRY_ID: ${{ secrets.YC_REGISTRY_ID }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          envs: YC_SA_JSON,YC_REGISTRY_ID,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,SECRET_KEY
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
 
-  #           echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} \
-  #             -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin
+            echo "$YC_SA_JSON" | docker login --username json_key --password-stdin cr.yandex
 
-  #           docker compose -f docker-compose.prod.yml down --remove-orphans
+            export YC_REGISTRY_ID POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY
 
-  #           docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml down --remove-orphans
 
-  #           docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml pull
 
-  #           docker image prune -f
+            docker compose -f docker-compose.prod.yml up -d
+
+            docker image prune -f

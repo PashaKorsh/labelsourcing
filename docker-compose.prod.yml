@@ -17,8 +17,9 @@ services:
     image: cr.yandex/${YC_REGISTRY_ID}/labelsourcing-backend:latest
     expose:
       - "8000"
-    env_file:
-      - ./backend.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY}
     depends_on:
       db:
         condition: service_healthy

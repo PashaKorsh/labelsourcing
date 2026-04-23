@@ -10,6 +10,8 @@ on:
         options:
           - build-and-push
           - deploy
+          - start-vm
+          - stop-vm
 
 jobs:
   build-and-push:
@@ -95,3 +97,29 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d
 
             docker image prune -f
+
+  start-vm:
+    name: Start Host VM
+    if: ${{ github.event.inputs.job == 'start-vm' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Yandex Cloud VM
+        uses: yc-actions/yc-github-runner@v1
+        with:
+          mode: start
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+          instance-id: ${{ secrets.YC_INSTANCE_ID }}
+
+  stop-vm:
+    name: Stop Host VM
+    if: ${{ github.event.inputs.job == 'stop-vm' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop Yandex Cloud VM
+        uses: yc-actions/yc-github-runner@v1
+        with:
+          mode: stop
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          folder-id: ${{ secrets.YC_FOLDER_ID }}
+          instance-id: ${{ secrets.YC_INSTANCE_ID }}

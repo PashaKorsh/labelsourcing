@@ -4,7 +4,8 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 // Все маршруты бэкенда в одном месте.
 export const API = {
   auth: {
-    login: () => `${API_BASE}/api/auth/login`,
+    login:           () => `${API_BASE}/api/auth/login`,
+    yandexCallback:  () => `${API_BASE}/api/auth/yandex/callback`,
   },
   users: {
     me:     () => `${API_BASE}/api/users/me`,

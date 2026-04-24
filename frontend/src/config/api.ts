@@ -5,6 +5,7 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 export const API = {
   auth: {
     login:           () => `${API_BASE}/api/auth/login`,
+    yandexLogin:     () => `${API_BASE}/api/auth/yandex/login`,
     yandexCallback:  () => `${API_BASE}/api/auth/yandex/callback`,
   },
   users: {

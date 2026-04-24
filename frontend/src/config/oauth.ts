@@ -3,7 +3,7 @@ const clientId = (import.meta.env.VITE_YANDEX_CLIENT_ID as string | undefined)
 
 // Если не задан — Яндекс использует redirect_uri из настроек приложения
 const redirectUri = (import.meta.env.VITE_YANDEX_REDIRECT_URI as string | undefined)
-  ?? 'http://localhost:5174/suggest/token.html'
+  ?? 'http://localhost/suggest/token.html'
 
 export const YANDEX_OAUTH = {
   clientId,

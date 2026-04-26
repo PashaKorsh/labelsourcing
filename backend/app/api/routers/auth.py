@@ -129,5 +129,13 @@ async def yandex_callback(
         await db.refresh(user)
 
     access_token = create_access_token(data={"sub": str(user.id)})
-    sep = "&" if "?" in success_url else "?"
-    return RedirectResponse(f"{success_url}{sep}token={access_token}")
+    response = RedirectResponse(success_url)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    return response

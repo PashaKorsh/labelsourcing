@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import styles from './AuthPage.module.css';
 import type { AppMode } from '../../types/appMode';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { API } from '../../config/api';
+import { API, apiFetch } from '../../config/api';
+import { ROUTES } from '../../config/routes';
 
 export interface AuthPageProps {
   onModeChange: (mode: AppMode) => void;
@@ -13,19 +14,17 @@ export function AuthPage({ onModeChange }: AuthPageProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    if (token) {
-      localStorage.setItem('access_token', token);
-      window.history.replaceState({}, '', '/login');
-      navigate('/');
-    }
+    // После OAuth-редиректа бэкенд ставит куку и возвращает на /login.
+    // Проверяем сессию: если кука уже есть — пускаем в приложение.
+    apiFetch(API.users.me())
+      .then(() => navigate(ROUTES.home))
+      .catch(() => {/* не авторизован — показываем кнопку */});
   }, [navigate]);
 
   const handleLogin = () => {
     const params = new URLSearchParams({
-      success_url: `${window.location.origin}/login`,
-      error_url: `${window.location.origin}/login`,
+      success_url: `${window.location.origin}${ROUTES.login}`,
+      error_url: `${window.location.origin}${ROUTES.login}`,
     });
     window.location.href = `${API.auth.yandexLogin()}?${params}`;
   };

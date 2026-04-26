@@ -39,12 +39,11 @@ export const API = {
 
 // Обёртка fetch с автоматической подстановкой JWT-токена из localStorage.
 export async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
-  const token = localStorage.getItem('access_token');
   const res = await fetch(url, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
   });

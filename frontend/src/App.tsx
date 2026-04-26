@@ -4,6 +4,7 @@ import { WorkspacePage } from './pages/WorkspacePage';
 import { ValidationPage } from './pages/ValidationPage';
 import { AuthPage } from './pages/AuthPage';
 import type { AppMode } from './types/appMode';
+import { ROUTES } from './config/routes';
 import styles from './App.module.css';
 
 function MainPage() {
@@ -13,7 +14,7 @@ function MainPage() {
 
   const handleModeChange = (newMode: AppMode) => {
     if (newMode === 'auth') {
-      navigate('/login');
+      navigate(ROUTES.login);
     } else {
       setMode(newMode);
     }
@@ -30,7 +31,7 @@ function LoginPage() {
   const navigate = useNavigate();
   return (
     <div className={styles.root}>
-      <AuthPage onModeChange={(mode) => mode !== 'auth' && navigate('/')} />
+      <AuthPage onModeChange={(mode) => mode !== 'auth' && navigate(ROUTES.home)} />
     </div>
   );
 }
@@ -39,9 +40,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<MainPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path={ROUTES.login} element={<LoginPage />} />
+        <Route path={ROUTES.home} element={<MainPage />} />
+        <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
       </Routes>
     </BrowserRouter>
   );

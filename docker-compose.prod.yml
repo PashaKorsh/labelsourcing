@@ -25,16 +25,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  frontend:
-    image: cr.yandex/${YC_REGISTRY_ID}/labelsourcing-frontend:latest
-    expose:
-      - "3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
   nginx:
-    image: nginx:alpine
+    image: cr.yandex/${YC_REGISTRY_ID}/labelsourcing-frontend:latest
     ports:
       - "80:80"
       - "443:443"
@@ -44,7 +36,6 @@ services:
       - ./certbot/conf:/etc/letsencrypt
     depends_on:
       - backend
-      - frontend
     restart: unless-stopped
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
 

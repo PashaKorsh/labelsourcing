@@ -1,38 +1,36 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import type { AnnotationTask } from '../types/task';
-import { serializeTaskAnnotations } from './annotationSerializer';
+import type { AnnotationTask } from '../../types/task';
+import type { TaskService } from './TaskService';
+import { serializeTaskAnnotations } from '../../utils/annotationSerializer';
 
-// Управляет очередью задач разметки и хранит аннотации для каждой задачи.
-// Навигация (текущий индекс) намеренно оставлена в React-компоненте.
-// Для реальных запросов к API используйте annotationApi.ts.
-export interface TaskService {
-  getTasks(): readonly AnnotationTask[];
-  getAnnotations(taskId: string): ImageAnnotation[];
-  saveAnnotations(taskId: string, annotations: ImageAnnotation[], imageSize?: { w: number; h: number }): void;
-  exportAllAnnotations(): void;
-}
+export const MOCK_DATASET_ID = 'mock-dataset';
 
-class MockTaskService implements TaskService {
+export class MockTaskService implements TaskService {
   private readonly tasks: AnnotationTask[] = [
     {
       id: 'task-1',
-      datasetId: 'mock-dataset',
+      datasetId: MOCK_DATASET_ID,
       imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png',
     },
     {
       id: 'task-2',
-      datasetId: 'mock-dataset',
+      datasetId: MOCK_DATASET_ID,
       imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/3840px-React-icon.svg.png',
     },
     {
       id: 'task-3',
-      datasetId: 'mock-dataset',
+      datasetId: MOCK_DATASET_ID,
       imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Docker_%28container_engine%29_logo.svg/1920px-Docker_%28container_engine%29_logo.svg.png',
     },
   ];
 
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
+
+  // Все задачи предзагружены — loadNextTask возвращает null.
+  async loadNextTask(_datasetId: string): Promise<AnnotationTask | null> {
+    return null;
+  }
 
   getTasks(): readonly AnnotationTask[] {
     return this.tasks;
@@ -42,7 +40,11 @@ class MockTaskService implements TaskService {
     return this.annotationsMap.get(taskId) ?? [];
   }
 
-  saveAnnotations(taskId: string, annotations: ImageAnnotation[], imageSize?: { w: number; h: number }): void {
+  async saveAnnotations(
+    taskId: string,
+    annotations: ImageAnnotation[],
+    imageSize?: { w: number; h: number },
+  ): Promise<void> {
     this.annotationsMap.set(taskId, annotations);
     if (imageSize) this.imageSizeMap.set(taskId, imageSize);
   }
@@ -54,14 +56,11 @@ class MockTaskService implements TaskService {
         const annotations = this.annotationsMap.get(task.id)!;
         const size = this.imageSizeMap.get(task.id);
         if (!size) {
-          console.warn(`[taskService] Размер изображения для задачи ${task.id} неизвестен, координаты не нормализованы`);
+          console.warn(`[MockTaskService] Размер изображения для задачи ${task.id} неизвестен`);
           return serializeTaskAnnotations(task.id, annotations, 1, 1);
         }
         return serializeTaskAnnotations(task.id, annotations, size.w, size.h);
       });
-
-    console.log('[taskService] exportAllAnnotations:', JSON.stringify(output, null, 2));
+    console.log('[MockTaskService] exportAllAnnotations:', JSON.stringify(output, null, 2));
   }
 }
-
-export const taskService: TaskService = new MockTaskService();

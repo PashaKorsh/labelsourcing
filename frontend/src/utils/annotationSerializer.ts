@@ -17,7 +17,7 @@ export interface SerializedTaskResult {
 }
 
 // Конвертирует аннотации одной задачи в формат для отправки.
-// imageW / imageH — натуральные размеры изображения (в пикселях),
+// imageW / imageH — натуральные размеры изображения в пикселях,
 // используются для нормализации координат в диапазон [0, 1].
 export function serializeTaskAnnotations(
   taskId: string,

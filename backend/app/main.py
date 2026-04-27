@@ -18,6 +18,7 @@ app = FastAPI(
     description="API для краудсорсинговой платформы разметки данных",
     version="0.1.0",
     lifespan=lifespan,
+    root_path="/api",
 )
 
 app.add_middleware(
@@ -28,13 +29,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/api")
-app.include_router(datasets.router, prefix="/api")
-app.include_router(tasks.router, prefix="/api")
-app.include_router(labels.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(tags.router, prefix="/api")
+app.include_router(auth.router)
+app.include_router(datasets.router)
+app.include_router(tasks.router)
+app.include_router(labels.router)
+app.include_router(users.router)
+app.include_router(tags.router)
 
-@app.get("/api/health", tags=["System"])
+@app.get("/health", tags=["System"])
 async def health_check():
     return {"status": "ok", "service": "labelsourcing-backend"}

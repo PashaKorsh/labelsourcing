@@ -1,0 +1,139 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run'
+        required: true
+        type: choice
+        options:
+          - build-and-push
+          - deploy
+          - start-vm
+          - stop-vm
+
+jobs:
+  build-and-push:
+    name: Build & Push to Registry
+    if: ${{ github.event.inputs.job == 'build-and-push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to Yandex Cloud Container Registry
+        uses: yc-actions/yc-cr-login@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-backend:latest
+          cache-from: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-backend:cache
+          cache-to: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-backend:cache,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:latest
+          cache-from: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:cache
+          cache-to: type=registry,ref=cr.yandex/${{ secrets.YC_REGISTRY_ID }}/labelsourcing-frontend:cache,mode=max
+
+  deploy:
+    name: Deploy to Server
+    if: ${{ github.event.inputs.job == 'deploy' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy docker-compose and configs to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          source: "docker-compose.prod.yml,nginx/"
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          YC_SA_JSON: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          YC_REGISTRY_ID: ${{ secrets.YC_REGISTRY_ID }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          envs: YC_SA_JSON,YC_REGISTRY_ID,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,SECRET_KEY
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "$YC_SA_JSON" | docker login --username json_key --password-stdin cr.yandex
+
+            export YC_REGISTRY_ID POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY
+
+            docker compose -f docker-compose.prod.yml down --remove-orphans
+
+            docker compose -f docker-compose.prod.yml pull -q
+
+            docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+
+            docker compose -f docker-compose.prod.yml up -d
+
+            docker image prune -f
+
+  start-vm:
+    name: Start Host VM
+    if: ${{ github.event.inputs.job == 'start-vm' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i ~/yc -n
+          echo "$HOME/yc/bin" >> $GITHUB_PATH
+
+      - name: Authenticate
+        run: |
+          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > sa-key.json
+          ~/yc/bin/yc config set service-account-key sa-key.json
+          ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+
+      - name: Start VM
+        run: |
+          ~/yc/bin/yc compute instance start ${{ secrets.YC_INSTANCE_ID }}
+
+  stop-vm:
+    name: Stop Host VM
+    if: ${{ github.event.inputs.job == 'stop-vm' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i ~/yc -n
+          echo "$HOME/yc/bin" >> $GITHUB_PATH
+
+      - name: Authenticate
+        run: |
+          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > sa-key.json
+          ~/yc/bin/yc config set service-account-key sa-key.json
+          ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+
+      - name: Stop VM
+        run: |
+          ~/yc/bin/yc compute instance stop ${{ secrets.YC_INSTANCE_ID }}

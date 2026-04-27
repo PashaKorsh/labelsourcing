@@ -1,17 +1,7 @@
-import type { ValidationTask, ValidationVerdict, ValidationResult } from '../types/validationTask';
+import type { ValidationTask, ValidationVerdict, ValidationResult } from '../../types/validationTask';
+import type { ValidationService } from './ValidationService';
 
-// Управляет очередью задач валидации и хранит вердикты.
-// Для реальных данных нужен эндпоинт GET /api/labels/task/{id} на бэкенде
-// (сейчас не реализован). После появления — создать ApiValidationService.
-export interface ValidationService {
-  getTasks(): readonly ValidationTask[];
-  setVerdict(taskId: string, verdict: ValidationVerdict): void;
-  getVerdict(taskId: string): ValidationVerdict | null;
-  getResults(): ValidationResult[];
-  submit(): Promise<void>;
-}
-
-class MockValidationService implements ValidationService {
+export class MockValidationService implements ValidationService {
   private readonly tasks: ValidationTask[] = [
     {
       id: 'val-1',
@@ -72,11 +62,6 @@ class MockValidationService implements ValidationService {
   }
 
   async submit(): Promise<void> {
-    const results = this.getResults();
-    console.log('[validationService] Результаты валидации:', JSON.stringify(results, null, 2));
-    // TODO: вызвать updateLabelStatus из annotationApi для каждого результата
-    // (требует хранения labelId вместе с задачей)
+    console.log('[MockValidationService] Результаты валидации:', JSON.stringify(this.getResults(), null, 2));
   }
 }
-
-export const validationService: ValidationService = new MockValidationService();

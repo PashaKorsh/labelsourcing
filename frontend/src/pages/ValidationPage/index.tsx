@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { ReadOnlyAnnotationCanvas } from '../../components/ReadOnlyAnnotationCanvas';
-import { validationService } from '../../services/validationService';
-import { deserializeAnnotations } from '../../services/annotationDeserializer';
+import { validationService } from '../../services';
+import { deserializeAnnotations } from '../../utils/annotationDeserializer';
 import type { ValidationVerdict } from '../../types/validationTask';
 import type { Tag } from '../../types/annotation';
-import type { AppMode } from '../../types/appMode';
 import styles from './ValidationPage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 
@@ -26,11 +25,7 @@ interface ReadyTaskData {
   initialAnnotations: ImageAnnotation[];
 }
 
-export interface ValidationPageProps {
-  onModeChange: (mode: AppMode) => void;
-}
-
-export function ValidationPage({ onModeChange }: ValidationPageProps) {
+export function ValidationPage() {
   const tasks = validationService.getTasks();
 
   const [taskIndex, setTaskIndex] = useState(0);
@@ -130,7 +125,7 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
       <div className={styles.page}>
         <header className={styles.header}>
           <h1 className={styles.headerTitle}>Label Sourcing</h1>
-          <ModeSwitcher currentMode='validation' onModeChange={onModeChange} />
+          <ModeSwitcher />
           <div className={styles.headerRight} />
         </header>
         <div className={styles.doneScreen}>
@@ -148,7 +143,7 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
-        <ModeSwitcher currentMode='validation' onModeChange={onModeChange} />
+        <ModeSwitcher />
         <nav className={styles.taskNav}>
           <button
             className={styles.navButton}

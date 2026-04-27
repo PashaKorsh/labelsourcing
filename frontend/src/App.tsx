@@ -1,23 +1,20 @@
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { WorkspacePage } from './pages/WorkspacePage';
 import { ValidationPage } from './pages/ValidationPage';
-import type { AppMode } from './types/appMode';
-import styles from './App.module.css';
 import { AuthPage } from './pages/AuthPage';
-
-const PAGES: Record<AppMode, React.ComponentType<{ onModeChange: (mode: AppMode) => void }>> = {
-  annotation: WorkspacePage,
-  validation: ValidationPage,
-  auth: AuthPage,
-};
+import styles from './App.module.css';
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>('annotation');
-  const CurrentPage = PAGES[mode] || WorkspacePage;
-
   return (
-    <div className={styles.root}>
-      <CurrentPage onModeChange={setMode} />
-    </div>
+    <BrowserRouter>
+      <div className={styles.root}>
+        <Routes>
+          <Route path="/auth"                       element={<AuthPage />} />
+          <Route path="/workspace/:datasetId"       element={<WorkspacePage />} />
+          <Route path="/validation/:datasetId"      element={<ValidationPage />} />
+          <Route path="*"                           element={<Navigate to="/auth" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }

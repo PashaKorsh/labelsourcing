@@ -1,15 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import styles from './AuthPage.module.css';
-import type { AppMode } from '../../types/appMode';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 
 const CONTAINER_ID = 'yandex-passport-button';
 
-export interface AuthPageProps {
-  onModeChange: (mode: AppMode) => void;
-}
-
-export function AuthPage({ onModeChange }: AuthPageProps) {
+export function AuthPage() {
   const isInitialized = useRef(false);
 
   useEffect(() => {
@@ -37,9 +32,9 @@ export function AuthPage({ onModeChange }: AuthPageProps) {
         }
       )
         .then((result) => result.handler())
-        .then((data) => {
+        .then((_data) => {
           console.log('Токен от Яндекса получен');
-          // TODO: отправить data.access_token на бэкенд для валидации
+          // TODO: отправить _data.access_token на бэкенд для валидации
         })
         .catch((error: unknown) => {
           console.error('Ошибка входа через Яндекс:', error);
@@ -63,7 +58,7 @@ export function AuthPage({ onModeChange }: AuthPageProps) {
         <p className={styles.subtitle}>Войдите, чтобы начать разметку</p>
         <div id={CONTAINER_ID} className={styles.yandexButton} />
       </div>
-      <ModeSwitcher currentMode='auth' onModeChange={onModeChange} />
+      <ModeSwitcher />
     </div>
   );
 }

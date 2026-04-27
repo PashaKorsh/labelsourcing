@@ -1,15 +1,18 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styles from './AuthPage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { API, apiFetch } from '../../config/api';
 import { ROUTES } from '../../config/routes';
 
 export function AuthPage() {
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Если кука сессии уже есть — пользователь авторизован.
-    // TODO: перенаправить на страницу выбора датасета после её реализации.
-    apiFetch(API.users.me()).catch(() => { /* не авторизован — остаёмся на странице входа */ });
-  }, []);
+    apiFetch(API.users.me())
+      .then(() => navigate(ROUTES.home, { replace: true }))
+      .catch(() => { /* не авторизован — показываем кнопку */ });
+  }, [navigate]);
 
   const handleLogin = () => {
     const params = new URLSearchParams({

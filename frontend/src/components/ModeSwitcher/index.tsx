@@ -1,7 +1,7 @@
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import type { AppMode } from '../../types/appMode';
 import { MOCK_DATASET_ID } from '../../services/task/MockTaskService';
-import { ROUTES } from '../../config/routes';
+import { ROUTES, buildRoute } from '../../config/routes';
 import styles from './ModeSwitcher.module.css';
 
 const MODES: { id: AppMode; label: string }[] = [
@@ -11,8 +11,8 @@ const MODES: { id: AppMode; label: string }[] = [
 ];
 
 function pathToMode(pathname: string): AppMode {
-  if (pathname.startsWith('/workspace')) return 'annotation';
-  if (pathname.startsWith('/validation')) return 'validation';
+  if (pathname.startsWith('/dataset') && pathname.endsWith('/validation')) return 'validation';
+  if (pathname.startsWith('/dataset')) return 'annotation';
   return 'auth';
 }
 
@@ -26,13 +26,14 @@ export function ModeSwitcher() {
   const { pathname } = useLocation();
 
   const currentMode = pathToMode(pathname);
-  // Если datasetId нет в URL (например, на /auth) — используем мок.
+  // Если datasetId нет в URL (например, на /login) — используем мок.
   const targetDatasetId = datasetId ?? MOCK_DATASET_ID;
 
   const handleClick = (mode: AppMode) => {
     if (mode === currentMode) return;
     if (mode === 'auth') { navigate(ROUTES.login); return; }
-    navigate(mode === 'annotation' ? `/workspace/${targetDatasetId}` : `/validation/${targetDatasetId}`);
+    const route = mode === 'annotation' ? ROUTES.datasetAnnotation : ROUTES.datasetValidation;
+    navigate(buildRoute(route, { datasetId: targetDatasetId }));
   };
 
   return (

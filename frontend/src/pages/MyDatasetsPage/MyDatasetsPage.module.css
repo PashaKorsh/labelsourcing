@@ -1,0 +1,89 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 36px 0;
+}
+
+.content {
+  margin: 0 auto;
+  width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: white;
+  border-radius: 24px;
+}
+
+.image {
+  height: 80px;
+  width: 128px;
+  object-fit: cover;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 18px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.meta {
+  font-size: 13px;
+  color: #6f6f6f;
+  margin: 0;
+}
+
+.editButton {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.editButton:hover {
+  background: #e8e8e8;
+}
+
+.createButton {
+  align-self: stretch;
+  padding: 16px;
+  background: white;
+  border: 2px dashed #d0d0d0;
+  border-radius: 24px;
+  font-size: 16px;
+  color: #6f6f6f;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.createButton:hover {
+  border-color: #aaa;
+  color: #333;
+}

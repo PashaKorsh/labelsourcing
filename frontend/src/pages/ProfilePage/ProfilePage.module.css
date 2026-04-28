@@ -1,0 +1,72 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 36px 0;
+}
+
+.content {
+  margin: 0 auto;
+  width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  border-radius: 24px;
+  padding: 32px;
+  align-self: stretch;
+}
+
+.avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.name {
+  font-size: 24px;
+  line-height: 1;
+  margin: 0;
+}
+
+.email {
+  font-size: 14px;
+  color: #6f6f6f;
+  margin: 0;
+}
+
+.stats {
+  display: flex;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.statCard {
+  flex: 1;
+  background: white;
+  border-radius: 24px;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.statValue {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 13px;
+  color: #6f6f6f;
+}

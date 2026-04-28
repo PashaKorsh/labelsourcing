@@ -1,8 +1,13 @@
 export const ROUTES = {
-  login:               '/login',
-  home:                '/datasets',
-  datasetAnnotation:   '/dataset/:datasetId',
-  datasetValidation:   '/dataset/:datasetId/validation',
+  login:             '/login',
+  home:              '/datasets',
+  profile:           '/profile',
+  myDatasets:        '/my_datasets',
+  datasetNew:        '/dataset/new',
+  datasetAnnotation: '/dataset/:datasetId',
+  datasetValidation: '/dataset/:datasetId/validation',
+  users:             '/users',
+  tags:              '/tags',
 } as const;
 
 /** Подставляет параметры в шаблон маршрута. */

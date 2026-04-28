@@ -1,10 +1,10 @@
-import { type Tag } from './tag'
+import { type Role } from './role'
 
 export type Dataset = {
   id: number
   title: string
   description: string
-  tags: Tag[]
+  tags: Role[]
   imageUrl: string
   completed?: boolean
 }

@@ -1,0 +1,57 @@
+.card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  align-self: stretch;
+  background: white;
+  border-radius: 24px;
+}
+
+.image {
+  height: 128px;
+  width: 204px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  align-self: stretch;
+}
+
+.textGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.description {
+  font-size: 16px;
+  line-height: 19px;
+  white-space: pre-line;
+}
+
+.footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.tags {
+  display: flex;
+  gap: 4px;
+}
+
+.dimmed {
+  opacity: 0.7;
+}

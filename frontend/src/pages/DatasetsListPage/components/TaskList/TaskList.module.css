@@ -1,0 +1,6 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 8px;
+}

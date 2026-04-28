@@ -5,12 +5,14 @@ import { ROUTES, buildRoute } from '../../config/routes';
 import styles from './ModeSwitcher.module.css';
 
 const MODES: { id: AppMode; label: string }[] = [
-  { id: 'auth', label: 'Вход' },
+  { id: 'auth',       label: 'Вход' },
+  { id: 'datasets',   label: 'Датасеты' },
   { id: 'annotation', label: 'Аннотирование' },
   { id: 'validation', label: 'Валидация' },
 ];
 
 function pathToMode(pathname: string): AppMode {
+  if (pathname === ROUTES.home) return 'datasets';
   if (pathname.startsWith('/dataset') && pathname.endsWith('/validation')) return 'validation';
   if (pathname.startsWith('/dataset')) return 'annotation';
   return 'auth';
@@ -31,7 +33,8 @@ export function ModeSwitcher() {
 
   const handleClick = (mode: AppMode) => {
     if (mode === currentMode) return;
-    if (mode === 'auth') { navigate(ROUTES.login); return; }
+    if (mode === 'auth')     { navigate(ROUTES.login); return; }
+    if (mode === 'datasets') { navigate(ROUTES.home);  return; }
     const route = mode === 'annotation' ? ROUTES.datasetAnnotation : ROUTES.datasetValidation;
     navigate(buildRoute(route, { datasetId: targetDatasetId }));
   };

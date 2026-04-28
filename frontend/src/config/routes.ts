@@ -1,6 +1,6 @@
 export const ROUTES = {
   login:               '/login',
-  home:                '/',
+  home:                '/datasets',
   datasetAnnotation:   '/dataset/:datasetId',
   datasetValidation:   '/dataset/:datasetId/validation',
 } as const;

@@ -1,12 +1,12 @@
-import React from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { SearchBar } from '../../components/SearchBar';
-import { TaskList } from '../../components/TaskList';
+import { ModeSwitcher } from '../../components/ModeSwitcher';
+import { TaskList } from './components/TaskList';
 import type { Dataset } from '../../types/dataset';
-import type { Tag } from '../../types/tag';
+import type { Role } from '../../types/role';
 
-const medic: Tag = { name: 'Медик', color: '#eb5757' }
-const user: Tag = { name: 'Пользователь', color: '#d9d9d9'}
+const medic: Role = { name: 'Медик', color: '#eb5757' };
+const user: Role  = { name: 'Пользователь', color: '#d9d9d9' };
 
 const datasets: Dataset[] = [
   {
@@ -44,6 +44,7 @@ export function DatasetsListPage() {
   return (
     <main className="min-h-screen bg-[#f5f5f5] py-[36px]">
       <div className="mx-auto flex w-[700px] flex-col gap-[8px] items-center">
+        <ModeSwitcher />
         <PageHeader
           title="Задания"
           avatarUrl="https://picsum.photos/seed/labelsourcing-avatar/80/80"

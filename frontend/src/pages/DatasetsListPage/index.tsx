@@ -45,10 +45,7 @@ export function DatasetsListPage() {
     <main className="min-h-screen bg-[#f5f5f5] py-[36px]">
       <div className="mx-auto flex w-[700px] flex-col gap-[8px] items-center">
         <ModeSwitcher />
-        <PageHeader
-          title="Задания"
-          avatarUrl="https://picsum.photos/seed/labelsourcing-avatar/80/80"
-        />
+        <PageHeader />
         <SearchBar />
         <TaskList tasks={datasets} />
       </div>

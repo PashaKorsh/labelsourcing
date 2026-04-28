@@ -8,15 +8,29 @@
   width: fit-content;
 }
 
-.titleChip {
-  background: #f5f5f5;
+.chip {
   padding: 8px 16px;
   border-radius: 20px;
-}
-
-.titleText {
   font-size: 20px;
   line-height: 1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.chip:hover {
+  background: #ebebeb;
+}
+
+.chipActive {
+  background: #f5f5f5;
+}
+
+.chipActive:hover {
+  background: #f5f5f5;
 }
 
 .avatarWrapper {
@@ -26,6 +40,10 @@
   height: 40px;
   width: 40px;
   border-radius: 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
   transition: box-shadow 150ms;
 }
 

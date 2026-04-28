@@ -5,8 +5,6 @@ import { RoleBadge } from '../../components/RoleBadge';
 import type { Role } from '../../types/role';
 import styles from './UsersPage.module.css';
 
-const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-avatar/80/80';
-
 interface MockUser {
   id: number;
   name: string;
@@ -47,7 +45,7 @@ export function UsersPage() {
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
-        <PageHeader title="Пользователи" avatarUrl={AVATAR_URL} />
+        <PageHeader />
         <SearchBar />
 
         <section className={styles.list}>

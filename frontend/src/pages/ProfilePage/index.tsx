@@ -4,7 +4,7 @@ import { RoleBadge } from '../../components/RoleBadge';
 import type { Role } from '../../types/role';
 import styles from './ProfilePage.module.css';
 
-const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-profile/200/200';
+const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-avatar/80/80';
 
 const MOCK_ROLE: Role = { name: 'Медик', color: '#eb5757' };
 
@@ -13,7 +13,7 @@ export function ProfilePage() {
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
-        <PageHeader title="Профиль" avatarUrl={AVATAR_URL} />
+        <PageHeader />
 
         <div className={styles.card}>
           <img src={AVATAR_URL} alt="Аватар пользователя" className={styles.avatar} />

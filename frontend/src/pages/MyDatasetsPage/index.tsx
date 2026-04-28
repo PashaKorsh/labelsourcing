@@ -1,9 +1,9 @@
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { SearchBar } from '../../components/SearchBar';
+import { ROUTES } from '../../config/routes';
 import styles from './MyDatasetsPage.module.css';
-
-const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-avatar/80/80';
 
 const MOCK_DATASETS = [
   {
@@ -30,11 +30,13 @@ const MOCK_DATASETS = [
 ];
 
 export function MyDatasetsPage() {
+  const navigate = useNavigate();
+
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
-        <PageHeader title="Мои датасеты" avatarUrl={AVATAR_URL} />
+        <PageHeader />
         <SearchBar />
 
         <section className={styles.list}>
@@ -52,7 +54,13 @@ export function MyDatasetsPage() {
           ))}
         </section>
 
-        <button type="button" className={styles.createButton}>+ Создать датасет</button>
+        <button
+          type="button"
+          className={styles.createButton}
+          onClick={() => navigate(ROUTES.datasetNew)}
+        >
+          + Создать датасет
+        </button>
       </div>
     </main>
   );

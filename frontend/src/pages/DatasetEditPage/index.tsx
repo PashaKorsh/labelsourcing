@@ -4,8 +4,6 @@ import { RoleBadge } from '../../components/RoleBadge';
 import type { Role } from '../../types/role';
 import styles from './DatasetEditPage.module.css';
 
-const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-avatar/80/80';
-
 const AVAILABLE_ROLES: Role[] = [
   { name: 'Медик', color: '#eb5757' },
   { name: 'Пользователь', color: '#d9d9d9' },
@@ -16,7 +14,7 @@ export function DatasetEditPage() {
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
-        <PageHeader title="Новый датасет" avatarUrl={AVATAR_URL} />
+        <PageHeader />
 
         <div className={styles.card}>
           <div className={styles.field}>

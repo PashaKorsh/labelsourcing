@@ -1,23 +1,40 @@
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ROUTES } from '../../config/routes';
 import styles from './PageHeader.module.css';
 
-interface PageHeaderProps {
-  title: string;
-  avatarUrl: string;
-}
+const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-avatar/80/80';
 
-export function PageHeader({ title, avatarUrl }: PageHeaderProps) {
-  return ( // TODO : вынести кнопку хедера в отдельный компонент
+const NAV_ITEMS = [
+  { label: 'Датасеты',     path: ROUTES.home },
+  { label: 'Мои датасеты', path: ROUTES.myDatasets },
+  { label: 'Пользователи', path: ROUTES.users },
+  { label: 'Теги',         path: ROUTES.tags },
+] as const;
+
+export function PageHeader() {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  return (
     <nav className={styles.nav}>
-      <div className={styles.titleChip}>
-        <span className={styles.titleText}>{title}</span>
-      </div>
-      <div className={styles.avatarWrapper}>
-        <img
-          src={avatarUrl}
-          alt="Avatar"
-          className={styles.avatarImage}
-        />
-      </div>
+      {NAV_ITEMS.map(({ label, path }) => (
+        <button
+          key={path}
+          type="button"
+          className={`${styles.chip} ${pathname === path ? styles.chipActive : ''}`}
+          onClick={() => navigate(path)}
+        >
+          {label}
+        </button>
+      ))}
+      <button
+        type="button"
+        className={styles.avatarWrapper}
+        onClick={() => navigate(ROUTES.profile)}
+        aria-label="Профиль"
+      >
+        <img src={AVATAR_URL} alt="" className={styles.avatarImage} />
+      </button>
     </nav>
   );
 }

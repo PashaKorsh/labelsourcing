@@ -4,6 +4,11 @@ WORKDIR /app
 COPY package.json .
 RUN npm install
 COPY . .
+
+ARG VITE_API_MODE
+
+ENV VITE_API_MODE=$VITE_API_MODE
+
 RUN npm run build
 
 # serve stage

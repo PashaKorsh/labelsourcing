@@ -25,7 +25,10 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_MODE=${VITE_API_MODE:-real}
     expose:
       - "3000"
     depends_on:

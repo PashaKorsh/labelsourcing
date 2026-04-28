@@ -1,4 +1,5 @@
 from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy import select
@@ -7,6 +8,8 @@ from jose import JWTError, jwt
 from app.database import get_db
 from app.core.config import settings
 from app.models import User
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 def _extract_token(request: Request) -> str | None:
@@ -21,7 +24,8 @@ def _extract_token(request: Request) -> str | None:
 
 async def get_current_user(
         request: Request,
-        db: AsyncSession = Depends(get_db)
+        db: AsyncSession = Depends(get_db),
+        _: str | None = Depends(oauth2_scheme),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

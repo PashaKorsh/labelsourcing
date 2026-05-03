@@ -23,15 +23,10 @@
   align-self: stretch;
 }
 
-.cardTitle {
-  font-size: 18px;
-  margin: 0;
-}
-
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .label {
@@ -70,74 +65,7 @@
   border-color: #999;
 }
 
-.existingUrls {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: #f8f8f8;
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.existingUrlRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.urlText {
-  font-size: 13px;
-  color: #555;
-  word-break: break-all;
-}
-
-.urlInputRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.urlInputRow .input {
-  flex: 1;
-}
-
-.removeUrlButton {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  background: none;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  color: #999;
-  cursor: pointer;
-  font-size: 14px;
-  transition: border-color 0.15s, color 0.15s;
-}
-
-.removeUrlButton:hover {
-  border-color: #e05555;
-  color: #e05555;
-}
-
-.addUrlButton {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  color: #555;
-  font-size: 14px;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 4px 0;
-  transition: color 0.15s;
-}
-
-.addUrlButton:hover {
-  color: #111;
-}
-
 .saveButton {
-  align-self: stretch;
   height: 48px;
   background: #1a1a1a;
   color: white;

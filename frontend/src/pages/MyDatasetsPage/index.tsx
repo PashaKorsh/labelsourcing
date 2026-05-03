@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { SearchBar } from '../../components/SearchBar';
-import { ROUTES } from '../../config/routes';
+import { ROUTES, buildRoute } from '../../config/routes';
 import { datasetService } from '../../services';
 import type { Dataset } from '../../types/dataset';
 import styles from './MyDatasetsPage.module.css';
@@ -42,7 +42,13 @@ export function MyDatasetsPage() {
                     <p className={styles.meta}>{dataset.taskCount} заданий</p>
                   )}
                 </div>
-                <button type="button" className={styles.editButton}>Редактировать</button>
+                <button
+                  type="button"
+                  className={styles.editButton}
+                  onClick={() => navigate(buildRoute(ROUTES.datasetEdit, { datasetId: dataset.id }))}
+                >
+                  Редактировать
+                </button>
               </div>
             ))
           )}

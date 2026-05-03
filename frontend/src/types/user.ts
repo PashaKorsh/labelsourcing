@@ -1,10 +1,12 @@
+import type { AppTag } from './appTag';
+
 export interface UserProfile {
   id: string;
   email: string;
   name?: string;
   avatarUrl?: string;
   roles: string[];
-  tags: { id: string; name: string; color: string }[];
+  tags: AppTag[];
 }
 
 export interface UserListItem {
@@ -13,6 +15,6 @@ export interface UserListItem {
   name?: string;
   avatarUrl?: string;
   roles: string[];
-  tags: { id: string; name: string; color: string }[];
+  tags: AppTag[];
   createdAt: string;
 }

@@ -4,6 +4,7 @@ export const ROUTES = {
   profile:           '/profile',
   myDatasets:        '/my_datasets',
   datasetNew:        '/dataset/new',
+  datasetEdit:       '/dataset/:datasetId/edit',
   datasetAnnotation: '/dataset/:datasetId',
   datasetValidation: '/dataset/:datasetId/validation',
   users:             '/users',

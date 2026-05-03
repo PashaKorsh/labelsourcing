@@ -1,4 +1,5 @@
 import type { Dataset } from '../../types/dataset';
+import type { AnnotationTask } from '../../types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
 
 const TAG_MEDIC = { id: 'tag-medic', name: 'Медик', color: '#eb5757' };
@@ -65,30 +66,58 @@ const MOCK_MINE: Dataset[] = [
 
 export class MockDatasetService implements DatasetService {
   private datasets: Dataset[] = [...MOCK_LIST];
+  private mineDatasets: Dataset[] = [...MOCK_MINE];
+  private tasksByDataset: Map<string, AnnotationTask[]> = new Map([
+    ['10', [
+      { id: 'task-ds10-1', datasetId: '10', imageUrl: 'https://picsum.photos/seed/ds10-1/400/300' },
+      { id: 'task-ds10-2', datasetId: '10', imageUrl: 'https://picsum.photos/seed/ds10-2/400/300' },
+    ]],
+    ['11', [
+      { id: 'task-ds11-1', datasetId: '11', imageUrl: 'https://picsum.photos/seed/ds11-1/400/300' },
+    ]],
+  ]);
 
   async list(_params?: DatasetListParams): Promise<Dataset[]> {
     return [...this.datasets];
   }
 
   async listMine(): Promise<Dataset[]> {
-    return [...MOCK_MINE];
+    return [...this.mineDatasets];
+  }
+
+  async get(id: string): Promise<Dataset> {
+    const ds = [...this.datasets, ...this.mineDatasets].find(d => d.id === id);
+    if (!ds) throw new Error(`Dataset ${id} not found`);
+    return { ...ds };
+  }
+
+  async getTasks(datasetId: string): Promise<AnnotationTask[]> {
+    return [...(this.tasksByDataset.get(datasetId) ?? [])];
   }
 
   async create(data: DatasetCreateInput): Promise<Dataset> {
     const dataset: Dataset = {
       id: String(Date.now()),
+      title: data.title,
       description: data.description,
       tags: [],
     };
-    this.datasets.push(dataset);
+    this.mineDatasets.push(dataset);
     return dataset;
   }
 
   async update(id: string, data: DatasetUpdateInput): Promise<Dataset> {
-    const idx = this.datasets.findIndex(d => d.id === id);
-    if (idx === -1) throw new Error(`Dataset ${id} not found`);
-    const updated: Dataset = { ...this.datasets[idx], ...data, id };
-    this.datasets[idx] = updated;
+    const allDatasets = [...this.datasets, ...this.mineDatasets];
+    const target = allDatasets.find(d => d.id === id);
+    if (!target) throw new Error(`Dataset ${id} not found`);
+    const updated: Dataset = { ...target, ...data, id };
+
+    const mineIdx = this.mineDatasets.findIndex(d => d.id === id);
+    if (mineIdx !== -1) this.mineDatasets[mineIdx] = updated;
+    else {
+      const listIdx = this.datasets.findIndex(d => d.id === id);
+      if (listIdx !== -1) this.datasets[listIdx] = updated;
+    }
     return updated;
   }
 }

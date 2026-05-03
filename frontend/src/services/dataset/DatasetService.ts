@@ -1,4 +1,5 @@
 import type { Dataset } from '../../types/dataset';
+import type { AnnotationTask } from '../../types/task';
 
 export interface DatasetListParams {
   search?: string;
@@ -9,23 +10,22 @@ export interface DatasetListParams {
 }
 
 export interface DatasetCreateInput {
+  title?: string;
   description: string;
   tagIds?: string[];
 }
 
 export interface DatasetUpdateInput {
+  title?: string;
   description?: string;
   tagIds?: string[];
 }
 
 export interface DatasetService {
-  /** Список датасетов с опциональной фильтрацией. */
   list(params?: DatasetListParams): Promise<Dataset[]>;
-
-  /** Датасеты текущего пользователя (owner). */
   listMine(): Promise<Dataset[]>;
-
+  get(id: string): Promise<Dataset>;
+  getTasks(datasetId: string): Promise<AnnotationTask[]>;
   create(data: DatasetCreateInput): Promise<Dataset>;
-
   update(id: string, data: DatasetUpdateInput): Promise<Dataset>;
 }

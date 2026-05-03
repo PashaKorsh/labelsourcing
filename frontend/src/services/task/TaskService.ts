@@ -25,4 +25,7 @@ export interface TaskService {
   ): Promise<void>;
 
   exportAllAnnotations(): void;
+
+  /** Создаёт задачи для датасета из списка URL изображений. */
+  createBatch(datasetId: string, imageUrls: string[]): Promise<void>;
 }

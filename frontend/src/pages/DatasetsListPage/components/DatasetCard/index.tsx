@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { type Dataset } from '../../../../types/dataset';
 import { PlayButton } from '../../../../components/PlayButton';
 import { RoleBadge } from '../../../../components/RoleBadge';
+import { ROUTES, buildRoute } from '../../../../config/routes';
 import styles from './DatasetCard.module.css';
 
 type Props = {
@@ -8,6 +10,12 @@ type Props = {
 };
 
 export function DatasetCard({ dataset }: Props) {
+  const navigate = useNavigate();
+
+  const handlePlay = () => {
+    navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId: dataset.id }));
+  };
+
   return (
     <div className={styles.card}>
       {dataset.imageUrl && (
@@ -30,7 +38,7 @@ export function DatasetCard({ dataset }: Props) {
               <RoleBadge key={tag.id} role={tag} />
             ))}
           </div>
-          <PlayButton />
+          <PlayButton onClick={handlePlay} />
         </div>
       </div>
     </div>

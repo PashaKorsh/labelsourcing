@@ -72,6 +72,13 @@ export class ApiTaskService implements TaskService {
     });
   }
 
+  async createBatch(datasetId: string, imageUrls: string[]): Promise<void> {
+    await apiFetch(API.tasks.batch(), {
+      method: 'POST',
+      body: JSON.stringify({ dataset_id: datasetId, image_urls: imageUrls }),
+    });
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

@@ -1,8 +1,10 @@
+import type { AppTag } from './appTag';
+
 export interface Dataset {
   id: string;
   title?: string;
   description: string;
-  tags: { id: string; name: string; color: string }[];
+  tags: AppTag[];
   imageUrl?: string;
   completed?: boolean;
   taskCount?: number;

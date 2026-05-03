@@ -5,7 +5,7 @@ export interface TaskService {
   /**
    * Загружает следующую задачу из датасета.
    * Мок — no-op (задачи предзагружены в getTasks).
-   * API — запрос к GET /api/tasks/dataset/{id}/next, результат добавляется в getTasks().
+   * API — запрос к GET /api/v1/datasets/{id}/next, результат добавляется в getTasks().
    */
   loadNextTask(datasetId: string): Promise<AnnotationTask | null>;
 

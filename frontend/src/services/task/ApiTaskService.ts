@@ -19,7 +19,7 @@ export class ApiTaskService implements TaskService {
   // Запрашивает следующую задачу, которую текущий пользователь ещё не размечал.
   // Добавляет её в локальный кэш — getTasks() начинает её возвращать.
   async loadNextTask(datasetId: string): Promise<AnnotationTask | null> {
-    const res = await apiFetch(API.tasks.next(datasetId));
+    const res = await apiFetch(API.datasets.next(datasetId));
     const dto: TaskDto | null = await res.json();
     if (!dto) return null;
 
@@ -42,6 +42,8 @@ export class ApiTaskService implements TaskService {
   }
 
   // Сохраняет аннотации локально и отправляет разметку на сервер.
+  // dataset_id берётся из кэшированной задачи — он нужен бэкенду, т.к. одна задача
+  // может использоваться в нескольких датасетах с разной разметкой.
   async saveAnnotations(
     taskId: string,
     annotations: ImageAnnotation[],
@@ -49,6 +51,12 @@ export class ApiTaskService implements TaskService {
   ): Promise<void> {
     this.annotationsMap.set(taskId, annotations);
     if (imageSize) this.imageSizeMap.set(taskId, imageSize);
+
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) {
+      console.error(`[ApiTaskService] Задача ${taskId} не найдена в кэше`);
+      return;
+    }
 
     const size = imageSize ?? this.imageSizeMap.get(taskId);
     const serialized = serializeTaskAnnotations(
@@ -58,9 +66,9 @@ export class ApiTaskService implements TaskService {
       size?.h ?? 1,
     );
 
-    await apiFetch(API.labels.create(), {
-      method: 'POST',
-      body: JSON.stringify({ task_id: taskId, data: serialized.output_values }),
+    await apiFetch(API.tasks.saveLabel(taskId), {
+      method: 'PUT',
+      body: JSON.stringify({ dataset_id: task.datasetId, data: serialized.output_values }),
     });
   }
 

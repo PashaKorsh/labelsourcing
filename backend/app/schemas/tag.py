@@ -1,16 +1,14 @@
 import uuid
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
-class TagBase(BaseModel):
+class TagCreate(BaseModel):
     name: str
+    color: Optional[str] = None
 
 
-class TagCreate(TagBase):
-    pass
-
-
-class TagResponse(TagBase):
+class TagResponse(TagCreate):
     id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)

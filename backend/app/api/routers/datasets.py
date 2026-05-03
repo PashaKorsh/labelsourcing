@@ -1,3 +1,4 @@
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -5,9 +6,10 @@ from sqlalchemy.orm import selectinload
 import uuid
 
 from app.database import get_db
-from app.models import Dataset, User, Tag, Dataset, Task, Label
+from app.models import Dataset, User, Tag, Task, Label
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
+from app.schemas.task import TaskResponse
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
@@ -16,7 +18,7 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 async def create_dataset(
         dataset_in: DatasetCreate,
         db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(require_roles(["admin"]))
 ):
     """Создать новый набор данных"""
     new_dataset = Dataset(
@@ -24,7 +26,6 @@ async def create_dataset(
         description=dataset_in.description
     )
     db.add(new_dataset)
-
     await db.commit()
 
     stmt = (
@@ -43,11 +44,22 @@ async def create_dataset(
 
 @router.get("/", response_model=list[DatasetResponse])
 async def get_datasets(
+        limit: int = 100,
+        offset: int = 0,
+        # Поиск по названию датасета (будет реализован позже)
+        search: Optional[str] = None,
+        # Фильтр по статусу (new/started/done — будет реализован позже)
+        status: Optional[str] = None,
+        # Фильтр по владельцу
+        owner_id: Optional[uuid.UUID] = None,
+        # Поиск по имени/email владельца (будет реализован позже)
+        owner_search: Optional[str] = None,
+        # Фильтр по тегам (будет реализован позже)
+        tag_ids: Optional[List[uuid.UUID]] = None,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     """Список всех датасетов с актуальными счётчиками"""
-
     stmt = (
         select(
             Dataset,
@@ -57,7 +69,9 @@ async def get_datasets(
         .outerjoin(Task, Dataset.id == Task.dataset_id)
         .outerjoin(Label, Task.id == Label.task_id)
         .group_by(Dataset.id)
-        .options(selectinload(Dataset.tags))  # Не забываем подгружать теги
+        .options(selectinload(Dataset.tags))
+        .limit(limit)
+        .offset(offset)
     )
 
     result = await db.execute(stmt)
@@ -70,6 +84,45 @@ async def get_datasets(
         datasets_with_counts.append(dataset)
 
     return datasets_with_counts
+
+
+@router.get("/{dataset_id}/next", response_model=TaskResponse | None)
+async def get_next_task(
+        dataset_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    """Выдаёт следующую задачу, которую текущий пользователь ещё не размечал в этом датасете.
+    Проверяем только разметку в конкретном датасете — задача может использоваться в нескольких."""
+    stmt = (
+        select(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(~Task.labels.any(
+            (Label.user_id == current_user.id) & (Label.dataset_id == dataset_id)
+        ))
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+@router.get("/{dataset_id}/tasks", response_model=list[TaskResponse])
+async def get_dataset_tasks(
+        dataset_id: uuid.UUID,
+        limit: int = 100,
+        offset: int = 0,
+        db: AsyncSession = Depends(get_db),
+        admin_user: User = Depends(require_roles(["admin"]))
+):
+    """Список всех задач датасета — только для Админов"""
+    query = (
+        select(Task)
+        .where(Task.dataset_id == dataset_id)
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 @router.get("/{dataset_id}", response_model=DatasetResponse)
@@ -116,7 +169,10 @@ async def update_dataset(
     result = await db.execute(stmt)
     dataset = result.scalar_one_or_none()
 
-    if update_data.description:
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    if update_data.description is not None:
         dataset.description = update_data.description
 
     if update_data.tag_ids is not None:

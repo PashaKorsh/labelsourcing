@@ -77,12 +77,22 @@ export class MockDatasetService implements DatasetService {
     ]],
   ]);
 
-  async list(_params?: DatasetListParams): Promise<Dataset[]> {
-    return [...this.datasets];
+  async list(params?: DatasetListParams): Promise<Dataset[]> {
+    let result = [...this.datasets];
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      result = result.filter(d => (d.title ?? d.description).toLowerCase().includes(q));
+    }
+    return result;
   }
 
-  async listMine(): Promise<Dataset[]> {
-    return [...this.mineDatasets];
+  async listMine(search?: string): Promise<Dataset[]> {
+    let result = [...this.mineDatasets];
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(d => (d.title ?? d.description).toLowerCase().includes(q));
+    }
+    return result;
   }
 
   async get(id: string): Promise<Dataset> {

@@ -7,9 +7,8 @@ interface DatasetDto {
   id: string;
   title?: string | null;
   description: string | null;
-  created_at: string;
   tags: { id: string; name: string; color: string | null }[];
-  task_count?: number;
+  tasks_count?: number;
 }
 
 interface TaskDto {
@@ -25,7 +24,7 @@ function mapDto(dto: DatasetDto): Dataset {
     title: dto.title ?? undefined,
     description: dto.description ?? '',
     tags: dto.tags.map(t => ({ id: t.id, name: t.name, color: t.color ?? '#d9d9d9' })),
-    taskCount: dto.task_count,
+    taskCount: dto.tasks_count,
   };
 }
 
@@ -44,10 +43,10 @@ export class ApiDatasetService implements DatasetService {
     return dtos.map(mapDto);
   }
 
-  async listMine(): Promise<Dataset[]> {
+  async listMine(search?: string): Promise<Dataset[]> {
     const meRes = await apiFetch(API.users.me());
     const me: { id: string } = await meRes.json();
-    return this.list({ ownerId: me.id });
+    return this.list({ ownerId: me.id, search });
   }
 
   async get(id: string): Promise<Dataset> {

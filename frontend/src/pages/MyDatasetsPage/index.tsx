@@ -12,20 +12,25 @@ export function MyDatasetsPage() {
   const navigate = useNavigate();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    datasetService.listMine()
-      .then(setDatasets)
-      .catch(err => console.error('[MyDatasetsPage]', err))
-      .finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    const timer = setTimeout(() => {
+      datasetService.listMine(search || undefined)
+        .then(setDatasets)
+        .catch(err => console.error('[MyDatasetsPage]', err))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
-        <SearchBar />
+        <SearchBar value={search} onChange={setSearch} />
 
         <section className={styles.list}>
           {loading ? (

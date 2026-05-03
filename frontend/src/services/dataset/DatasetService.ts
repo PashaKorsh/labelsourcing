@@ -23,7 +23,7 @@ export interface DatasetUpdateInput {
 
 export interface DatasetService {
   list(params?: DatasetListParams): Promise<Dataset[]>;
-  listMine(): Promise<Dataset[]>;
+  listMine(search?: string): Promise<Dataset[]>;
   get(id: string): Promise<Dataset>;
   getTasks(datasetId: string): Promise<AnnotationTask[]>;
   create(data: DatasetCreateInput): Promise<Dataset>;

@@ -5,11 +5,13 @@ from pydantic import BaseModel, ConfigDict
 from .tag import TagResponse
 
 class DatasetCreate(BaseModel):
+    title: Optional[str] = None
     description: Optional[str] = None
 
 class DatasetResponse(BaseModel):
     id: uuid.UUID
     owner_id: uuid.UUID
+    title: Optional[str] = None
     description: Optional[str] = None
     tasks_count: int = 0
     labeled_count: int = 0
@@ -18,5 +20,6 @@ class DatasetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class DatasetUpdate(BaseModel):
+    title: Optional[str] = None
     description: Optional[str] = None
     tag_ids: Optional[list[uuid.UUID]] = None

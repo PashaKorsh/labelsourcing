@@ -23,6 +23,7 @@ async def create_dataset(
     """Создать новый набор данных"""
     new_dataset = Dataset(
         owner_id=current_user.id,
+        title=dataset_in.title,
         description=dataset_in.description
     )
     db.add(new_dataset)
@@ -172,6 +173,8 @@ async def update_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
+    if update_data.title is not None:
+        dataset.title = update_data.title
     if update_data.description is not None:
         dataset.description = update_data.description
 

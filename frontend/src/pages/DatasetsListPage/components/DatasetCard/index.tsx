@@ -10,22 +10,24 @@ type Props = {
 export function DatasetCard({ dataset }: Props) {
   return (
     <div className={styles.card}>
-      <img
-        src={dataset.imageUrl}
-        alt=""
-        className={`${styles.image} ${dataset.completed ? styles.dimmed : ''}`}
-      />
+      {dataset.imageUrl && (
+        <img
+          src={dataset.imageUrl}
+          alt=""
+          className={`${styles.image} ${dataset.completed ? styles.dimmed : ''}`}
+        />
+      )}
 
       <div className={`${styles.content} ${dataset.completed ? styles.dimmed : ''}`}>
         <div className={styles.textGroup}>
-          <h2 className={styles.title}>{dataset.title}</h2>
-          <p className={styles.description}>{dataset.description}</p>
+          <h2 className={styles.title}>{dataset.title ?? dataset.description}</h2>
+          {dataset.title && <p className={styles.description}>{dataset.description}</p>}
         </div>
 
         <div className={styles.footer}>
           <div className={styles.tags}>
-            {dataset.tags.map((role) => (
-              <RoleBadge key={role.name} role={role} />
+            {dataset.tags.map((tag) => (
+              <RoleBadge key={tag.id} role={tag} />
             ))}
           </div>
           <PlayButton />

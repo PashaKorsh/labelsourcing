@@ -1,10 +1,9 @@
-import { type Role } from './role'
-
-export type Dataset = {
-  id: number
-  title: string
-  description: string
-  tags: Role[]
-  imageUrl: string
-  completed?: boolean
+export interface Dataset {
+  id: string;
+  title?: string;
+  description: string;
+  tags: { id: string; name: string; color: string }[];
+  imageUrl?: string;
+  completed?: boolean;
+  taskCount?: number;
 }

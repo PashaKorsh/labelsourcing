@@ -1,46 +1,23 @@
+import { useState, useEffect } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { SearchBar } from '../../components/SearchBar';
 import { RoleBadge } from '../../components/RoleBadge';
-import type { Role } from '../../types/role';
+import { userService } from '../../services';
+import type { UserListItem } from '../../types/user';
 import styles from './UsersPage.module.css';
 
-interface MockUser {
-  id: number;
-  name: string;
-  email: string;
-  avatarUrl: string;
-  roles: Role[];
-}
-
-const MOCK_USERS: MockUser[] = [
-  {
-    id: 1,
-    name: 'Иван Иванов',
-    email: 'ivan@labelsourcing.ru',
-    avatarUrl: 'https://picsum.photos/seed/labelsourcing-user-1/80/80',
-    roles: [{ name: 'Медик', color: '#eb5757' }],
-  },
-  {
-    id: 2,
-    name: 'Мария Петрова',
-    email: 'maria@labelsourcing.ru',
-    avatarUrl: 'https://picsum.photos/seed/labelsourcing-user-2/80/80',
-    roles: [{ name: 'Пользователь', color: '#d9d9d9' }],
-  },
-  {
-    id: 3,
-    name: 'Алексей Сидоров',
-    email: 'alex@labelsourcing.ru',
-    avatarUrl: 'https://picsum.photos/seed/labelsourcing-user-3/80/80',
-    roles: [
-      { name: 'Медик', color: '#eb5757' },
-      { name: 'Пользователь', color: '#d9d9d9' },
-    ],
-  },
-];
-
 export function UsersPage() {
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    userService.list()
+      .then(setUsers)
+      .catch(err => console.error('[UsersPage]', err))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <main className={styles.page}>
       <div className={styles.content}>
@@ -49,21 +26,27 @@ export function UsersPage() {
         <SearchBar />
 
         <section className={styles.list}>
-          {MOCK_USERS.map((user) => (
-            <div key={user.id} className={styles.row}>
-              <img src={user.avatarUrl} alt="" className={styles.avatar} />
-              <div className={styles.info}>
-                <p className={styles.name}>{user.name}</p>
-                <p className={styles.email}>{user.email}</p>
+          {loading ? (
+            <p>Загрузка…</p>
+          ) : (
+            users.map((user) => (
+              <div key={user.id} className={styles.row}>
+                {user.avatarUrl && (
+                  <img src={user.avatarUrl} alt="" className={styles.avatar} />
+                )}
+                <div className={styles.info}>
+                  <p className={styles.name}>{user.name ?? user.email}</p>
+                  <p className={styles.email}>{user.email}</p>
+                </div>
+                <div className={styles.roles}>
+                  {user.tags.map((tag) => (
+                    <RoleBadge key={tag.id} role={tag} />
+                  ))}
+                </div>
+                <button type="button" className={styles.editButton}>Изменить</button>
               </div>
-              <div className={styles.roles}>
-                {user.roles.map((role) => (
-                  <RoleBadge key={role.name} role={role} />
-                ))}
-              </div>
-              <button type="button" className={styles.editButton}>Изменить</button>
-            </div>
-          ))}
+            ))
+          )}
         </section>
       </div>
     </main>

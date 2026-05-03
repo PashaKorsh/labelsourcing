@@ -10,20 +10,25 @@ import styles from './UsersPage.module.css';
 export function UsersPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    userService.list()
-      .then(setUsers)
-      .catch(err => console.error('[UsersPage]', err))
-      .finally(() => setLoading(false));
-  }, []);
+    setLoading(true);
+    const timer = setTimeout(() => {
+      userService.list({ search: search || undefined })
+        .then(setUsers)
+        .catch(err => console.error('[UsersPage]', err))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
-        <SearchBar />
+        <SearchBar value={search} onChange={setSearch} />
 
         <section className={styles.list}>
           {loading ? (

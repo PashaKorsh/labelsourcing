@@ -44,17 +44,37 @@ const MOCK_USERS: UserListItem[] = [
 ];
 
 export class MockUserService implements UserService {
+  private users: UserListItem[] = [...MOCK_USERS];
+
   async getMe(): Promise<UserProfile> {
     return MOCK_PROFILE;
   }
 
-  async list(_params?: UserListParams): Promise<UserListItem[]> {
-    return [...MOCK_USERS];
+  async list(params?: UserListParams): Promise<UserListItem[]> {
+    let result = [...this.users];
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      result = result.filter(u =>
+        u.email.toLowerCase().includes(q) || (u.name ?? '').toLowerCase().includes(q),
+      );
+    }
+    return result;
   }
 
-  async update(id: string, _data: UserUpdateInput): Promise<UserListItem> {
-    const user = MOCK_USERS.find(u => u.id === id);
-    if (!user) throw new Error(`User ${id} not found`);
-    return user;
+  async update(id: string, data: UserUpdateInput): Promise<UserListItem> {
+    const idx = this.users.findIndex(u => u.id === id);
+    if (idx === -1) throw new Error(`User ${id} not found`);
+
+    const allTags = [
+      { id: 'tag-medic', name: 'Медик', color: '#eb5757' },
+      { id: 'tag-user', name: 'Пользователь', color: '#d9d9d9' },
+    ];
+    const tags = data.tagIds
+      ? allTags.filter(t => data.tagIds!.includes(t.id))
+      : this.users[idx].tags;
+
+    const updated: UserListItem = { ...this.users[idx], tags };
+    this.users[idx] = updated;
+    return updated;
   }
 }

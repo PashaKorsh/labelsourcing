@@ -70,28 +70,6 @@
   border-color: #999;
 }
 
-.existingUrls {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: #f8f8f8;
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.existingUrlRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.urlText {
-  font-size: 13px;
-  color: #555;
-  word-break: break-all;
-}
-
 .urlInputRow {
   display: flex;
   align-items: center;

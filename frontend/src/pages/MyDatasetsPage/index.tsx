@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { SearchBar } from '../../components/SearchBar';
+import { RoleBadge } from '../../components/RoleBadge';
 import { ROUTES, buildRoute } from '../../config/routes';
 import { datasetService } from '../../services';
 import type { Dataset } from '../../types/dataset';
@@ -43,8 +44,12 @@ export function MyDatasetsPage() {
                 )}
                 <div className={styles.info}>
                   <h2 className={styles.title}>{dataset.title ?? dataset.description}</h2>
-                  {dataset.taskCount !== undefined && (
-                    <p className={styles.meta}>{dataset.taskCount} заданий</p>
+                  {dataset.tags.length > 0 && (
+                    <div className={styles.tags}>
+                      {dataset.tags.map(tag => (
+                        <RoleBadge key={tag.id} role={tag} />
+                      ))}
+                    </div>
                   )}
                 </div>
                 <button

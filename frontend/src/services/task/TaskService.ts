@@ -28,4 +28,7 @@ export interface TaskService {
 
   /** Создаёт задачи для датасета из списка URL изображений. */
   createBatch(datasetId: string, imageUrls: string[]): Promise<void>;
+
+  /** Удаляет задачу по ID. */
+  deleteTask(taskId: string): Promise<void>;
 }

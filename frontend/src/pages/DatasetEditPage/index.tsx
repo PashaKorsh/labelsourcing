@@ -3,12 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { AppTagSelector } from '../../components/AppTagSelector';
+import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
 import { ROUTES } from '../../config/routes';
 import { datasetService, taskService } from '../../services';
 import type { AppTag } from '../../types/appTag';
+import type { Tag } from '../../types/annotation';
 import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
 import styles from './DatasetEditPage.module.css';
+
+interface TaskRow {
+  id?: string;
+  url: string;
+}
 
 export function DatasetEditPage() {
   const { datasetId } = useParams<{ datasetId: string }>();
@@ -18,8 +24,9 @@ export function DatasetEditPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedTags, setSelectedTags] = useState<AppTag[]>([]);
-  const [existingTasks, setExistingTasks] = useState<AnnotationTask[]>([]);
-  const [newUrls, setNewUrls] = useState<string[]>(['']);
+  const [taskRows, setTaskRows] = useState<TaskRow[]>([{ url: '' }]);
+  const [originalTaskIds, setOriginalTaskIds] = useState<string[]>([]);
+  const [annotationLabels, setAnnotationLabels] = useState<Tag[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -32,18 +39,20 @@ export function DatasetEditPage() {
       setTitle(ds.title ?? '');
       setDescription(ds.description);
       setSelectedTags(ds.tags);
-      setExistingTasks(tasks);
+      const rows: TaskRow[] = tasks.map(t => ({ id: t.id, url: t.imageUrl }));
+      setTaskRows(rows.length > 0 ? rows : [{ url: '' }]);
+      setOriginalTaskIds(tasks.map(t => t.id));
+      setAnnotationLabels(ds.annotationLabels ?? []);
     }).catch(console.error);
   }, [datasetId]);
 
-  const handleUrlChange = (index: number, value: string) => {
-    setNewUrls(prev => prev.map((u, i) => i === index ? value : u));
-  };
+  const handleUrlChange = (index: number, value: string) =>
+    setTaskRows(prev => prev.map((r, i) => i === index ? { ...r, url: value } : r));
 
-  const addUrlField = () => setNewUrls(prev => [...prev, '']);
+  const addRow = () => setTaskRows(prev => [...prev, { url: '' }]);
 
-  const removeUrlField = (index: number) =>
-    setNewUrls(prev => prev.filter((_, i) => i !== index));
+  const removeRow = (index: number) =>
+    setTaskRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : [{ url: '' }]);
 
   const handleSave = async () => {
     if (!datasetId || !description.trim()) return;
@@ -53,9 +62,27 @@ export function DatasetEditPage() {
         title: title.trim() || undefined,
         description: description.trim(),
         tagIds: selectedTags.map(t => t.id),
+        annotationLabels,
       });
 
-      const urlsToCreate = newUrls.filter(u => u.trim());
+      const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
+      const deletedIds = originalTaskIds.filter(id => !currentIds.has(id));
+      await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
+
+      const urlsToCreate: string[] = [];
+      for (const row of taskRows) {
+        if (!row.url.trim()) continue;
+        if (!row.id) {
+          urlsToCreate.push(row.url.trim());
+        } else {
+          const origUrl = taskRows.find(r => r.id === row.id)?.url;
+          const wasChanged = origUrl !== undefined && origUrl !== row.url.trim();
+          if (wasChanged) {
+            await taskService.deleteTask(row.id);
+            urlsToCreate.push(row.url.trim());
+          }
+        }
+      }
       if (urlsToCreate.length > 0) {
         await taskService.createBatch(datasetId, urlsToCreate);
       }
@@ -115,41 +142,33 @@ export function DatasetEditPage() {
         </div>
 
         <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Метки разметки</h2>
+          <AnnotationLabelEditor labels={annotationLabels} onChange={setAnnotationLabels} />
+        </div>
+
+        <div className={styles.card}>
           <h2 className={styles.cardTitle}>Изображения</h2>
-
-          {existingTasks.length > 0 && (
-            <div className={styles.existingUrls}>
-              {existingTasks.map(task => (
-                <div key={task.id} className={styles.existingUrlRow}>
-                  <span className={styles.urlText}>{task.imageUrl}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className={styles.field}>
-            <label className={styles.label}>Добавить изображения</label>
-            {newUrls.map((url, i) => (
+            {taskRows.map((row, i) => (
               <div key={i} className={styles.urlInputRow}>
                 <input
                   type="url"
                   className={styles.input}
                   placeholder="https://example.com/image.jpg"
-                  value={url}
+                  value={row.url}
                   onChange={e => handleUrlChange(i, e.target.value)}
                 />
-                {newUrls.length > 1 && (
-                  <button
-                    type="button"
-                    className={styles.removeUrlButton}
-                    onClick={() => removeUrlField(i)}
-                  >
-                    ✕
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className={styles.removeUrlButton}
+                  onClick={() => removeRow(i)}
+                  title="Удалить"
+                >
+                  ✕
+                </button>
               </div>
             ))}
-            <button type="button" className={styles.addUrlButton} onClick={addUrlField}>
+            <button type="button" className={styles.addUrlButton} onClick={addRow}>
               + Добавить ещё
             </button>
           </div>

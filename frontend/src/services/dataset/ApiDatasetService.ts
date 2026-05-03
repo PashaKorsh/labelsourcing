@@ -3,12 +3,20 @@ import type { AnnotationTask } from '../../types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
 import { API, apiFetch } from '../../config/api';
 
+interface AnnotationLabelDto {
+  id: string;
+  label: string;
+  color: string;
+  hotkey?: string;
+}
+
 interface DatasetDto {
   id: string;
   title?: string | null;
   description: string | null;
   tags: { id: string; name: string; color: string | null }[];
   tasks_count?: number;
+  annotation_labels?: AnnotationLabelDto[] | null;
 }
 
 interface TaskDto {
@@ -25,6 +33,12 @@ function mapDto(dto: DatasetDto): Dataset {
     description: dto.description ?? '',
     tags: dto.tags.map(t => ({ id: t.id, name: t.name, color: t.color ?? '#d9d9d9' })),
     taskCount: dto.tasks_count,
+    annotationLabels: dto.annotation_labels?.map(l => ({
+      id: l.id,
+      label: l.label,
+      color: l.color,
+      hotkey: l.hotkey,
+    })),
   };
 }
 
@@ -69,7 +83,12 @@ export class ApiDatasetService implements DatasetService {
   async create(data: DatasetCreateInput): Promise<Dataset> {
     const res = await apiFetch(API.datasets.create(), {
       method: 'POST',
-      body: JSON.stringify({ title: data.title, description: data.description, tag_ids: data.tagIds }),
+      body: JSON.stringify({
+        title: data.title,
+        description: data.description,
+        tag_ids: data.tagIds,
+        annotation_labels: data.annotationLabels,
+      }),
     });
     const dto: DatasetDto = await res.json();
     return mapDto(dto);
@@ -78,7 +97,12 @@ export class ApiDatasetService implements DatasetService {
   async update(id: string, data: DatasetUpdateInput): Promise<Dataset> {
     const res = await apiFetch(API.datasets.update(id), {
       method: 'PATCH',
-      body: JSON.stringify({ title: data.title, description: data.description, tag_ids: data.tagIds }),
+      body: JSON.stringify({
+        title: data.title,
+        description: data.description,
+        tag_ids: data.tagIds,
+        annotation_labels: data.annotationLabels,
+      }),
     });
     const dto: DatasetDto = await res.json();
     return mapDto(dto);

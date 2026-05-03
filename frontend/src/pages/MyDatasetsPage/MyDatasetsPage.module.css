@@ -50,10 +50,10 @@
   line-height: 1.2;
 }
 
-.meta {
-  font-size: 13px;
-  color: #6f6f6f;
-  margin: 0;
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .editButton {

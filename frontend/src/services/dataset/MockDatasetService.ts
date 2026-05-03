@@ -111,6 +111,7 @@ export class MockDatasetService implements DatasetService {
       title: data.title,
       description: data.description,
       tags: [],
+      annotationLabels: data.annotationLabels,
     };
     this.mineDatasets.push(dataset);
     return dataset;
@@ -120,7 +121,13 @@ export class MockDatasetService implements DatasetService {
     const allDatasets = [...this.datasets, ...this.mineDatasets];
     const target = allDatasets.find(d => d.id === id);
     if (!target) throw new Error(`Dataset ${id} not found`);
-    const updated: Dataset = { ...target, ...data, id };
+    const updated: Dataset = {
+      ...target,
+      title: data.title ?? target.title,
+      description: data.description ?? target.description,
+      annotationLabels: data.annotationLabels ?? target.annotationLabels,
+      id,
+    };
 
     const mineIdx = this.mineDatasets.findIndex(d => d.id === id);
     if (mineIdx !== -1) this.mineDatasets[mineIdx] = updated;

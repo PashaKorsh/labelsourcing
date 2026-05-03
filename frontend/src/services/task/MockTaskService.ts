@@ -55,6 +55,11 @@ export class MockTaskService implements TaskService {
     });
   }
 
+  async deleteTask(taskId: string): Promise<void> {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

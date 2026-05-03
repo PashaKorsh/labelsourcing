@@ -39,6 +39,20 @@ async def create_tasks_batch(
     return {"status": "success", "added": len(new_tasks)}
 
 
+@router.delete("/{task_id}", status_code=204)
+async def delete_task(
+    task_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin_user: User = Depends(require_roles(["admin"]))
+):
+    """Удалить задачу"""
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    await db.delete(task)
+    await db.commit()
+
+
 @router.put("/{task_id}/labels", response_model=LabelResponse)
 async def submit_label(
     task_id: uuid.UUID,

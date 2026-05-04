@@ -5,74 +5,60 @@ import { ToolSelector } from '../../components/ToolSelector';
 import { TagSelector } from '../../components/TagSelector';
 import { HintsBar } from '../../components/HintsBar';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
-import { taskService } from '../../services/taskService';
-import { getImageClient } from '../../services/imageClient';
+import { taskService, datasetService } from '../../services';
+import { useDatasetId } from '../../hooks/useRouteParams';
+import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
-import type { AppMode } from '../../types/appMode';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 
-const TAGS: Tag[] = [
+const DEFAULT_TAGS: Tag[] = [
   { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
   { id: 'vehicle', label: 'Транспорт', color: '#3b82f6', hotkey: '2' },
   { id: 'animal', label: 'Животное', color: '#22c55e', hotkey: '3' },
   { id: 'object', label: 'Объект', color: '#f59e0b', hotkey: '4' },
 ];
 
-export interface WorkspacePageProps {
-  onModeChange: (mode: AppMode) => void;
-}
-
-export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
-  const tasks = taskService.getTasks();
-
+export function WorkspacePage() {
+  const datasetId = useDatasetId();
+  // Мок инициализирует задачи сразу; API-сервис начинает с пустого списка.
+  const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
+  const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [taskIndex, setTaskIndex] = useState(0);
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
-  const [activeTagId, setActiveTagId] = useState<string | null>(TAGS[0].id);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
+  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
+  const [activeTagId, setActiveTagId] = useState<string | null>(DEFAULT_TAGS[0].id);
 
-  // Актуальные аннотации без лишних ре-рендеров — для сохранения перед навигацией
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
 
   const task = tasks[taskIndex] ?? null;
-  const activeTag = TAGS.find(t => t.id === activeTagId) ?? null;
+  const activeTag = tags.find(t => t.id === activeTagId) ?? null;
 
-  // Получаем URL изображения при смене задачи.
-  // cancelled-флаг исключает гонку, когда Promise от предыдущей задачи
-  // разрешается после того, как мы уже перешли к следующей.
+  // Загружаем метки разметки из датасета и первую задачу при монтировании.
   useEffect(() => {
-    if (!task) return;
-    let cancelled = false;
-    let resolvedUrl: string | null = null;
-
-    setImageUrl(null);
-    setImageError(null);
-
-    const client = getImageClient(task.locator.source);
-
-    client
-      .resolve(task.locator)
-      .then(url => {
-        if (cancelled) return;
-        resolvedUrl = url;
-        setImageUrl(url);
+    if (!datasetId) return;
+    datasetService.get(datasetId)
+      .then(ds => {
+        if (ds.annotationLabels && ds.annotationLabels.length > 0) {
+          const HOTKEYS = '1234567890';
+          const withHotkeys = ds.annotationLabels.map((l, i) => ({
+            ...l,
+            hotkey: i < HOTKEYS.length ? HOTKEYS[i] : undefined,
+          }));
+          setTags(withHotkeys);
+          setActiveTagId(withHotkeys[0].id);
+        }
       })
-      .catch(err => {
-        if (cancelled) return;
-        setImageError(String(err));
-      });
+      .catch(err => console.error('[WorkspacePage] get dataset:', err));
 
-    return () => {
-      cancelled = true;
-      if (resolvedUrl && client.revoke) {
-        client.revoke(resolvedUrl);
-      }
-    };
-  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    taskService.loadNextTask(datasetId).then(newTask => {
+      if (newTask) setTasks(taskService.getTasks());
+      else setHasMoreTasks(false);
+    }).catch(err => console.error('[WorkspacePage] loadNextTask:', err));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAnnotationsChange = useCallback((annotations: ImageAnnotation[]) => {
     annotationsRef.current = annotations;
@@ -82,34 +68,45 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
     imageSizeRef.current = size;
   }, []);
 
-  const navigateTo = useCallback(
-    (nextIndex: number) => {
-      if (!task) return;
-      taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
-      setTaskIndex(nextIndex);
-    },
-    [task],
-  );
+  const navigateTo = useCallback(async (nextIndex: number) => {
+    if (!task) return;
+    await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
 
-  const handleSave = useCallback(() => {
-    if (task) taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
+    // Если переходим дальше последней загруженной задачи — запрашиваем следующую.
+    if (nextIndex >= tasks.length) {
+      const newTask = await taskService.loadNextTask(datasetId ?? '').catch(err => {
+        console.error('[WorkspacePage] loadNextTask:', err);
+        return null;
+      });
+      if (newTask) {
+        setTasks(taskService.getTasks());
+      } else {
+        setHasMoreTasks(false);
+        return;
+      }
+    }
+
+    setTaskIndex(nextIndex);
+  }, [task, tasks.length]);
+
+  const handleSave = useCallback(async () => {
+    if (task) await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
     taskService.exportAllAnnotations();
   }, [task]);
 
   const canGoPrev = taskIndex > 0;
-  const canGoNext = taskIndex < tasks.length - 1;
+  const canGoNext = taskIndex < tasks.length - 1 || hasMoreTasks;
 
-  // Горячие клавиши для инструментов и тегов — берём из их определений
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};
     for (const tool of IMAGE_DRAWING_TOOLS) {
       if (tool.hotkey) map[tool.hotkey] = () => setActiveTool(tool.id);
     }
-    for (const tag of TAGS) {
+    for (const tag of tags) {
       if (tag.hotkey) map[tag.hotkey] = () => setActiveTagId(tag.id);
     }
     return map;
-  }, []);
+  }, [tags]);
   useHotkeys(hotkeys);
 
   return (
@@ -117,8 +114,8 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
 
-        <ModeSwitcher currentMode='annotation' onModeChange={onModeChange} />
-        
+        <ModeSwitcher />
+
         <nav className={styles.taskNav}>
           <button
             className={styles.navButton}
@@ -129,7 +126,7 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
             ← Пред
           </button>
           <span className={styles.taskCounter}>
-            {task?.name ?? `Задача ${taskIndex + 1}`}
+            {(task?.metadata?.name as string | undefined) ?? `Задача ${taskIndex + 1}`}
             <span className={styles.taskIndex}>
               {taskIndex + 1} / {tasks.length}
             </span>
@@ -154,7 +151,7 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
           />
           <div className={styles.divider} />
           <TagSelector
-            tags={TAGS}
+            tags={tags}
             activeTagId={activeTagId}
             onSelect={setActiveTagId}
           />
@@ -167,20 +164,18 @@ export function WorkspacePage({ onModeChange }: WorkspacePageProps) {
 
         <main className={styles.canvasArea}>
           <div className={styles.canvasContent}>
-            {imageError ? (
-              <div className={styles.status}>Не удалось загрузить изображение: {imageError}</div>
-            ) : !imageUrl ? (
-              <div className={styles.status}>Загрузка…</div>
+            {!task ? (
+              <div className={styles.status}>
+                {tasks.length === 0 ? 'Загрузка…' : 'Все задачи выполнены'}
+              </div>
             ) : (
-              // key={task.id} пересоздаёт AnnotationCanvas при смене задачи,
-              // давая Annotorious чистый экземпляр (и пустой стек undo).
               <AnnotationCanvas
-                key={task!.id}
-                imageUrl={imageUrl}
+                key={task.id}
+                imageUrl={task.imageUrl}
                 activeTool={activeTool}
                 activeTag={activeTag}
-                tags={TAGS}
-                initialAnnotations={taskService.getAnnotations(task!.id)}
+                tags={tags}
+                initialAnnotations={taskService.getAnnotations(task.id)}
                 onAnnotationsChange={handleAnnotationsChange}
                 onImageSizeChange={handleImageSizeChange}
                 onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}

@@ -34,5 +34,21 @@
 }
 
 .yandexButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
+  padding: 10px 24px;
+  background: #fc3f1d;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.yandexButton:hover {
+  background: #e0361a;
 }

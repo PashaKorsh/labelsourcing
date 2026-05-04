@@ -49,7 +49,9 @@ class Dataset(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
+    annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     owner: Mapped["User"] = relationship(back_populates="datasets")
@@ -76,6 +78,7 @@ class Label(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
+    dataset_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), nullable=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     data: Mapped[Dict[str, Any]] = mapped_column(JSONB)
     status: Mapped[str] = mapped_column(String, server_default="pending")
@@ -89,6 +92,7 @@ class Tag(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(Text, unique=True)
+    color: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     users: Mapped[List["User"]] = relationship(secondary="user_tags", back_populates="tags")
     datasets: Mapped[List["Dataset"]] = relationship(secondary="dataset_tags", back_populates="tags")

@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { ReadOnlyAnnotationCanvas } from '../../components/ReadOnlyAnnotationCanvas';
-import { validationService } from '../../services/validationService';
-import { getImageClient } from '../../services/imageClient';
-import { deserializeAnnotations } from '../../services/annotationDeserializer';
+import { validationService } from '../../services';
+import { deserializeAnnotations } from '../../utils/annotationDeserializer';
 import type { ValidationVerdict } from '../../types/validationTask';
 import type { Tag } from '../../types/annotation';
-import type { AppMode } from '../../types/appMode';
 import styles from './ValidationPage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 
@@ -27,11 +25,7 @@ interface ReadyTaskData {
   initialAnnotations: ImageAnnotation[];
 }
 
-export interface ValidationPageProps {
-  onModeChange: (mode: AppMode) => void;
-}
-
-export function ValidationPage({ onModeChange }: ValidationPageProps) {
+export function ValidationPage() {
   const tasks = validationService.getTasks();
 
   const [taskIndex, setTaskIndex] = useState(0);
@@ -45,62 +39,41 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
   const canGoNext = taskIndex < tasks.length - 1;
   const allJudged = tasks.every(t => validationService.getVerdict(t.id) !== null);
 
-  // Загружаем изображение и вычисляем аннотации до монтирования холста.
-  // Предзагрузка через new Image() даёт натуральные размеры ДО того, как
-  // Annotorious инициализирует систему координат — это исключает гонку между
-  // установкой аннотаций и обработкой ResizeObserver в Annotorious.
+  // Предзагрузка изображения для получения натуральных размеров.
+  // Размеры нужны до монтирования холста, чтобы денормализовать координаты аннотаций.
   useEffect(() => {
     if (!task) return;
     let cancelled = false;
-    let resolvedUrl: string | null = null;
 
     setTaskData(null);
     setImageError(null);
     setCurrentVerdict(validationService.getVerdict(task.id));
 
-    const client = getImageClient(task.locator.source);
-    // Snapshot: task может измениться до resolve, поэтому фиксируем id
+    const url = task.imageUrl;
     const currentTaskId = task.id;
     const currentAnnotations = task.annotations;
 
-    client
-      .resolve(task.locator)
-      .then(url => {
-        if (cancelled) return;
-        resolvedUrl = url;
+    const preload = new window.Image();
+    preload.crossOrigin = 'anonymous';
 
-        const preload = new window.Image();
-        preload.crossOrigin = 'anonymous';
-
-        preload.onload = () => {
-          if (cancelled) return;
-          const initialAnnotations = deserializeAnnotations(
-            currentAnnotations,
-            preload.naturalWidth,
-            preload.naturalHeight,
-          );
-          setTaskData({ taskId: currentTaskId, imageUrl: url, initialAnnotations });
-        };
-
-        preload.onerror = () => {
-          if (cancelled) return;
-          // Монтируем холст без аннотаций — изображение всё равно отобразим
-          setTaskData({ taskId: currentTaskId, imageUrl: url, initialAnnotations: [] });
-        };
-
-        preload.src = url;
-      })
-      .catch(err => {
-        if (cancelled) return;
-        setImageError(String(err));
-      });
-
-    return () => {
-      cancelled = true;
-      if (resolvedUrl && client.revoke) {
-        client.revoke(resolvedUrl);
-      }
+    preload.onload = () => {
+      if (cancelled) return;
+      const initialAnnotations = deserializeAnnotations(
+        currentAnnotations,
+        preload.naturalWidth,
+        preload.naturalHeight,
+      );
+      setTaskData({ taskId: currentTaskId, imageUrl: url, initialAnnotations });
     };
+
+    preload.onerror = () => {
+      if (cancelled) return;
+      setImageError(`Не удалось загрузить изображение: ${url}`);
+    };
+
+    preload.src = url;
+
+    return () => { cancelled = true; };
   }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const navigateTo = useCallback((nextIndex: number) => {
@@ -118,7 +91,6 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
     setSubmitted(true);
   }, []);
 
-  // Горячие клавиши: A — отклонить, S — одобрить, D/F — навигация
   const taskIndexRef = useRef(taskIndex);
   useEffect(() => { taskIndexRef.current = taskIndex; }, [taskIndex]);
 
@@ -153,7 +125,7 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
       <div className={styles.page}>
         <header className={styles.header}>
           <h1 className={styles.headerTitle}>Label Sourcing</h1>
-          <ModeSwitcher currentMode='validation' onModeChange={onModeChange} />
+          <ModeSwitcher />
           <div className={styles.headerRight} />
         </header>
         <div className={styles.doneScreen}>
@@ -171,7 +143,7 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.headerTitle}>Label Sourcing</h1>
-        <ModeSwitcher currentMode='validation' onModeChange={onModeChange} />
+        <ModeSwitcher />
         <nav className={styles.taskNav}>
           <button
             className={styles.navButton}
@@ -200,12 +172,10 @@ export function ValidationPage({ onModeChange }: ValidationPageProps) {
 
       <main className={styles.canvasArea}>
         {imageError ? (
-          <div className={styles.status}>Не удалось загрузить изображение: {imageError}</div>
+          <div className={styles.status}>{imageError}</div>
         ) : !taskData ? (
           <div className={styles.status}>Загрузка…</div>
         ) : (
-          // key={taskData.taskId} пересоздаёт холст при смене задачи,
-          // сбрасывая zoom/pan и давая Annotorious чистый экземпляр.
           <ReadOnlyAnnotationCanvas
             key={taskData.taskId}
             imageUrl={taskData.imageUrl}

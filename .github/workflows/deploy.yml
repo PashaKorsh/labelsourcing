@@ -85,13 +85,13 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          envs: YC_SA_JSON,YC_REGISTRY_ID,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,SECRET_KEY
+          envs: YC_SA_JSON,YC_REGISTRY_ID,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,SECRET_KEY,YANDEX_CLIENT_ID,YANDEX_CLIENT_SECRET,YANDEX_REDIRECT_URI
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
 
             echo "$YC_SA_JSON" | docker login --username json_key --password-stdin cr.yandex
 
-            export YC_REGISTRY_ID POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY
+            export YC_REGISTRY_ID POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY YANDEX_CLIENT_ID YANDEX_CLIENT_SECRET YANDEX_REDIRECT_URI
 
             docker compose -f docker-compose.prod.yml pull -q
 

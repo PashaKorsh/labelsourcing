@@ -1,9 +1,8 @@
-from collections import Counter
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, case, exists
+from sqlalchemy import select, func, case, exists
 from sqlalchemy.orm import selectinload
 import uuid
 
@@ -101,17 +100,21 @@ async def get_datasets(
     return datasets_with_counts
 
 
-@router.get("/{dataset_id}/next", response_model=TaskResponse | None)
+MAX_TASKS_PER_REQUEST = 10
+
+
+@router.get("/{dataset_id}/next", response_model=list[TaskResponse])
 async def get_next_task(
         dataset_id: uuid.UUID,
+        count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Бронирует и возвращает следующую доступную задачу для текущего пользователя.
-    Задача считается доступной, если:
+    """Бронирует и возвращает до `count` доступных задач (max 10).
+    Задача доступна, если:
     - статус 'pending'
     - у пользователя нет активного/завершённого ассайнмента на неё
-    - количество живых ассайнментов меньше required_answers датасета
+    - количество живых (in_progress, не истёкших) ассайнментов меньше required_answers датасета
     """
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
@@ -146,26 +149,53 @@ async def get_next_task(
         .limit(1)
         .with_for_update(skip_locked=True)
     )
-    result = await db.execute(task_stmt)
-    task = result.scalar_one_or_none()
 
-    if not task:
-        await db.rollback()
-        return None
+    # Один пул за раз: если у пользователя уже есть живые ассайнменты —
+    # возвращаем те же задачи (восстановление сессии + защита от накопления пулов)
+    existing_stmt = (
+        select(Task)
+        .join(Assignment, Task.id == Assignment.task_id)
+        .where(Task.dataset_id == dataset_id)
+        .where(Assignment.user_id == current_user.id)
+        .where(Assignment.status == "in_progress")
+        .where(Assignment.expires_at > func.now())
+        .order_by(Task.created_at)
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing_tasks = existing_result.scalars().all()
+    if existing_tasks:
+        return existing_tasks
 
     expires_at = datetime.utcnow() + timedelta(minutes=ASSIGNMENT_EXPIRY_MINUTES)
-    assignment = Assignment(
-        task_id=task.id,
-        user_id=current_user.id,
-        status="in_progress",
-        expires_at=expires_at,
-    )
-    db.add(assignment)
-    task.active_assignments += 1
+    result_tasks: list[Task] = []
+
+    for _ in range(count):
+        # flush делает новые ассайнменты видимыми для следующей итерации запроса
+        if result_tasks:
+            await db.flush()
+
+        task_result = await db.execute(task_stmt)
+        task = task_result.scalar_one_or_none()
+        if not task:
+            break
+
+        db.add(Assignment(
+            task_id=task.id,
+            user_id=current_user.id,
+            status="in_progress",
+            expires_at=expires_at,
+        ))
+        task.active_assignments += 1
+        result_tasks.append(task)
+
+    if not result_tasks:
+        await db.rollback()
+        return []
 
     await db.commit()
-    await db.refresh(task)
-    return task
+    for task in result_tasks:
+        await db.refresh(task)
+    return result_tasks
 
 
 @router.get("/{dataset_id}/tasks", response_model=list[TaskResponse])

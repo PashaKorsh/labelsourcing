@@ -54,7 +54,7 @@ export function WorkspacePage() {
       })
       .catch(err => console.error('[WorkspacePage] get dataset:', err));
 
-    taskService.loadNextTask(datasetId).then(newTask => {
+    taskService.loadNextTask(datasetId, 3).then(newTask => {
       if (newTask) setTasks(taskService.getTasks());
       else setHasMoreTasks(false);
     }).catch(err => console.error('[WorkspacePage] loadNextTask:', err));

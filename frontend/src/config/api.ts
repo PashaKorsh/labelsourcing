@@ -19,7 +19,7 @@ export const API = {
     detail: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
     update: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
     tasks:  (id: string) => `${API_BASE}/api/v1/datasets/${id}/tasks`,
-    next:   (id: string) => `${API_BASE}/api/v1/datasets/${id}/next`,
+    next:   (id: string, count = 1) => `${API_BASE}/api/v1/datasets/${id}/next?count=${count}`,
   },
   tasks: {
     create:    () => `${API_BASE}/api/v1/tasks/`,

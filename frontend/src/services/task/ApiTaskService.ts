@@ -16,21 +16,27 @@ export class ApiTaskService implements TaskService {
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
-  // Запрашивает следующую задачу, которую текущий пользователь ещё не размечал.
-  // Добавляет её в локальный кэш — getTasks() начинает её возвращать.
-  async loadNextTask(datasetId: string): Promise<AnnotationTask | null> {
-    const res = await apiFetch(API.datasets.next(datasetId));
-    const dto: TaskDto | null = await res.json();
-    if (!dto) return null;
+  // Запрашивает задачи у бэкенда и добавляет в кэш только те, которых там нет.
+  // При восстановлении сессии бэк вернёт уже взятые in_progress задачи —
+  // дедупликация предотвращает дубликаты в массиве.
+  // Возвращает первую новую задачу или null, если всё уже в кэше / задач нет.
+  async loadNextTask(datasetId: string, count = 1): Promise<AnnotationTask | null> {
+    const res = await apiFetch(API.datasets.next(datasetId, count));
+    const dtos: TaskDto[] = await res.json();
+    if (!dtos.length) return null;
 
-    const task: AnnotationTask = {
-      id: dto.id,
-      datasetId: dto.dataset_id,
-      imageUrl: dto.url,
-      metadata: dto.task_metadata,
-    };
-    this.tasks.push(task);
-    return task;
+    const existingIds = new Set(this.tasks.map(t => t.id));
+    const newTasks = dtos
+      .filter(dto => !existingIds.has(dto.id))
+      .map(dto => ({
+        id: dto.id,
+        datasetId: dto.dataset_id,
+        imageUrl: dto.url,
+        metadata: dto.task_metadata,
+      }));
+
+    this.tasks.push(...newTasks);
+    return newTasks[0] ?? null;
   }
 
   getTasks(): readonly AnnotationTask[] {

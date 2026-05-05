@@ -115,7 +115,7 @@ class Tag(Base):
     color: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     users: Mapped[List["User"]] = relationship(secondary="user_tags", back_populates="tags")
-    datasets: Mapped[List["Dataset"]] = relationship(secondary="dataset_tags", back_populates="datasets")
+    datasets: Mapped[List["Dataset"]] = relationship(secondary="dataset_tags", back_populates="tags")
 
 
 class UserTag(Base):

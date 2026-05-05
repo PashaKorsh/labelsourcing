@@ -27,6 +27,7 @@ export function WorkspacePage() {
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [taskIndex, setTaskIndex] = useState(0);
+  const [savedTaskIds, setSavedTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [activeTagId, setActiveTagId] = useState<string | null>(DEFAULT_TAGS[0].id);
@@ -68,9 +69,10 @@ export function WorkspacePage() {
     imageSizeRef.current = size;
   }, []);
 
+  const isCurrentTaskSaved = task ? savedTaskIds.has(task.id) : false;
+
   const navigateTo = useCallback(async (nextIndex: number) => {
     if (!task) return;
-    await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
 
     // Если переходим дальше последней загруженной задачи — запрашиваем следующую.
     if (nextIndex >= tasks.length) {
@@ -90,12 +92,14 @@ export function WorkspacePage() {
   }, [task, tasks.length]);
 
   const handleSave = useCallback(async () => {
-    if (task) await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
-    taskService.exportAllAnnotations();
+    if (!task) return;
+    await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
+    setSavedTaskIds(prev => new Set(prev).add(task.id));
   }, [task]);
 
   const canGoPrev = taskIndex > 0;
-  const canGoNext = taskIndex < tasks.length - 1 || hasMoreTasks;
+  // Вперёд — только если текущая задача сохранена
+  const canGoNext = isCurrentTaskSaved && (taskIndex < tasks.length - 1 || hasMoreTasks);
 
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};

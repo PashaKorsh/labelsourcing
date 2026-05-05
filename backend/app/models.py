@@ -93,7 +93,13 @@ class Assignment(Base):
 
     task: Mapped["Task"] = relationship(back_populates="assignments")
     user: Mapped["User"] = relationship(back_populates="assignments")
-    label: Mapped[Optional["Label"]] = relationship(back_populates="assignment", uselist=False)
+    label: Mapped[Optional["Label"]] = relationship(
+        back_populates="assignment",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
+        passive_deletes=True,
+    )
 
 
 class Label(Base):

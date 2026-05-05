@@ -11,7 +11,7 @@ export function AuthPage() {
   useEffect(() => {
     apiFetch(API.users.me())
       .then(() => navigate(ROUTES.home, { replace: true }))
-      .catch(() => { /* не авторизован — показываем кнопку */ });
+      .catch(() => { /* не авторизован, значит показываем кнопку */ });
   }, [navigate]);
 
   const handleLogin = () => {

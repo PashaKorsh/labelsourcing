@@ -29,13 +29,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/v1")
-app.include_router(datasets.router, prefix="/v1")
-app.include_router(tasks.router, prefix="/v1")
-app.include_router(labels.router, prefix="/v1")
-app.include_router(users.router, prefix="/v1")
-app.include_router(tags.router, prefix="/v1")
-app.include_router(sources.router, prefix="/v1")
+app.include_router(auth.router)
+app.include_router(datasets.router)
+app.include_router(tasks.router)
+app.include_router(labels.router)
+app.include_router(users.router)
+app.include_router(tags.router)
+app.include_router(sources.router)
 
 @app.get("/health", tags=["System"])
 async def health_check():

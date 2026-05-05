@@ -24,22 +24,14 @@ services:
       db:
         condition: service_healthy
 
-  frontend:
+  nginx:
     build:
       context: ./frontend
       args:
         - VITE_API_MODE=${VITE_API_MODE:-real}
-    expose:
-      - "3000"
-    depends_on:
-      - backend
-
-  nginx:
-    image: nginx:alpine
     ports:
       - "80:80"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx-test.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - backend
-      - frontend

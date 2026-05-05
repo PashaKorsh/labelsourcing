@@ -14,8 +14,7 @@ import type { DatasetService } from './dataset/DatasetService';
 import type { UserService } from './user/UserService';
 import type { TagService } from './tag/TagService';
 
-// VITE_API_MODE=real — реальные сервисы; всё остальное (в т.ч. отсутствие переменной) — моки.
-const USE_REAL_API = import.meta.env.VITE_API_MODE === 'real';
+const USE_REAL_API = import.meta.env.VITE_API_MODE !== 'mock';
 console.debug(`Is real launch mode: ${USE_REAL_API}`);
 
 interface Services {

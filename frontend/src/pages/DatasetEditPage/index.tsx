@@ -1,15 +1,112 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { RoleBadge } from '../../components/RoleBadge';
-import type { Role } from '../../types/role';
+import { AppTagSelector } from '../../components/AppTagSelector';
+import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
+import { ROUTES } from '../../config/routes';
+import { datasetService, taskService } from '../../services';
+import type { AppTag } from '../../types/appTag';
+import type { Tag } from '../../types/annotation';
+import type { Dataset } from '../../types/dataset';
 import styles from './DatasetEditPage.module.css';
 
-const AVAILABLE_ROLES: Role[] = [
-  { name: 'Медик', color: '#eb5757' },
-  { name: 'Пользователь', color: '#d9d9d9' },
-];
+interface TaskRow {
+  id?: string;
+  url: string;
+}
 
 export function DatasetEditPage() {
+  const { datasetId } = useParams<{ datasetId: string }>();
+  const navigate = useNavigate();
+
+  const [dataset, setDataset] = useState<Dataset | null>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedTags, setSelectedTags] = useState<AppTag[]>([]);
+  const [taskRows, setTaskRows] = useState<TaskRow[]>([{ url: '' }]);
+  const [originalTaskIds, setOriginalTaskIds] = useState<string[]>([]);
+  const [annotationLabels, setAnnotationLabels] = useState<Tag[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!datasetId) return;
+    Promise.all([
+      datasetService.get(datasetId),
+      datasetService.getTasks(datasetId),
+    ]).then(([ds, tasks]) => {
+      setDataset(ds);
+      setTitle(ds.title ?? '');
+      setDescription(ds.description);
+      setSelectedTags(ds.tags);
+      const rows: TaskRow[] = tasks.map(t => ({ id: t.id, url: t.imageUrl }));
+      setTaskRows(rows.length > 0 ? rows : [{ url: '' }]);
+      setOriginalTaskIds(tasks.map(t => t.id));
+      setAnnotationLabels(ds.annotationLabels ?? []);
+    }).catch(console.error);
+  }, [datasetId]);
+
+  const handleUrlChange = (index: number, value: string) =>
+    setTaskRows(prev => prev.map((r, i) => i === index ? { ...r, url: value } : r));
+
+  const addRow = () => setTaskRows(prev => [...prev, { url: '' }]);
+
+  const removeRow = (index: number) =>
+    setTaskRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : [{ url: '' }]);
+
+  const handleSave = async () => {
+    if (!datasetId || !description.trim()) return;
+    setSubmitting(true);
+    try {
+      await datasetService.update(datasetId, {
+        title: title.trim() || undefined,
+        description: description.trim(),
+        tagIds: selectedTags.map(t => t.id),
+        annotationLabels,
+      });
+
+      const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
+      const deletedIds = originalTaskIds.filter(id => !currentIds.has(id));
+      await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
+
+      const urlsToCreate: string[] = [];
+      for (const row of taskRows) {
+        if (!row.url.trim()) continue;
+        if (!row.id) {
+          urlsToCreate.push(row.url.trim());
+        } else {
+          const origUrl = taskRows.find(r => r.id === row.id)?.url;
+          const wasChanged = origUrl !== undefined && origUrl !== row.url.trim();
+          if (wasChanged) {
+            await taskService.deleteTask(row.id);
+            urlsToCreate.push(row.url.trim());
+          }
+        }
+      }
+      if (urlsToCreate.length > 0) {
+        await taskService.createBatch(datasetId, urlsToCreate);
+      }
+
+      navigate(ROUTES.myDatasets);
+    } catch (err) {
+      console.error('[DatasetEditPage]', err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!dataset) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.content}>
+          <ModeSwitcher />
+          <PageHeader />
+          <p>Загрузка…</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className={styles.page}>
       <div className={styles.content}>
@@ -22,7 +119,9 @@ export function DatasetEditPage() {
             <input
               type="text"
               className={styles.input}
-              placeholder="Введите название датасета"
+              placeholder="Название набора"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
             />
           </div>
 
@@ -30,33 +129,59 @@ export function DatasetEditPage() {
             <label className={styles.label}>Описание</label>
             <textarea
               className={styles.textarea}
-              placeholder="Краткое описание датасета"
+              placeholder="Описание датасета"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>URL изображения-превью</label>
-            <input
-              type="text"
-              className={styles.input}
-              placeholder="https://..."
-            />
+            <label className={styles.label}>Роли</label>
+            <AppTagSelector selectedTags={selectedTags} onTagsChange={setSelectedTags} />
           </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>Доступные роли</label>
-            <div className={styles.roleList}>
-              {AVAILABLE_ROLES.map((role) => (
-                <label key={role.name} className={styles.roleCheckbox}>
-                  <input type="checkbox" />
-                  <RoleBadge role={role} />
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <button type="button" className={styles.saveButton}>Создать датасет</button>
         </div>
+
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Метки разметки</h2>
+          <AnnotationLabelEditor labels={annotationLabels} onChange={setAnnotationLabels} />
+        </div>
+
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Изображения</h2>
+          <div className={styles.field}>
+            {taskRows.map((row, i) => (
+              <div key={i} className={styles.urlInputRow}>
+                <input
+                  type="url"
+                  className={styles.input}
+                  placeholder="https://example.com/image.jpg"
+                  value={row.url}
+                  onChange={e => handleUrlChange(i, e.target.value)}
+                />
+                <button
+                  type="button"
+                  className={styles.removeUrlButton}
+                  onClick={() => removeRow(i)}
+                  title="Удалить"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button type="button" className={styles.addUrlButton} onClick={addRow}>
+              + Добавить ещё
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className={styles.saveButton}
+          onClick={handleSave}
+          disabled={submitting || !description.trim()}
+        >
+          {submitting ? 'Сохранение…' : 'Сохранить'}
+        </button>
       </div>
     </main>
   );

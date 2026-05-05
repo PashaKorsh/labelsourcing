@@ -49,6 +49,17 @@ export class MockTaskService implements TaskService {
     if (imageSize) this.imageSizeMap.set(taskId, imageSize);
   }
 
+  async createBatch(datasetId: string, imageUrls: string[]): Promise<void> {
+    imageUrls.forEach((url, i) => {
+      this.tasks.push({ id: `mock-${Date.now()}-${i}`, datasetId, imageUrl: url });
+    });
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

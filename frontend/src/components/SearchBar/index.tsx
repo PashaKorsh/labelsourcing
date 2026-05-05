@@ -1,11 +1,19 @@
 import styles from './SearchBar.module.css';
 
-export function SearchBar() {
+interface Props {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+export function SearchBar({ value, onChange, placeholder = 'Поиск' }: Props) {
   return (
     <input
       type="text"
-      placeholder="Поиск"
+      placeholder={placeholder}
       className={styles.input}
+      value={value}
+      onChange={e => onChange(e.target.value)}
     />
   );
 }

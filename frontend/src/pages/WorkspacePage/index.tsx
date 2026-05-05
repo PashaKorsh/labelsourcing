@@ -5,7 +5,7 @@ import { ToolSelector } from '../../components/ToolSelector';
 import { TagSelector } from '../../components/TagSelector';
 import { HintsBar } from '../../components/HintsBar';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
-import { taskService } from '../../services';
+import { taskService, datasetService } from '../../services';
 import { useDatasetId } from '../../hooks/useRouteParams';
 import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
@@ -14,7 +14,7 @@ import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 
-const TAGS: Tag[] = [
+const DEFAULT_TAGS: Tag[] = [
   { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
   { id: 'vehicle', label: 'Транспорт', color: '#3b82f6', hotkey: '2' },
   { id: 'animal', label: 'Животное', color: '#22c55e', hotkey: '3' },
@@ -28,18 +28,32 @@ export function WorkspacePage() {
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [taskIndex, setTaskIndex] = useState(0);
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
-  const [activeTagId, setActiveTagId] = useState<string | null>(TAGS[0].id);
+  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
+  const [activeTagId, setActiveTagId] = useState<string | null>(DEFAULT_TAGS[0].id);
 
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
 
   const task = tasks[taskIndex] ?? null;
-  const activeTag = TAGS.find(t => t.id === activeTagId) ?? null;
+  const activeTag = tags.find(t => t.id === activeTagId) ?? null;
 
-  // Загружаем первую задачу при монтировании.
-  // Для мока — no-op (задачи уже в списке). Для API — запрашивает /next.
+  // Загружаем метки разметки из датасета и первую задачу при монтировании.
   useEffect(() => {
     if (!datasetId) return;
+    datasetService.get(datasetId)
+      .then(ds => {
+        if (ds.annotationLabels && ds.annotationLabels.length > 0) {
+          const HOTKEYS = '1234567890';
+          const withHotkeys = ds.annotationLabels.map((l, i) => ({
+            ...l,
+            hotkey: i < HOTKEYS.length ? HOTKEYS[i] : undefined,
+          }));
+          setTags(withHotkeys);
+          setActiveTagId(withHotkeys[0].id);
+        }
+      })
+      .catch(err => console.error('[WorkspacePage] get dataset:', err));
+
     taskService.loadNextTask(datasetId).then(newTask => {
       if (newTask) setTasks(taskService.getTasks());
       else setHasMoreTasks(false);
@@ -88,11 +102,11 @@ export function WorkspacePage() {
     for (const tool of IMAGE_DRAWING_TOOLS) {
       if (tool.hotkey) map[tool.hotkey] = () => setActiveTool(tool.id);
     }
-    for (const tag of TAGS) {
+    for (const tag of tags) {
       if (tag.hotkey) map[tag.hotkey] = () => setActiveTagId(tag.id);
     }
     return map;
-  }, []);
+  }, [tags]);
   useHotkeys(hotkeys);
 
   return (
@@ -137,7 +151,7 @@ export function WorkspacePage() {
           />
           <div className={styles.divider} />
           <TagSelector
-            tags={TAGS}
+            tags={tags}
             activeTagId={activeTagId}
             onSelect={setActiveTagId}
           />
@@ -160,7 +174,7 @@ export function WorkspacePage() {
                 imageUrl={task.imageUrl}
                 activeTool={activeTool}
                 activeTag={activeTag}
-                tags={TAGS}
+                tags={tags}
                 initialAnnotations={taskService.getAnnotations(task.id)}
                 onAnnotationsChange={handleAnnotationsChange}
                 onImageSizeChange={handleImageSizeChange}

@@ -1,57 +1,67 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { SearchBar } from '../../components/SearchBar';
-import { ROUTES } from '../../config/routes';
+import { RoleBadge } from '../../components/RoleBadge';
+import { ROUTES, buildRoute } from '../../config/routes';
+import { datasetService } from '../../services';
+import type { Dataset } from '../../types/dataset';
 import styles from './MyDatasetsPage.module.css';
-
-const MOCK_DATASETS = [
-  {
-    id: 1,
-    title: 'Датасет с кошками',
-    imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-1/400/240',
-    taskCount: 248,
-    published: true,
-  },
-  {
-    id: 2,
-    title: 'Датасет с собаками',
-    imageUrl: 'https://picsum.photos/seed/labelsourcing-dog-1/400/240',
-    taskCount: 134,
-    published: false,
-  },
-  {
-    id: 3,
-    title: 'Природные объекты',
-    imageUrl: 'https://picsum.photos/seed/labelsourcing-nature-1/400/240',
-    taskCount: 76,
-    published: true,
-  },
-];
 
 export function MyDatasetsPage() {
   const navigate = useNavigate();
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    const timer = setTimeout(() => {
+      datasetService.listMine(search || undefined)
+        .then(setDatasets)
+        .catch(err => console.error('[MyDatasetsPage]', err))
+        .finally(() => setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
-        <SearchBar />
+        <SearchBar value={search} onChange={setSearch} />
 
         <section className={styles.list}>
-          {MOCK_DATASETS.map((dataset) => (
-            <div key={dataset.id} className={styles.row}>
-              <img src={dataset.imageUrl} alt="" className={styles.image} />
-              <div className={styles.info}>
-                <h2 className={styles.title}>{dataset.title}</h2>
-                <p className={styles.meta}>
-                  {dataset.taskCount} заданий · {dataset.published ? 'Опубликован' : 'Черновик'}
-                </p>
+          {loading ? (
+            <p>Загрузка…</p>
+          ) : (
+            datasets.map((dataset) => (
+              <div key={dataset.id} className={styles.row}>
+                {dataset.imageUrl && (
+                  <img src={dataset.imageUrl} alt="" className={styles.image} />
+                )}
+                <div className={styles.info}>
+                  <h2 className={styles.title}>{dataset.title ?? dataset.description}</h2>
+                  {dataset.tags.length > 0 && (
+                    <div className={styles.tags}>
+                      {dataset.tags.map(tag => (
+                        <RoleBadge key={tag.id} role={tag} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className={styles.editButton}
+                  onClick={() => navigate(buildRoute(ROUTES.datasetEdit, { datasetId: dataset.id }))}
+                >
+                  Редактировать
+                </button>
               </div>
-              <button type="button" className={styles.editButton}>Редактировать</button>
-            </div>
-          ))}
+            ))
+          )}
         </section>
 
         <button

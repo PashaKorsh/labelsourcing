@@ -21,9 +21,12 @@ async def create_dataset(
         current_user: User = Depends(require_roles(["admin"]))
 ):
     """Создать новый набор данных"""
+    labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else None
     new_dataset = Dataset(
         owner_id=current_user.id,
-        description=dataset_in.description
+        title=dataset_in.title,
+        description=dataset_in.description,
+        annotation_labels=labels_data,
     )
     db.add(new_dataset)
     await db.commit()
@@ -172,6 +175,8 @@ async def update_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
+    if update_data.title is not None:
+        dataset.title = update_data.title
     if update_data.description is not None:
         dataset.description = update_data.description
 
@@ -179,6 +184,9 @@ async def update_dataset(
         tags_stmt = select(Tag).where(Tag.id.in_(update_data.tag_ids))
         tags_res = await db.execute(tags_stmt)
         dataset.tags = list(tags_res.scalars().all())
+
+    if update_data.annotation_labels is not None:
+        dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
 
     await db.commit()
     await db.refresh(dataset)

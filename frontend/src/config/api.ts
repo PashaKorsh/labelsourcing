@@ -22,8 +22,9 @@ export const API = {
     next:   (id: string) => `${API_BASE}/api/v1/datasets/${id}/next`,
   },
   tasks: {
-    create: () => `${API_BASE}/api/v1/tasks/`,
-    batch:  () => `${API_BASE}/api/v1/tasks/batch`,
+    create:    () => `${API_BASE}/api/v1/tasks/`,
+    batch:     () => `${API_BASE}/api/v1/tasks/batch`,
+    delete:    (id: string) => `${API_BASE}/api/v1/tasks/${id}`,
     saveLabel: (taskId: string) => `${API_BASE}/api/v1/tasks/${taskId}/labels`,
   },
   labels: {

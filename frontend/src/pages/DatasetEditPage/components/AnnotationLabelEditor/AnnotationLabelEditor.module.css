@@ -1,0 +1,72 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.colorPicker {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 2px;
+  cursor: pointer;
+  background: none;
+}
+
+.nameInput {
+  flex: 1;
+  height: 36px;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 15px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.nameInput:focus {
+  border-color: #999;
+}
+
+.removeButton {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  color: #999;
+  cursor: pointer;
+  font-size: 12px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.removeButton:hover {
+  border-color: #e05555;
+  color: #e05555;
+}
+
+.addButton {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #555;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.addButton:hover {
+  color: #111;
+}

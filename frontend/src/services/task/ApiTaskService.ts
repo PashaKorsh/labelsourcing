@@ -72,6 +72,19 @@ export class ApiTaskService implements TaskService {
     });
   }
 
+  async createBatch(datasetId: string, imageUrls: string[]): Promise<void> {
+    await apiFetch(API.tasks.batch(), {
+      method: 'POST',
+      body: JSON.stringify({ dataset_id: datasetId, urls: imageUrls }),
+    });
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    await apiFetch(API.tasks.delete(taskId), { method: 'DELETE' });
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

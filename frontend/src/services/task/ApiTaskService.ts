@@ -68,7 +68,7 @@ export class ApiTaskService implements TaskService {
 
     await apiFetch(API.tasks.saveLabel(taskId), {
       method: 'PUT',
-      body: JSON.stringify({ dataset_id: task.datasetId, data: serialized.output_values }),
+      body: JSON.stringify({ data: serialized.output_values }),
     });
   }
 

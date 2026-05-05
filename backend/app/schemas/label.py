@@ -1,23 +1,17 @@
 import uuid
-from typing import Dict, Any, Optional
+from datetime import datetime
+from typing import Dict, Any
 from pydantic import BaseModel, ConfigDict
 
 
-class LabelCreate(BaseModel):
-    dataset_id: uuid.UUID
+class LabelSubmit(BaseModel):
     data: Dict[str, Any]
 
 
 class LabelResponse(BaseModel):
     id: uuid.UUID
-    task_id: uuid.UUID
-    dataset_id: Optional[uuid.UUID]
-    user_id: uuid.UUID
-    data: Dict[str, Any]
-    status: str
+    assignment_id: uuid.UUID
+    result: Dict[str, Any]
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class LabelStatusUpdate(BaseModel):
-    status: str

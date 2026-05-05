@@ -14,6 +14,7 @@ class AnnotationLabelSchema(BaseModel):
 class DatasetCreate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    required_answers: int = 3
     annotation_labels: Optional[List[AnnotationLabelSchema]] = None
 
 
@@ -22,6 +23,8 @@ class DatasetResponse(BaseModel):
     owner_id: uuid.UUID
     title: Optional[str] = None
     description: Optional[str] = None
+    required_answers: int = 3
+    status: str = "active"
     tasks_count: int = 0
     labeled_count: int = 0
     tags: list[TagResponse] = []
@@ -38,5 +41,7 @@ class DatasetResponse(BaseModel):
 class DatasetUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    required_answers: Optional[int] = None
+    status: Optional[str] = None
     tag_ids: Optional[list[uuid.UUID]] = None
     annotation_labels: Optional[List[AnnotationLabelSchema]] = None

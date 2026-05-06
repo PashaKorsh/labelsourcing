@@ -75,7 +75,7 @@ class Dataset(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     required_answers: Mapped[int] = mapped_column(Integer, server_default="3")
     default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
-    status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status"), default=DatasetStatus.ACTIVE)
+    status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status", values_callable=lambda x: [e.value for e in x]), default=DatasetStatus.ACTIVE)
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -91,10 +91,10 @@ class Task(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     url: Mapped[str] = mapped_column(Text)
-    type: Mapped[TaskType] = mapped_column(SAEnum(TaskType, name="task_type"), default=TaskType.ANNOTATION)
+    type: Mapped[TaskType] = mapped_column(SAEnum(TaskType, name="task_type", values_callable=lambda x: [e.value for e in x]), default=TaskType.ANNOTATION)
     completed_answers: Mapped[int] = mapped_column(Integer, server_default="0")
     active_assignments: Mapped[int] = mapped_column(Integer, server_default="0")
-    status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus, name="task_status"), default=TaskStatus.PENDING)
+    status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus, name="task_status", values_callable=lambda x: [e.value for e in x]), default=TaskStatus.PENDING)
     # Слово metadata зарезервировано в алхимии (Base.metadata), поэтому атрибут называется task_metadata
     task_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -112,7 +112,7 @@ class Assignment(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    status: Mapped[AssignmentStatus] = mapped_column(SAEnum(AssignmentStatus, name="assignment_status"))
+    status: Mapped[AssignmentStatus] = mapped_column(SAEnum(AssignmentStatus, name="assignment_status", values_callable=lambda x: [e.value for e in x]))
     assigned_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime)
 

@@ -8,6 +8,7 @@ export interface Dataset {
   tags: AppTag[];
   imageUrl?: string;
   completed?: boolean;
+  userDone?: boolean;
   taskCount?: number;
   annotationLabels?: Tag[];
 }

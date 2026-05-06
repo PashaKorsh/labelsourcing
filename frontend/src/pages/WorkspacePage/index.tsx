@@ -13,6 +13,7 @@ import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import styles from './WorkspacePage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
+import { CompletedScreen } from '../../components/CompletedScreen';
 
 const DEFAULT_TAGS: Tag[] = [
   { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
@@ -169,9 +170,9 @@ export function WorkspacePage() {
         <main className={styles.canvasArea}>
           <div className={styles.canvasContent}>
             {!task ? (
-              <div className={styles.status}>
-                {tasks.length === 0 ? 'Загрузка…' : 'Все задачи выполнены'}
-              </div>
+              tasks.length === 0 && hasMoreTasks
+                ? <div className={styles.status}>Загрузка…</div>
+                : <CompletedScreen />
             ) : (
               <AnnotationCanvas
                 key={task.id}

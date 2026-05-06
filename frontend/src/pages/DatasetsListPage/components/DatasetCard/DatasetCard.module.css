@@ -55,3 +55,14 @@
 .dimmed {
   opacity: 0.7;
 }
+
+.doneBadge {
+  font-size: 13px;
+  font-weight: 500;
+  color: #16a34a;
+  padding: 6px 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  white-space: nowrap;
+}

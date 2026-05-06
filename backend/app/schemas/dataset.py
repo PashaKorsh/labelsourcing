@@ -29,6 +29,7 @@ class DatasetResponse(BaseModel):
     status: str = "active"
     tasks_count: int = 0
     labeled_count: int = 0
+    user_done: bool = False
     tags: list[TagResponse] = []
     annotation_labels: List[AnnotationLabelSchema] = []
 

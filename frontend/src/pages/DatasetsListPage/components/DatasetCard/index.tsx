@@ -11,8 +11,10 @@ type Props = {
 
 export function DatasetCard({ dataset }: Props) {
   const navigate = useNavigate();
+  const isDone = dataset.userDone ?? false;
 
   const handlePlay = () => {
+    if (isDone) return;
     navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId: dataset.id }));
   };
 
@@ -38,7 +40,11 @@ export function DatasetCard({ dataset }: Props) {
               <RoleBadge key={tag.id} role={tag} />
             ))}
           </div>
-          <PlayButton onClick={handlePlay} />
+          {isDone ? (
+            <span className={styles.doneBadge}>✓ Выполнено</span>
+          ) : (
+            <PlayButton onClick={handlePlay} />
+          )}
         </div>
       </div>
     </div>

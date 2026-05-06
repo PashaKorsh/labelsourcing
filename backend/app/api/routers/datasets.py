@@ -19,7 +19,18 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 ASSIGNMENT_EXPIRY_MINUTES = 30
 
 
-async def _get_dataset_with_counts(db: AsyncSession, dataset_id: uuid.UUID) -> Dataset | None:
+def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
+    if access is None:
+        return False
+    effective_limit = min(access.labeling_limit, tasks_count)
+    return not access.can_label or access.labeled_count >= effective_limit
+
+
+async def _get_dataset_with_counts(
+    db: AsyncSession,
+    dataset_id: uuid.UUID,
+    user_id: uuid.UUID | None = None,
+) -> Dataset | None:
     stmt = (
         select(
             Dataset,
@@ -38,6 +49,17 @@ async def _get_dataset_with_counts(db: AsyncSession, dataset_id: uuid.UUID) -> D
     dataset = row[0]
     dataset.tasks_count = row[1]
     dataset.labeled_count = row[2] or 0
+    dataset.user_done = False
+
+    if user_id is not None:
+        access = (await db.execute(
+            select(UserDatasetAccess).where(
+                UserDatasetAccess.user_id == user_id,
+                UserDatasetAccess.dataset_id == dataset_id,
+            )
+        )).scalar_one_or_none()
+        dataset.user_done = _compute_user_done(access, dataset.tasks_count)
+
     return dataset
 
 
@@ -98,7 +120,22 @@ async def get_datasets(
         dataset = row[0]
         dataset.tasks_count = row[1]
         dataset.labeled_count = row[2] or 0
+        dataset.user_done = False
         datasets_with_counts.append(dataset)
+
+    if datasets_with_counts:
+        dataset_ids = [d.id for d in datasets_with_counts]
+        access_result = await db.execute(
+            select(UserDatasetAccess).where(
+                UserDatasetAccess.user_id == current_user.id,
+                UserDatasetAccess.dataset_id.in_(dataset_ids),
+            )
+        )
+        access_map: dict[uuid.UUID, UserDatasetAccess] = {
+            a.dataset_id: a for a in access_result.scalars()
+        }
+        for dataset in datasets_with_counts:
+            dataset.user_done = _compute_user_done(access_map.get(dataset.id), dataset.tasks_count)
 
     return datasets_with_counts
 
@@ -155,8 +192,14 @@ async def get_next_task(
     )
     access = (await db.execute(access_stmt)).scalar_one()
 
-    # Проверяем права и квоту — оба случая равнозначны для пользователя
-    if not access.can_label or access.labeled_count >= access.labeling_limit:
+    total_tasks = (
+        await db.execute(select(func.count()).where(Task.dataset_id == dataset_id))
+    ).scalar_one()
+
+    # Проверяем права и квоту — оба случая равнозначны для пользователя.
+    # Лимит не может превышать количество задач в датасете.
+    effective_limit = min(access.labeling_limit, total_tasks)
+    if not access.can_label or access.labeled_count >= effective_limit:
         await db.rollback()
         return []
 
@@ -299,7 +342,7 @@ async def get_dataset_detail(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    dataset = await _get_dataset_with_counts(db, dataset_id)
+    dataset = await _get_dataset_with_counts(db, dataset_id, user_id=current_user.id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
     return dataset

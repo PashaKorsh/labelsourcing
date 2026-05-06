@@ -85,7 +85,6 @@ export function WorkspacePage() {
         setTasks(taskService.getTasks());
       } else {
         setHasMoreTasks(false);
-        return;
       }
     }
 

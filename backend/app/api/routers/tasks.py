@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.database import get_db
-from app.models import Task, User, Assignment, Label, Dataset
+from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
 from app.schemas.label import LabelSubmit, LabelResponse
@@ -112,6 +112,14 @@ async def submit_label(
         dataset = await db.get(Dataset, task.dataset_id)
         if task.completed_answers >= dataset.required_answers:
             task.status = "completed"
+
+        access_stmt = select(UserDatasetAccess).where(
+            UserDatasetAccess.user_id == current_user.id,
+            UserDatasetAccess.dataset_id == task.dataset_id,
+        )
+        access = (await db.execute(access_stmt)).scalar_one_or_none()
+        if access is not None:
+            access.labeled_count += 1
 
     await db.commit()
     await db.refresh(label)

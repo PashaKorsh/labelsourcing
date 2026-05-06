@@ -24,6 +24,7 @@ CREATE TABLE datasets (
     name TEXT NOT NULL,
     required_answers INT NOT NULL DEFAULT 3,
     status VARCHAR(50) DEFAULT 'active',
+    default_labeling_limit INT DEFAULT 50,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
@@ -33,6 +34,8 @@ CREATE TABLE datasets (
 - **`required_answers`**: Глобальный кворум. Указывает, сколько успешных лейблов нужно собрать, чтобы задача считалась закрытой.
 - **`status`**: Статус жизненного цикла всего проекта.
     - **Варианты:** `active` (идет раздача), `paused` (остановлено), `completed` (все задачи размечены).
+- **`default_labeling_limit`**: Базовый лимит задач, который будет назначен пользователю при его первом обращении к этому датасету. Позволяет
+    гибко настраивать квоты для разных проектов (в одном проекте давать по 50 задач, в другом по 500)
 - **`created_at`**: Дата создания проекта.
 ---
 ### 3. Таблица `tasks`
@@ -100,3 +103,32 @@ CREATE TABLE labels (
 - **`result`**: Главное поле с данными.
     - **Варианты:** для `classification` — `{"label": "cat"}`, для `annotation` — массив координат полигонов, для `validation` — `{"is_correct": true}`.
 - **`created_at`**: Время сохранения. Помогает вычислять скорость работы юзера (разница с `assigned_at`).
+---
+### 6. Таблица `user_dataset_access`
+Промежуточная таблица-контроллер. Хранит состояние отношений между конкретным человеком и конкретным набором данных: квоты, счетчики прогресса и права доступа.
+SQL
+```
+CREATE TABLE user_dataset_access (
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    dataset_id UUID REFERENCES datasets(id) ON DELETE CASCADE,
+
+    -- Квоты
+    labeling_limit INT DEFAULT 50,
+    labeled_count INT DEFAULT 0,
+
+    -- Права
+    can_label BOOLEAN DEFAULT TRUE,
+    can_validate BOOLEAN DEFAULT FALSE,
+
+    PRIMARY KEY (user_id, dataset_id)
+);
+```
+- **`user_id / dataset_id`**: Составной первичный ключ (Composite Primary Key). Гарантирует, что для связки «один юзер — один проект» существует только одна запись с настройками.
+
+- **`labeling_limit`**: Персональный лимит задач на разметку. При создании записи копируется из datasets.default_labeling_limit, но в дальнейшем может быть увеличен модератором индивидуально (докидывание задач).
+
+- **`labeled_count`**: Счетчик уже выполненных и принятых задач в этом проекте конкретным пользователем.
+
+- **`can_label`**: Флаг доступа. Разрешает пользователю запрашивать задачи типа annotation или classification.
+
+- **`can_validate`**: Флаг доступа к проверке чужой работы (type = 'validation'). По умолчанию выключен, может быть включен администратором для проверенных исполнителей.

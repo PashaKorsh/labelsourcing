@@ -3,14 +3,16 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case, exists
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 import uuid
 
 from app.database import get_db
-from app.models import Dataset, User, Tag, Task, Assignment
+from app.models import Dataset, User, Tag, Task, Assignment, UserDatasetAccess
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse
+from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
@@ -51,6 +53,7 @@ async def create_dataset(
         title=dataset_in.title,
         description=dataset_in.description,
         required_answers=dataset_in.required_answers,
+        default_labeling_limit=dataset_in.default_labeling_limit,
         annotation_labels=labels_data,
     )
     db.add(new_dataset)
@@ -111,14 +114,51 @@ async def get_next_task(
         current_user: User = Depends(get_current_user)
 ):
     """Бронирует и возвращает до `count` доступных задач (max 10).
-    Задача доступна, если:
-    - статус 'pending'
-    - у пользователя нет активного/завершённого ассайнмента на неё
-    - количество живых (in_progress, не истёкших) ассайнментов меньше required_answers датасета
+    Автоматически создаёт запись user_dataset_access при первом обращении.
+    Возвращает [] если задач нет или лимит пользователя исчерпан.
     """
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    # Восстановление сессии: если у пользователя уже есть живые ассайнменты — вернуть их
+    existing_stmt = (
+        select(Task)
+        .join(Assignment, Task.id == Assignment.task_id)
+        .where(Task.dataset_id == dataset_id)
+        .where(Assignment.user_id == current_user.id)
+        .where(Assignment.status == "in_progress")
+        .where(Assignment.expires_at > func.now())
+        .order_by(Task.created_at)
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing_tasks = existing_result.scalars().all()
+    if existing_tasks:
+        return existing_tasks
+
+    # Upsert access-записи: создать если нет, иначе не трогать
+    upsert_stmt = (
+        pg_insert(UserDatasetAccess)
+        .values(
+            user_id=current_user.id,
+            dataset_id=dataset_id,
+            labeling_limit=dataset.default_labeling_limit,
+        )
+        .on_conflict_do_nothing(index_elements=["user_id", "dataset_id"])
+    )
+    await db.execute(upsert_stmt)
+    await db.flush()
+
+    access_stmt = select(UserDatasetAccess).where(
+        UserDatasetAccess.user_id == current_user.id,
+        UserDatasetAccess.dataset_id == dataset_id,
+    )
+    access = (await db.execute(access_stmt)).scalar_one()
+
+    # Проверяем права и квоту — оба случая равнозначны для пользователя
+    if not access.can_label or access.labeled_count >= access.labeling_limit:
+        await db.rollback()
+        return []
 
     # Живые ассайнменты = in_progress и ещё не истёкшие
     live_count_sq = (
@@ -150,27 +190,10 @@ async def get_next_task(
         .with_for_update(skip_locked=True)
     )
 
-    # Один пул за раз: если у пользователя уже есть живые ассайнменты —
-    # возвращаем те же задачи (восстановление сессии + защита от накопления пулов)
-    existing_stmt = (
-        select(Task)
-        .join(Assignment, Task.id == Assignment.task_id)
-        .where(Task.dataset_id == dataset_id)
-        .where(Assignment.user_id == current_user.id)
-        .where(Assignment.status == "in_progress")
-        .where(Assignment.expires_at > func.now())
-        .order_by(Task.created_at)
-    )
-    existing_result = await db.execute(existing_stmt)
-    existing_tasks = existing_result.scalars().all()
-    if existing_tasks:
-        return existing_tasks
-
     expires_at = datetime.utcnow() + timedelta(minutes=ASSIGNMENT_EXPIRY_MINUTES)
     result_tasks: list[Task] = []
 
     for _ in range(count):
-        # flush делает новые ассайнменты видимыми для следующей итерации запроса
         if result_tasks:
             await db.flush()
 
@@ -217,6 +240,59 @@ async def get_dataset_tasks(
     return result.scalars().all()
 
 
+@router.get("/{dataset_id}/access", response_model=list[UserDatasetAccessResponse])
+async def get_dataset_access(
+        dataset_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        admin_user: User = Depends(require_roles(["admin"]))
+):
+    """Список записей доступа всех пользователей к датасету — только для администраторов"""
+    stmt = select(UserDatasetAccess).where(UserDatasetAccess.dataset_id == dataset_id)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.put("/{dataset_id}/access/{user_id}", response_model=UserDatasetAccessResponse)
+async def upsert_user_access(
+        dataset_id: uuid.UUID,
+        user_id: uuid.UUID,
+        update_in: UserDatasetAccessUpdate,
+        db: AsyncSession = Depends(get_db),
+        admin_user: User = Depends(require_roles(["admin"]))
+):
+    """Создать или обновить запись доступа пользователя к датасету — только для администраторов"""
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    stmt = select(UserDatasetAccess).where(
+        UserDatasetAccess.user_id == user_id,
+        UserDatasetAccess.dataset_id == dataset_id,
+    )
+    access = (await db.execute(stmt)).scalar_one_or_none()
+
+    if access is None:
+        access = UserDatasetAccess(
+            user_id=user_id,
+            dataset_id=dataset_id,
+            labeling_limit=update_in.labeling_limit if update_in.labeling_limit is not None else dataset.default_labeling_limit,
+            can_label=update_in.can_label if update_in.can_label is not None else True,
+            can_validate=update_in.can_validate if update_in.can_validate is not None else False,
+        )
+        db.add(access)
+    else:
+        if update_in.labeling_limit is not None:
+            access.labeling_limit = update_in.labeling_limit
+        if update_in.can_label is not None:
+            access.can_label = update_in.can_label
+        if update_in.can_validate is not None:
+            access.can_validate = update_in.can_validate
+
+    await db.commit()
+    await db.refresh(access)
+    return access
+
+
 @router.get("/{dataset_id}", response_model=DatasetResponse)
 async def get_dataset_detail(
         dataset_id: uuid.UUID,
@@ -249,6 +325,8 @@ async def update_dataset(
         dataset.description = update_data.description
     if update_data.required_answers is not None:
         dataset.required_answers = update_data.required_answers
+    if update_data.default_labeling_limit is not None:
+        dataset.default_labeling_limit = update_data.default_labeling_limit
     if update_data.status is not None:
         dataset.status = update_data.status
     if update_data.annotation_labels is not None:

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Any, Dict
 
-from sqlalchemy import ForeignKey, Text, DateTime, String, Integer, UniqueConstraint
+from sqlalchemy import ForeignKey, Text, DateTime, String, Integer, Boolean, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -24,6 +24,7 @@ class User(Base):
     datasets: Mapped[List["Dataset"]] = relationship(back_populates="owner")
     assignments: Mapped[List["Assignment"]] = relationship(back_populates="user")
     tags: Mapped[List["Tag"]] = relationship(secondary="user_tags", back_populates="users")
+    dataset_accesses: Mapped[List["UserDatasetAccess"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Role(Base):
@@ -51,6 +52,7 @@ class Dataset(Base):
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     required_answers: Mapped[int] = mapped_column(Integer, server_default="3")
+    default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     status: Mapped[str] = mapped_column(String(50), server_default="active")
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -58,6 +60,7 @@ class Dataset(Base):
     owner: Mapped["User"] = relationship(back_populates="datasets")
     tasks: Mapped[List["Task"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     tags: Mapped[List["Tag"]] = relationship(secondary="dataset_tags", back_populates="datasets")
+    user_accesses: Mapped[List["UserDatasetAccess"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -138,3 +141,18 @@ class DatasetTag(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     tag_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"))
+
+
+class UserDatasetAccess(Base):
+    __tablename__ = "user_dataset_access"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    dataset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True)
+
+    labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
+    labeled_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    can_label: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    can_validate: Mapped[bool] = mapped_column(Boolean, server_default="false")
+
+    user: Mapped["User"] = relationship(back_populates="dataset_accesses")
+    dataset: Mapped["Dataset"] = relationship(back_populates="user_accesses")

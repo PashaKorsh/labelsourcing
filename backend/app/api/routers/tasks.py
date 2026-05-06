@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.database import get_db
-from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess
+from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess, AssignmentStatus, TaskStatus
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
 from app.schemas.label import LabelSubmit, LabelResponse
@@ -75,7 +75,7 @@ async def submit_label(
     stmt = select(Assignment).where(
         Assignment.task_id == task_id,
         Assignment.user_id == current_user.id,
-        Assignment.status.in_(["in_progress", "done"]),
+        Assignment.status.in_([AssignmentStatus.IN_PROGRESS, AssignmentStatus.DONE]),
     )
     result = await db.execute(stmt)
     assignment = result.scalar_one_or_none()
@@ -102,8 +102,8 @@ async def submit_label(
     label = Label(assignment_id=assignment.id, result=label_in.data)
     db.add(label)
 
-    if assignment.status == "in_progress":
-        assignment.status = "done"
+    if assignment.status == AssignmentStatus.IN_PROGRESS:
+        assignment.status = AssignmentStatus.DONE
 
         task = await db.get(Task, task_id)
         task.active_assignments = max(0, task.active_assignments - 1)
@@ -111,7 +111,7 @@ async def submit_label(
 
         dataset = await db.get(Dataset, task.dataset_id)
         if task.completed_answers >= dataset.required_answers:
-            task.status = "completed"
+            task.status = TaskStatus.COMPLETED
 
         access_stmt = select(UserDatasetAccess).where(
             UserDatasetAccess.user_id == current_user.id,

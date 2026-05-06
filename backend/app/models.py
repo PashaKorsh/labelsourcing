@@ -1,8 +1,9 @@
 import uuid
+import enum
 from datetime import datetime
 from typing import List, Optional, Any, Dict
 
-from sqlalchemy import ForeignKey, Text, DateTime, String, Integer, Boolean, UniqueConstraint
+from sqlalchemy import ForeignKey, Text, DateTime, String, Integer, Boolean, UniqueConstraint, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -10,6 +11,27 @@ from sqlalchemy.sql import func
 
 class Base(DeclarativeBase):
     pass
+
+
+class AssignmentStatus(str, enum.Enum):
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+    EXPIRED = "expired"
+    REJECTED = "rejected"
+
+
+class TaskStatus(str, enum.Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+
+
+class TaskType(str, enum.Enum):
+    ANNOTATION = "annotation"
+
+
+class DatasetStatus(str, enum.Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
 
 
 class User(Base):
@@ -53,7 +75,7 @@ class Dataset(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     required_answers: Mapped[int] = mapped_column(Integer, server_default="3")
     default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
-    status: Mapped[str] = mapped_column(String(50), server_default="active")
+    status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status"), default=DatasetStatus.ACTIVE)
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -69,10 +91,10 @@ class Task(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     url: Mapped[str] = mapped_column(Text)
-    type: Mapped[str] = mapped_column(String(50), server_default="annotation")
+    type: Mapped[TaskType] = mapped_column(SAEnum(TaskType, name="task_type"), default=TaskType.ANNOTATION)
     completed_answers: Mapped[int] = mapped_column(Integer, server_default="0")
     active_assignments: Mapped[int] = mapped_column(Integer, server_default="0")
-    status: Mapped[str] = mapped_column(String(50), server_default="pending")
+    status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus, name="task_status"), default=TaskStatus.PENDING)
     # Слово metadata зарезервировано в алхимии (Base.metadata), поэтому атрибут называется task_metadata
     task_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -90,7 +112,7 @@ class Assignment(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     task_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"))
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    status: Mapped[str] = mapped_column(String(50))  # in_progress | done | expired | rejected
+    status: Mapped[AssignmentStatus] = mapped_column(SAEnum(AssignmentStatus, name="assignment_status"))
     assigned_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime)
 

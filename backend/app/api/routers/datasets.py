@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 import uuid
 
 from app.database import get_db
-from app.models import Dataset, User, Tag, Task, Assignment, UserDatasetAccess
+from app.models import Dataset, User, Tag, Task, Assignment, UserDatasetAccess, AssignmentStatus, TaskStatus
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse
@@ -164,7 +164,7 @@ async def get_next_task(
         .join(Assignment, Task.id == Assignment.task_id)
         .where(Task.dataset_id == dataset_id)
         .where(Assignment.user_id == current_user.id)
-        .where(Assignment.status == "in_progress")
+        .where(Assignment.status == AssignmentStatus.IN_PROGRESS)
         .where(Assignment.expires_at > func.now())
         .order_by(Task.created_at)
     )
@@ -207,7 +207,7 @@ async def get_next_task(
     live_count_sq = (
         select(func.count())
         .where(Assignment.task_id == Task.id)
-        .where(Assignment.status == "in_progress")
+        .where(Assignment.status == AssignmentStatus.IN_PROGRESS)
         .where(Assignment.expires_at > func.now())
         .correlate(Task)
         .scalar_subquery()
@@ -218,14 +218,14 @@ async def get_next_task(
         select(Assignment.id)
         .where(Assignment.task_id == Task.id)
         .where(Assignment.user_id == current_user.id)
-        .where(Assignment.status.in_(["in_progress", "done"]))
+        .where(Assignment.status.in_([AssignmentStatus.IN_PROGRESS, AssignmentStatus.DONE]))
         .correlate(Task)
     )
 
     task_stmt = (
         select(Task)
         .where(Task.dataset_id == dataset_id)
-        .where(Task.status == "pending")
+        .where(Task.status == TaskStatus.PENDING)
         .where(live_count_sq < dataset.required_answers)
         .where(~user_busy_sq)
         .order_by(Task.created_at)
@@ -248,7 +248,7 @@ async def get_next_task(
         db.add(Assignment(
             task_id=task.id,
             user_id=current_user.id,
-            status="in_progress",
+            status=AssignmentStatus.IN_PROGRESS,
             expires_at=expires_at,
         ))
         task.active_assignments += 1

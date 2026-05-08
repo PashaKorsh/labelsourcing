@@ -4,7 +4,7 @@ import base64
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,6 +48,13 @@ async def login_for_access_token(
 
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Выход из системы — удаляет cookie с токеном"""
+    response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
+    return {"ok": True}
 
 
 @router.get("/yandex/login")

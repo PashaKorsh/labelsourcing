@@ -90,7 +90,6 @@ export function TagsPage() {
                 <>
                   <div className={styles.colorSwatch} style={{ backgroundColor: tag.color ?? '#d9d9d9' }} />
                   <RoleBadge role={tag} />
-                  <span className={styles.colorCode}>{tag.color ?? '—'}</span>
                   <div className={styles.spacer} />
                   <button type="button" className={styles.editButton} onClick={() => startEdit(tag)}>
                     Редактировать

@@ -1,17 +1,11 @@
-import { useState, useEffect } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { RoleBadge } from '../../components/RoleBadge';
-import { userService } from '../../services';
-import type { UserProfile } from '../../types/user';
+import { useAuth } from '../../context/auth';
 import styles from './ProfilePage.module.css';
 
 export function ProfilePage() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-
-  useEffect(() => {
-    userService.getMe().then(setProfile).catch(console.error);
-  }, []);
+  const { user, logout } = useAuth();
 
   return (
     <main className={styles.page}>
@@ -19,17 +13,20 @@ export function ProfilePage() {
         <ModeSwitcher />
         <PageHeader />
 
-        {profile && (
+        {user && (
           <>
             <div className={styles.card}>
-              {profile.avatarUrl && (
-                <img src={profile.avatarUrl} alt="Аватар пользователя" className={styles.avatar} />
+              {user.avatarUrl && (
+                <img src={user.avatarUrl} alt="Аватар пользователя" className={styles.avatar} />
               )}
-              <h1 className={styles.name}>{profile.name ?? profile.email}</h1>
-              <p className={styles.email}>{profile.email}</p>
-              {profile.tags.map(tag => (
+              <h1 className={styles.name}>{user.name ?? user.email}</h1>
+              <p className={styles.email}>{user.email}</p>
+              {user.tags.map(tag => (
                 <RoleBadge key={tag.id} role={tag} />
               ))}
+              <button type="button" className={styles.logoutButton} onClick={logout}>
+                Выйти
+              </button>
             </div>
 
             <div className={styles.stats}>

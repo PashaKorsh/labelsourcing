@@ -59,6 +59,8 @@ async def _get_dataset_with_counts(
             )
         )).scalar_one_or_none()
         dataset.user_done = _compute_user_done(access, dataset.tasks_count)
+        if access is not None:
+            dataset.user_labeling_limit = min(access.labeling_limit, dataset.tasks_count)
 
     return dataset
 

@@ -30,6 +30,7 @@ class DatasetResponse(BaseModel):
     tasks_count: int = 0
     labeled_count: int = 0
     user_done: bool = False
+    user_labeling_limit: int | None = None
     tags: list[TagResponse] = []
     annotation_labels: List[AnnotationLabelSchema] = []
 

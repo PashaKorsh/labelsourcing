@@ -29,6 +29,7 @@ export function WorkspacePage() {
   // Мок инициализирует задачи сразу; API-сервис начинает с пустого списка.
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
+  const [labelingLimit, setLabelingLimit] = useState<number | null>(null);
   const [taskIndex, setTaskIndex] = useState(0);
   const [savedTaskIds, setSavedTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
@@ -48,8 +49,16 @@ export function WorkspacePage() {
   // Загружаем метки разметки из датасета и первую задачу при монтировании.
   useEffect(() => {
     if (!datasetId) return;
-    datasetService.get(datasetId)
+
+    taskService.loadNextTask(datasetId, 3)
+      .then(newTask => {
+        if (newTask) setTasks(taskService.getTasks());
+        else setHasMoreTasks(false);
+
+        return datasetService.get(datasetId);
+      })
       .then(ds => {
+        if (ds.userLabelingLimit != null) setLabelingLimit(ds.userLabelingLimit);
         if (ds.annotationLabels && ds.annotationLabels.length > 0) {
           const HOTKEYS = '1234567890';
           const withHotkeys = ds.annotationLabels.map((l, i) => ({
@@ -60,12 +69,7 @@ export function WorkspacePage() {
           setActiveTagId(withHotkeys[0].id);
         }
       })
-      .catch(err => console.error('[WorkspacePage] get dataset:', err));
-
-    taskService.loadNextTask(datasetId, 3).then(newTask => {
-      if (newTask) setTasks(taskService.getTasks());
-      else setHasMoreTasks(false);
-    }).catch(err => console.error('[WorkspacePage] loadNextTask:', err));
+      .catch(err => console.error('[WorkspacePage] init:', err));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAnnotationsChange = useCallback((annotations: ImageAnnotation[]) => {
@@ -143,7 +147,7 @@ export function WorkspacePage() {
           <span className={styles.taskCounter}>
             {(task?.metadata?.name as string | undefined) ?? `Задача ${taskIndex + 1}`}
             <span className={styles.taskIndex}>
-              {taskIndex + 1} / {tasks.length}
+              {taskIndex + 1} / {labelingLimit ?? tasks.length}
             </span>
             {task?.expiresAt && <ExpiryTimer expiresAt={task.expiresAt} />}
           </span>

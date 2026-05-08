@@ -8,6 +8,7 @@ import { ExpiryTimer } from '../../components/ExpiryTimer';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService, datasetService } from '../../services';
 import { useDatasetId } from '../../hooks/useRouteParams';
+import { useIsExpired } from '../../hooks/useIsExpired';
 import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
 import { useHotkeys } from '../../hooks/useHotkeys';
@@ -33,7 +34,6 @@ export function WorkspacePage() {
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [activeTagId, setActiveTagId] = useState<string | null>(DEFAULT_TAGS[0].id);
-  const [isExpired, setIsExpired] = useState(false);
 
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
@@ -41,8 +41,9 @@ export function WorkspacePage() {
   const task = tasks[taskIndex] ?? null;
   const activeTag = tags.find(t => t.id === activeTagId) ?? null;
 
-  // Сбрасываем флаг истечения при переходе к новой задаче
-  useEffect(() => { setIsExpired(false); }, [task?.id]);
+  // Вычисляется реактивно из expiresAt и текущего времени — не хранит ручное состояние.
+  // Корректно обновляется при навигации между задачами без сброса через useEffect.
+  const isExpired = useIsExpired(task?.expiresAt);
 
   // Загружаем метки разметки из датасета и первую задачу при монтировании.
   useEffect(() => {
@@ -102,11 +103,8 @@ export function WorkspacePage() {
       await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
       setSavedTaskIds(prev => new Set(prev).add(task.id));
     } catch (err) {
-      if (err instanceof Error && err.message.startsWith('410')) {
-        setIsExpired(true);
-      } else {
-        throw err;
-      }
+      if (!(err instanceof Error && err.message.startsWith('410'))) throw err;
+      // 410 — задание истекло; isExpired обновится само через useIsExpired
     }
   }, [task, isExpired]);
 
@@ -147,9 +145,7 @@ export function WorkspacePage() {
             <span className={styles.taskIndex}>
               {taskIndex + 1} / {tasks.length}
             </span>
-            {task?.expiresAt && (
-              <ExpiryTimer expiresAt={task.expiresAt} onExpire={() => setIsExpired(true)} />
-            )}
+            {task?.expiresAt && <ExpiryTimer expiresAt={task.expiresAt} />}
           </span>
           <button
             className={styles.navButton}

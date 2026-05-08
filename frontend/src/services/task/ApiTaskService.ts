@@ -42,7 +42,7 @@ export class ApiTaskService implements TaskService {
   }
 
   getTasks(): readonly AnnotationTask[] {
-    return this.tasks;
+    return [...this.tasks];
   }
 
   getAnnotations(taskId: string): ImageAnnotation[] {

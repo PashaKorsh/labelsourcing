@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import styles from './ExpiryTimer.module.css';
+
+function toUTC(isoString: string): string {
+  return isoString.endsWith('Z') || isoString.includes('+') ? isoString : isoString + 'Z';
+}
 
 function formatTimeLeft(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -9,30 +13,18 @@ function formatTimeLeft(seconds: number): string {
 
 interface Props {
   expiresAt: string;
-  onExpire?: () => void;
 }
 
-export function ExpiryTimer({ expiresAt, onExpire }: Props) {
+export function ExpiryTimer({ expiresAt }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(() =>
-    Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000))
+    Math.max(0, Math.floor((new Date(toUTC(expiresAt)).getTime() - Date.now()) / 1000))
   );
 
-  // Храним коллбэк в рефе, чтобы не включать в зависимости эффекта
-  const onExpireRef = useRef(onExpire);
-  useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
-
   useEffect(() => {
-    setSecondsLeft(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)));
-
+    setSecondsLeft(Math.max(0, Math.floor((new Date(toUTC(expiresAt)).getTime() - Date.now()) / 1000)));
     const id = setInterval(() => {
-      const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
-      setSecondsLeft(left);
-      if (left === 0) {
-        clearInterval(id);
-        onExpireRef.current?.();
-      }
+      setSecondsLeft(Math.max(0, Math.floor((new Date(toUTC(expiresAt)).getTime() - Date.now()) / 1000)));
     }, 1000);
-
     return () => clearInterval(id);
   }, [expiresAt]);
 

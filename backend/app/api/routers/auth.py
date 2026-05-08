@@ -121,19 +121,34 @@ async def yandex_callback(
     if not email:
         return RedirectResponse(error_url)
 
+    # Извлекаем имя и аватар из ответа Яндекса
+    yandex_name = user_info.get("real_name") or user_info.get("display_name")
+    avatar_id = user_info.get("default_avatar_id")
+    is_avatar_empty = user_info.get("is_avatar_empty", True)
+    yandex_avatar_url = (
+        f"https://avatars.yandex.net/get-yapic/{avatar_id}/islands-200"
+        if avatar_id and not is_avatar_empty
+        else None
+    )
+
     stmt = select(User).where(User.email == email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
     if not user:
-        # Пользователь входит только через Яндекс — пароль не используется
         user = User(
             email=email,
             password=get_password_hash(str(uuid.uuid4())),
+            name=yandex_name,
+            avatar_url=yandex_avatar_url,
         )
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
+    else:
+        user.name = yandex_name
+        user.avatar_url = yandex_avatar_url
+
+    await db.commit()
+    await db.refresh(user)
 
     access_token = create_access_token(data={"sub": str(user.id)})
     response = RedirectResponse(success_url)

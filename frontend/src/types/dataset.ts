@@ -11,5 +11,6 @@ export interface Dataset {
   userDone?: boolean;
   taskCount?: number;
   userLabelingLimit?: number;
+  userLabeledCount?: number;
   annotationLabels?: Tag[];
 }

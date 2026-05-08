@@ -31,6 +31,7 @@ class DatasetResponse(BaseModel):
     labeled_count: int = 0
     user_done: bool = False
     user_labeling_limit: int | None = None
+    user_labeled_count: int | None = None
     tags: list[TagResponse] = []
     annotation_labels: List[AnnotationLabelSchema] = []
 

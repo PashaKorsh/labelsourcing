@@ -31,6 +31,7 @@ export function WorkspacePage() {
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [labelingLimit, setLabelingLimit] = useState<number | null>(null);
+  const [taskOffset, setTaskOffset] = useState(0);
   const [taskIndex, setTaskIndex] = useState(0);
   const [savedTaskIds, setSavedTaskIds] = useState<ReadonlySet<string>>(new Set());
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
@@ -60,6 +61,7 @@ export function WorkspacePage() {
       })
       .then(ds => {
         if (ds.userLabelingLimit != null) setLabelingLimit(ds.userLabelingLimit);
+        if (ds.userLabeledCount != null) setTaskOffset(ds.userLabeledCount);
         if (ds.annotationLabels && ds.annotationLabels.length > 0) {
           const HOTKEYS = '1234567890';
           const withHotkeys = ds.annotationLabels.map((l, i) => ({
@@ -155,10 +157,14 @@ export function WorkspacePage() {
             ← Пред
           </button>
           <span className={styles.taskCounter}>
-            {(task?.metadata?.name as string | undefined) ?? `Задача ${taskIndex + 1}`}
-            <span className={styles.taskIndex}>
-              {taskIndex + 1} / {labelingLimit ?? tasks.length}
-            </span>
+            {task
+              ? (task.metadata?.name as string | undefined) ?? `Задача ${taskOffset + taskIndex + 1}`
+              : 'Готово'}
+            {task && (
+              <span className={styles.taskIndex}>
+                {taskOffset + taskIndex + 1} / {labelingLimit ?? tasks.length}
+              </span>
+            )}
             {task?.expiresAt && <ExpiryTimer expiresAt={task.expiresAt} />}
           </span>
           <button

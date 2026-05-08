@@ -26,19 +26,31 @@ export class ApiTaskService implements TaskService {
     const dtos: TaskDto[] = await res.json();
     if (!dtos.length) return null;
 
-    const existingIds = new Set(this.tasks.map(t => t.id));
-    const newTasks = dtos
-      .filter(dto => !existingIds.has(dto.id))
-      .map(dto => ({
+    const existingById = new Map(this.tasks.map((t, i) => [t.id, i]));
+    let firstTask: AnnotationTask | null = null;
+
+    for (const dto of dtos) {
+      const mapped: AnnotationTask = {
         id: dto.id,
         datasetId: dto.dataset_id,
         imageUrl: dto.url,
         metadata: dto.task_metadata,
         expiresAt: dto.expires_at,
-      }));
+      };
 
-    this.tasks.push(...newTasks);
-    return newTasks[0] ?? null;
+      const existingIdx = existingById.get(dto.id);
+      if (existingIdx !== undefined) {
+        // Задача была перевыдана (после истечения) — обновляем expiresAt
+        this.tasks[existingIdx] = { ...this.tasks[existingIdx], expiresAt: dto.expires_at };
+        if (!firstTask) firstTask = this.tasks[existingIdx];
+      } else {
+        this.tasks.push(mapped);
+        existingById.set(dto.id, this.tasks.length - 1);
+        if (!firstTask) firstTask = mapped;
+      }
+    }
+
+    return firstTask;
   }
 
   getTasks(): readonly AnnotationTask[] {

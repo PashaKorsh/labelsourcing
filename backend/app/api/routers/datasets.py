@@ -61,6 +61,7 @@ async def _get_dataset_with_counts(
         dataset.user_done = _compute_user_done(access, dataset.tasks_count)
         if access is not None:
             dataset.user_labeling_limit = min(access.labeling_limit, dataset.tasks_count)
+            dataset.user_labeled_count = access.labeled_count
 
     return dataset
 
@@ -254,13 +255,27 @@ async def get_next_task(
         if not task:
             break
 
-        db.add(Assignment(
-            task_id=task.id,
-            user_id=current_user.id,
-            status=AssignmentStatus.IN_PROGRESS,
-            expires_at=expires_at,
-        ))
-        task.active_assignments += 1
+        # Если у пользователя уже есть ассайнмент на эту задачу (истёкший) — обновляем его,
+        # иначе нарушится unique_user_task при повторной выдаче после истечения.
+        existing_assignment = (await db.execute(
+            select(Assignment).where(
+                Assignment.task_id == task.id,
+                Assignment.user_id == current_user.id,
+            )
+        )).scalar_one_or_none()
+
+        if existing_assignment:
+            existing_assignment.status = AssignmentStatus.IN_PROGRESS
+            existing_assignment.expires_at = expires_at
+            existing_assignment.assigned_at = datetime.utcnow()
+        else:
+            db.add(Assignment(
+                task_id=task.id,
+                user_id=current_user.id,
+                status=AssignmentStatus.IN_PROGRESS,
+                expires_at=expires_at,
+            ))
+            task.active_assignments += 1
         task.expires_at = expires_at
         result_tasks.append(task)
 

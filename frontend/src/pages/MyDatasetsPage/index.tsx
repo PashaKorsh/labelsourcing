@@ -6,25 +6,28 @@ import { SearchBar } from '../../components/SearchBar';
 import { RoleBadge } from '../../components/RoleBadge';
 import { ROUTES, buildRoute } from '../../config/routes';
 import { datasetService } from '../../services';
+import { useAuth } from '../../context/auth';
 import type { Dataset } from '../../types/dataset';
 import styles from './MyDatasetsPage.module.css';
 
 export function MyDatasetsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    if (!user) return;
     setLoading(true);
     const timer = setTimeout(() => {
-      datasetService.listMine(search || undefined)
+      datasetService.listMine(user.id, search || undefined)
         .then(setDatasets)
         .catch(err => console.error('[MyDatasetsPage]', err))
         .finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [user, search]);
 
   return (
     <main className={styles.page}>

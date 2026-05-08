@@ -4,36 +4,40 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 // Все маршруты бэкенда в одном месте.
 export const API = {
   auth: {
-    login:           () => `${API_BASE}/api/auth/login`,
-    yandexLogin:     () => `${API_BASE}/api/auth/yandex/login`,
-    yandexCallback:  () => `${API_BASE}/api/auth/yandex/callback`,
+    login:          () => `${API_BASE}/api/v1/auth/login`,
+    yandexLogin:    () => `${API_BASE}/api/v1/auth/yandex/login`,
+    yandexCallback: () => `${API_BASE}/api/v1/auth/yandex/callback`,
   },
   users: {
-    me:     () => `${API_BASE}/api/users/me`,
-    list:   () => `${API_BASE}/api/users/`,
-    update: (id: string) => `${API_BASE}/api/users/${id}`,
+    me:     () => `${API_BASE}/api/v1/users/me`,
+    list:   () => `${API_BASE}/api/v1/users/`,
+    update: (id: string) => `${API_BASE}/api/v1/users/${id}`,
   },
   datasets: {
-    list:   () => `${API_BASE}/api/datasets/`,
-    create: () => `${API_BASE}/api/datasets/`,
-    detail: (id: string) => `${API_BASE}/api/datasets/${id}`,
-    update: (id: string) => `${API_BASE}/api/datasets/${id}`,
+    list:   () => `${API_BASE}/api/v1/datasets/`,
+    create: () => `${API_BASE}/api/v1/datasets/`,
+    detail: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
+    update: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
+    tasks:  (id: string) => `${API_BASE}/api/v1/datasets/${id}/tasks`,
+    next:   (id: string, count = 1) => `${API_BASE}/api/v1/datasets/${id}/next?count=${count}`,
   },
   tasks: {
-    create:    () => `${API_BASE}/api/tasks/`,
-    batch:     () => `${API_BASE}/api/tasks/batch`,
-    byDataset: (id: string) => `${API_BASE}/api/tasks/dataset/${id}`,
-    next:      (datasetId: string) => `${API_BASE}/api/tasks/dataset/${datasetId}/next`,
+    create:    () => `${API_BASE}/api/v1/tasks/`,
+    batch:     () => `${API_BASE}/api/v1/tasks/batch`,
+    delete:    (id: string) => `${API_BASE}/api/v1/tasks/${id}`,
+    saveLabel: (taskId: string) => `${API_BASE}/api/v1/tasks/${taskId}/labels`,
   },
   labels: {
-    create:       () => `${API_BASE}/api/labels/`,
-    updateStatus: (id: string) => `${API_BASE}/api/labels/${id}/status`,
+    updateStatus: (id: string) => `${API_BASE}/api/v1/labels/${id}/status`,
   },
   tags: {
-    list:   () => `${API_BASE}/api/tags/`,
-    create: () => `${API_BASE}/api/tags/`,
-    update: (id: string) => `${API_BASE}/api/tags/${id}`,
-    delete: (id: string) => `${API_BASE}/api/tags/${id}`,
+    list:   () => `${API_BASE}/api/v1/tags/`,
+    create: () => `${API_BASE}/api/v1/tags/`,
+    update: (id: string) => `${API_BASE}/api/v1/tags/${id}`,
+    delete: (id: string) => `${API_BASE}/api/v1/tags/${id}`,
+  },
+  sources: {
+    list: () => `${API_BASE}/api/v1/sources/`,
   },
 } as const;
 

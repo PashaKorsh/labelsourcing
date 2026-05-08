@@ -1,29 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import uuid
+
 from app.database import get_db
-from app.models import Label, User
-from app.api.dependencies import get_current_user, require_roles
-from app.schemas.label import LabelCreate, LabelResponse, LabelStatusUpdate
+from app.models import Label, Assignment, User
+from app.api.dependencies import require_roles
 
 router = APIRouter(prefix="/labels", tags=["Labels"])
 
-@router.post("/", response_model=LabelResponse)
-async def submit_label(
-    label_in: LabelCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Сохранить результат разметки пользователя (полигоны/боксы)"""
-    new_label = Label(
-        task_id=label_in.task_id,
-        user_id=current_user.id,
-        data=label_in.data
-    )
-    db.add(new_label)
-    await db.commit()
-    await db.refresh(new_label)
-    return new_label
+ALLOWED_ASSIGNMENT_STATUSES = {"in_progress", "done", "expired", "rejected"}
+
+
+class LabelStatusUpdate(BaseModel):
+    status: str
 
 
 @router.patch("/{label_id}/status")
@@ -33,13 +24,20 @@ async def update_label_status(
         db: AsyncSession = Depends(get_db),
         admin_user: User = Depends(require_roles(["admin", "moderator"]))
 ):
-    label = await db.get(Label, label_id)
+    """Изменить статус ассайнмента через его label — для валидации (Админ/Модератор)"""
+    stmt = select(Label).where(Label.id == label_id)
+    result = await db.execute(stmt)
+    label = result.scalar_one_or_none()
+
     if not label:
         raise HTTPException(status_code=404, detail="Разметка не найдена")
 
-    # Сохраняем вердикт админа
-    label.data["review_status"] = status_in.status  # Если пишем в JSONB
-    # label.status = status_in.status # Если добавил колонку
+    new_status = status_in.status
+    if new_status not in ALLOWED_ASSIGNMENT_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Недопустимый статус: {new_status}")
+
+    assignment = await db.get(Assignment, label.assignment_id)
+    assignment.status = new_status
 
     await db.commit()
     return {"status": "updated"}

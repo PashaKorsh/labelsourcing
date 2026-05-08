@@ -1,22 +1,27 @@
 name: Deploy
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'docker-compose.prod.yml'
+      - 'nginx/**'
   workflow_dispatch:
     inputs:
       job:
-        description: 'Job to run'
+        description: 'VM action'
         required: true
         type: choice
         options:
-          - build-and-push
-          - deploy
           - start-vm
           - stop-vm
 
 jobs:
   build-and-push:
     name: Build & Push to Registry
-    if: ${{ github.event.inputs.job == 'build-and-push' }}
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,7 +55,7 @@ jobs:
 
   deploy:
     name: Deploy to Server
-    if: ${{ github.event.inputs.job == 'deploy' }}
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -75,32 +80,37 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          YANDEX_CLIENT_ID: ${{ secrets.YANDEX_CLIENT_ID }}
+          YANDEX_CLIENT_SECRET: ${{ secrets.YANDEX_CLIENT_SECRET }}
+          YANDEX_REDIRECT_URI: ${{ secrets.YANDEX_REDIRECT_URI }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
-          envs: YC_SA_JSON,YC_REGISTRY_ID,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,SECRET_KEY
+          envs: YC_SA_JSON,YC_REGISTRY_ID,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,SECRET_KEY,YANDEX_CLIENT_ID,YANDEX_CLIENT_SECRET,YANDEX_REDIRECT_URI
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
 
             echo "$YC_SA_JSON" | docker login --username json_key --password-stdin cr.yandex
 
-            export YC_REGISTRY_ID POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY
-
-            docker compose -f docker-compose.prod.yml down --remove-orphans
+            export YC_REGISTRY_ID POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY YANDEX_CLIENT_ID YANDEX_CLIENT_SECRET YANDEX_REDIRECT_URI
 
             docker compose -f docker-compose.prod.yml pull -q
 
-            docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+            docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head || {
+              docker compose -f docker-compose.prod.yml up -d
+              exit 1
+            }
 
+            docker compose -f docker-compose.prod.yml down --remove-orphans
             docker compose -f docker-compose.prod.yml up -d
 
             docker image prune -f
 
-  start-vm:
-    name: Start Host VM
-    if: ${{ github.event.inputs.job == 'start-vm' }}
+  manage-vm:
+    name: Manage VM
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Install Yandex Cloud CLI
@@ -115,25 +125,9 @@ jobs:
           ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
 
       - name: Start VM
-        run: |
-          ~/yc/bin/yc compute instance start ${{ secrets.YC_INSTANCE_ID }}
-
-  stop-vm:
-    name: Stop Host VM
-    if: ${{ github.event.inputs.job == 'stop-vm' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Yandex Cloud CLI
-        run: |
-          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i ~/yc -n
-          echo "$HOME/yc/bin" >> $GITHUB_PATH
-
-      - name: Authenticate
-        run: |
-          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > sa-key.json
-          ~/yc/bin/yc config set service-account-key sa-key.json
-          ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+        if: github.event.inputs.job == 'start-vm'
+        run: yc compute instance start ${{ secrets.YC_INSTANCE_ID }}
 
       - name: Stop VM
-        run: |
-          ~/yc/bin/yc compute instance stop ${{ secrets.YC_INSTANCE_ID }}
+        if: github.event.inputs.job == 'stop-vm'
+        run: yc compute instance stop ${{ secrets.YC_INSTANCE_ID }}

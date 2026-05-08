@@ -5,12 +5,24 @@ import { ROUTES, buildRoute } from '../../config/routes';
 import styles from './ModeSwitcher.module.css';
 
 const MODES: { id: AppMode; label: string }[] = [
-  { id: 'auth', label: 'Вход' },
-  { id: 'annotation', label: 'Аннотирование' },
-  { id: 'validation', label: 'Валидация' },
+  { id: 'auth',        label: 'Вход' },
+  { id: 'datasets',    label: 'Датасеты' },
+  { id: 'profile',     label: 'Профиль' },
+  { id: 'my_datasets', label: 'Мои датасеты' },
+  { id: 'dataset_new', label: 'Новый датасет' },
+  { id: 'annotation',  label: 'Аннотирование' },
+  { id: 'validation',  label: 'Валидация' },
+  { id: 'users',       label: 'Пользователи' },
+  { id: 'tags',        label: 'Теги' },
 ];
 
 function pathToMode(pathname: string): AppMode {
+  if (pathname === ROUTES.home)       return 'datasets';
+  if (pathname === ROUTES.profile)    return 'profile';
+  if (pathname === ROUTES.myDatasets) return 'my_datasets';
+  if (pathname === ROUTES.datasetNew) return 'dataset_new';
+  if (pathname === ROUTES.users)      return 'users';
+  if (pathname === ROUTES.tags)       return 'tags';
   if (pathname.startsWith('/dataset') && pathname.endsWith('/validation')) return 'validation';
   if (pathname.startsWith('/dataset')) return 'annotation';
   return 'auth';
@@ -31,9 +43,19 @@ export function ModeSwitcher() {
 
   const handleClick = (mode: AppMode) => {
     if (mode === currentMode) return;
-    if (mode === 'auth') { navigate(ROUTES.login); return; }
-    const route = mode === 'annotation' ? ROUTES.datasetAnnotation : ROUTES.datasetValidation;
-    navigate(buildRoute(route, { datasetId: targetDatasetId }));
+    switch (mode) {
+      case 'auth':        navigate(ROUTES.login);      break;
+      case 'datasets':    navigate(ROUTES.home);       break;
+      case 'profile':     navigate(ROUTES.profile);    break;
+      case 'my_datasets': navigate(ROUTES.myDatasets); break;
+      case 'dataset_new': navigate(ROUTES.datasetNew); break;
+      case 'users':       navigate(ROUTES.users);      break;
+      case 'tags':        navigate(ROUTES.tags);       break;
+      case 'annotation':
+        navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId: targetDatasetId })); break;
+      case 'validation':
+        navigate(buildRoute(ROUTES.datasetValidation, { datasetId: targetDatasetId })); break;
+    }
   };
 
   return (

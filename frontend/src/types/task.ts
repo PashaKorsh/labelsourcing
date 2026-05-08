@@ -3,4 +3,5 @@ export interface AnnotationTask {
   datasetId: string;
   imageUrl: string;
   metadata?: Record<string, unknown>;
+  expiresAt?: string;
 }

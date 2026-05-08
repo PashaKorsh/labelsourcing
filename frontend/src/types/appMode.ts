@@ -1,1 +1,10 @@
-export type AppMode = 'auth' | 'annotation' | 'validation';
+export type AppMode =
+  | 'auth'
+  | 'datasets'
+  | 'profile'
+  | 'my_datasets'
+  | 'dataset_new'
+  | 'annotation'
+  | 'validation'
+  | 'users'
+  | 'tags';

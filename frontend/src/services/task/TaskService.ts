@@ -3,11 +3,12 @@ import type { AnnotationTask } from '../../types/task';
 
 export interface TaskService {
   /**
-   * Загружает следующую задачу из датасета.
-   * Мок — no-op (задачи предзагружены в getTasks).
-   * API — запрос к GET /api/tasks/dataset/{id}/next, результат добавляется в getTasks().
+   * Запрашивает до `count` задач из датасета и добавляет их в getTasks().
+   * Возвращает первую новую задачу или null, если задач больше нет.
+   * Мок — no-op (задачи предзагружены).
+   * API — GET /api/v1/datasets/{id}/next?count=N
    */
-  loadNextTask(datasetId: string): Promise<AnnotationTask | null>;
+  loadNextTask(datasetId: string, count?: number): Promise<AnnotationTask | null>;
 
   /** Возвращает кэшированный список задач. */
   getTasks(): readonly AnnotationTask[];
@@ -25,4 +26,10 @@ export interface TaskService {
   ): Promise<void>;
 
   exportAllAnnotations(): void;
+
+  /** Создаёт задачи для датасета из списка URL изображений. */
+  createBatch(datasetId: string, imageUrls: string[]): Promise<void>;
+
+  /** Удаляет задачу по ID. */
+  deleteTask(taskId: string): Promise<void>;
 }

@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -29,6 +30,10 @@ async def get_my_profile(
 
 @router.get("/", response_model=list[UserResponse])
 async def get_all_users(
+        limit: int = 100,
+        offset: int = 0,
+        # Поиск по email/имени пользователя (будет реализован позже)
+        search: Optional[str] = None,
         db: AsyncSession = Depends(get_db),
         admin_user: User = Depends(require_roles(["admin"]))
 ):
@@ -36,7 +41,7 @@ async def get_all_users(
     stmt = select(User).options(
         selectinload(User.roles),
         selectinload(User.tags)
-    )
+    ).limit(limit).offset(offset)
     result = await db.execute(stmt)
     return result.scalars().all()
 

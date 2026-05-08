@@ -28,7 +28,7 @@ export class MockTaskService implements TaskService {
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
   // Все задачи предзагружены — loadNextTask возвращает null.
-  async loadNextTask(_datasetId: string): Promise<AnnotationTask | null> {
+  async loadNextTask(_datasetId: string, _count?: number): Promise<AnnotationTask | null> {
     return null;
   }
 
@@ -47,6 +47,17 @@ export class MockTaskService implements TaskService {
   ): Promise<void> {
     this.annotationsMap.set(taskId, annotations);
     if (imageSize) this.imageSizeMap.set(taskId, imageSize);
+  }
+
+  async createBatch(datasetId: string, imageUrls: string[]): Promise<void> {
+    imageUrls.forEach((url, i) => {
+      this.tasks.push({ id: `mock-${Date.now()}-${i}`, datasetId, imageUrl: url });
+    });
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
   }
 
   exportAllAnnotations(): void {

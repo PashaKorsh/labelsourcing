@@ -1,25 +1,33 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { WorkspacePage } from './pages/WorkspacePage';
-import { ValidationPage } from './pages/ValidationPage';
-import { AuthPage } from './pages/AuthPage';
-import { ROUTES } from './config/routes';
-import { MOCK_DATASET_ID } from './services/task/MockTaskService';
-import { buildRoute } from './config/routes';
+import { WorkspacePage }    from './pages/WorkspacePage';
+import { ValidationPage }   from './pages/ValidationPage';
+import { AuthPage }         from './pages/AuthPage';
+import { DatasetsListPage } from './pages/DatasetsListPage';
+import { ProfilePage }      from './pages/ProfilePage';
+import { MyDatasetsPage }   from './pages/MyDatasetsPage';
+import { DatasetNewPage }   from './pages/DatasetNewPage';
+import { DatasetEditPage }  from './pages/DatasetEditPage';
+import { UsersPage }        from './pages/UsersPage';
+import { TagsPage }         from './pages/TagsPage';
+import { ROUTES }           from './config/routes';
 import styles from './App.module.css';
-
-// Временный редирект с '/' на мок-датасет до реализации страницы выбора датасета.
-const HOME_REDIRECT = buildRoute(ROUTES.datasetAnnotation, { datasetId: MOCK_DATASET_ID });
 
 export default function App() {
   return (
     <BrowserRouter>
       <div className={styles.root}>
         <Routes>
-          <Route path={ROUTES.login}              element={<AuthPage />} />
-          <Route path={ROUTES.home}               element={<Navigate to={HOME_REDIRECT} replace />} />
-          <Route path={ROUTES.datasetAnnotation}  element={<WorkspacePage />} />
-          <Route path={ROUTES.datasetValidation}  element={<ValidationPage />} />
-          <Route path="*"                         element={<Navigate to={ROUTES.login} replace />} />
+          <Route path={ROUTES.login}             element={<AuthPage />} />
+          <Route path={ROUTES.home}              element={<DatasetsListPage />} />
+          <Route path={ROUTES.profile}           element={<ProfilePage />} />
+          <Route path={ROUTES.myDatasets}        element={<MyDatasetsPage />} />
+          <Route path={ROUTES.datasetNew}        element={<DatasetNewPage />} />
+          <Route path={ROUTES.datasetEdit}       element={<DatasetEditPage />} />
+          <Route path={ROUTES.datasetAnnotation} element={<WorkspacePage />} />
+          <Route path={ROUTES.datasetValidation} element={<ValidationPage />} />
+          <Route path={ROUTES.users}             element={<UsersPage />} />
+          <Route path={ROUTES.tags}              element={<TagsPage />} />
+          <Route path="*"                        element={<Navigate to={ROUTES.login} replace />} />
         </Routes>
       </div>
     </BrowserRouter>

@@ -9,6 +9,7 @@ interface TaskDto {
   dataset_id: string;
   url: string;
   task_metadata?: Record<string, unknown>;
+  expires_at?: string;
 }
 
 export class ApiTaskService implements TaskService {
@@ -16,25 +17,44 @@ export class ApiTaskService implements TaskService {
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
-  // Запрашивает следующую задачу, которую текущий пользователь ещё не размечал.
-  // Добавляет её в локальный кэш — getTasks() начинает её возвращать.
-  async loadNextTask(datasetId: string): Promise<AnnotationTask | null> {
-    const res = await apiFetch(API.tasks.next(datasetId));
-    const dto: TaskDto | null = await res.json();
-    if (!dto) return null;
+  // Запрашивает задачи у бэкенда и добавляет в кэш только те, которых там нет.
+  // При восстановлении сессии бэк вернёт уже взятые in_progress задачи —
+  // дедупликация предотвращает дубликаты в массиве.
+  // Возвращает первую новую задачу или null, если всё уже в кэше / задач нет.
+  async loadNextTask(datasetId: string, count = 1): Promise<AnnotationTask | null> {
+    const res = await apiFetch(API.datasets.next(datasetId, count));
+    const dtos: TaskDto[] = await res.json();
+    if (!dtos.length) return null;
 
-    const task: AnnotationTask = {
-      id: dto.id,
-      datasetId: dto.dataset_id,
-      imageUrl: dto.url,
-      metadata: dto.task_metadata,
-    };
-    this.tasks.push(task);
-    return task;
+    const existingById = new Map(this.tasks.map((t, i) => [t.id, i]));
+    let firstTask: AnnotationTask | null = null;
+
+    for (const dto of dtos) {
+      const mapped: AnnotationTask = {
+        id: dto.id,
+        datasetId: dto.dataset_id,
+        imageUrl: dto.url,
+        metadata: dto.task_metadata,
+        expiresAt: dto.expires_at,
+      };
+
+      const existingIdx = existingById.get(dto.id);
+      if (existingIdx !== undefined) {
+        // Задача была перевыдана (после истечения) — обновляем expiresAt
+        this.tasks[existingIdx] = { ...this.tasks[existingIdx], expiresAt: dto.expires_at };
+        if (!firstTask) firstTask = this.tasks[existingIdx];
+      } else {
+        this.tasks.push(mapped);
+        existingById.set(dto.id, this.tasks.length - 1);
+        if (!firstTask) firstTask = mapped;
+      }
+    }
+
+    return firstTask;
   }
 
   getTasks(): readonly AnnotationTask[] {
-    return this.tasks;
+    return [...this.tasks];
   }
 
   getAnnotations(taskId: string): ImageAnnotation[] {
@@ -42,6 +62,8 @@ export class ApiTaskService implements TaskService {
   }
 
   // Сохраняет аннотации локально и отправляет разметку на сервер.
+  // dataset_id берётся из кэшированной задачи — он нужен бэкенду, т.к. одна задача
+  // может использоваться в нескольких датасетах с разной разметкой.
   async saveAnnotations(
     taskId: string,
     annotations: ImageAnnotation[],
@@ -49,6 +71,12 @@ export class ApiTaskService implements TaskService {
   ): Promise<void> {
     this.annotationsMap.set(taskId, annotations);
     if (imageSize) this.imageSizeMap.set(taskId, imageSize);
+
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) {
+      console.error(`[ApiTaskService] Задача ${taskId} не найдена в кэше`);
+      return;
+    }
 
     const size = imageSize ?? this.imageSizeMap.get(taskId);
     const serialized = serializeTaskAnnotations(
@@ -58,10 +86,23 @@ export class ApiTaskService implements TaskService {
       size?.h ?? 1,
     );
 
-    await apiFetch(API.labels.create(), {
-      method: 'POST',
-      body: JSON.stringify({ task_id: taskId, data: serialized.output_values }),
+    await apiFetch(API.tasks.saveLabel(taskId), {
+      method: 'PUT',
+      body: JSON.stringify({ data: serialized.output_values }),
     });
+  }
+
+  async createBatch(datasetId: string, imageUrls: string[]): Promise<void> {
+    await apiFetch(API.tasks.batch(), {
+      method: 'POST',
+      body: JSON.stringify({ dataset_id: datasetId, urls: imageUrls }),
+    });
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    await apiFetch(API.tasks.delete(taskId), { method: 'DELETE' });
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
   }
 
   exportAllAnnotations(): void {

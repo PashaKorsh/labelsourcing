@@ -162,7 +162,7 @@ async def get_next_task(
 
     # Восстановление сессии: если у пользователя уже есть живые ассайнменты — вернуть их
     existing_stmt = (
-        select(Task)
+        select(Task, Assignment.expires_at)
         .join(Assignment, Task.id == Assignment.task_id)
         .where(Task.dataset_id == dataset_id)
         .where(Assignment.user_id == current_user.id)
@@ -170,10 +170,11 @@ async def get_next_task(
         .where(Assignment.expires_at > func.now())
         .order_by(Task.created_at)
     )
-    existing_result = await db.execute(existing_stmt)
-    existing_tasks = existing_result.scalars().all()
-    if existing_tasks:
-        return existing_tasks
+    existing_rows = (await db.execute(existing_stmt)).all()
+    if existing_rows:
+        for task, exp in existing_rows:
+            task.expires_at = exp
+        return [task for task, _ in existing_rows]
 
     # Upsert access-записи: создать если нет, иначе не трогать
     upsert_stmt = (

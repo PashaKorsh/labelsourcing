@@ -216,12 +216,18 @@ async def get_next_task(
         .scalar_subquery()
     )
 
-    # Пользователь уже работает над задачей или уже сделал её
+    # Пользователь уже работает над задачей и таймер не истёк или уже выполнил её
     user_busy_sq = exists(
         select(Assignment.id)
         .where(Assignment.task_id == Task.id)
         .where(Assignment.user_id == current_user.id)
-        .where(Assignment.status.in_([AssignmentStatus.IN_PROGRESS, AssignmentStatus.DONE]))
+        .where(
+            (Assignment.status == AssignmentStatus.DONE) |
+            (
+                (Assignment.status == AssignmentStatus.IN_PROGRESS) &
+                (Assignment.expires_at > func.now())
+            )
+        )
         .correlate(Task)
     )
 

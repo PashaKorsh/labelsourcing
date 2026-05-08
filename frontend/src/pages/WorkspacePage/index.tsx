@@ -13,6 +13,7 @@ import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
+import { isExpiredAt } from '../../utils/time';
 import styles from './WorkspacePage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { CompletedScreen } from '../../components/CompletedScreen';
@@ -85,21 +86,30 @@ export function WorkspacePage() {
   const navigateTo = useCallback(async (nextIndex: number) => {
     if (!task) return;
 
-    // Если переходим дальше последней загруженной задачи — запрашиваем следующую.
-    if (nextIndex >= tasks.length) {
+    // Удаляем истёкшие несохранённые задачи из массива перед навигацией
+    const isDead = (t: AnnotationTask) => !savedTaskIds.has(t.id) && isExpiredAt(t.expiresAt);
+    const cleanedTasks = tasks.filter(t => !isDead(t));
+    const removedBefore = tasks.slice(0, nextIndex).filter(isDead).length;
+    const adjustedNext = nextIndex - removedBefore;
+
+    // Если нужно догружать — делаем это до setTasks, чтобы не мелькал CompletedScreen
+    if (adjustedNext >= cleanedTasks.length) {
       const newTask = await taskService.loadNextTask(datasetId ?? '').catch(err => {
         console.error('[WorkspacePage] loadNextTask:', err);
         return null;
       });
       if (newTask) {
-        setTasks(taskService.getTasks());
+        setTasks(taskService.getTasks().filter(t => !isDead(t)));
       } else {
+        if (cleanedTasks.length !== tasks.length) setTasks(cleanedTasks);
         setHasMoreTasks(false);
       }
+    } else if (cleanedTasks.length !== tasks.length) {
+      setTasks(cleanedTasks);
     }
 
-    setTaskIndex(nextIndex);
-  }, [task, tasks.length]);
+    setTaskIndex(adjustedNext);
+  }, [task, tasks, savedTaskIds, datasetId]);
 
   const handleSave = useCallback(async () => {
     if (!task || isExpired) return;

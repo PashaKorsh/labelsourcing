@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict
 
@@ -19,6 +20,7 @@ class TaskResponse(BaseModel):
     active_assignments: int
     status: str
     task_metadata: Optional[Dict[str, Any]] = None
+    expires_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

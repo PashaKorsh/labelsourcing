@@ -9,6 +9,7 @@ interface TaskDto {
   dataset_id: string;
   url: string;
   task_metadata?: Record<string, unknown>;
+  expires_at?: string;
 }
 
 export class ApiTaskService implements TaskService {
@@ -33,6 +34,7 @@ export class ApiTaskService implements TaskService {
         datasetId: dto.dataset_id,
         imageUrl: dto.url,
         metadata: dto.task_metadata,
+        expiresAt: dto.expires_at,
       }));
 
     this.tasks.push(...newTasks);

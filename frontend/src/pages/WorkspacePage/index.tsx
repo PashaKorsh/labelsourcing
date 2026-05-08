@@ -4,6 +4,7 @@ import { AnnotationCanvas } from '../../components/AnnotationCanvas';
 import { ToolSelector } from '../../components/ToolSelector';
 import { TagSelector } from '../../components/TagSelector';
 import { HintsBar } from '../../components/HintsBar';
+import { ExpiryTimer } from '../../components/ExpiryTimer';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService, datasetService } from '../../services';
 import { useDatasetId } from '../../hooks/useRouteParams';
@@ -32,12 +33,16 @@ export function WorkspacePage() {
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [activeTagId, setActiveTagId] = useState<string | null>(DEFAULT_TAGS[0].id);
+  const [isExpired, setIsExpired] = useState(false);
 
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
 
   const task = tasks[taskIndex] ?? null;
   const activeTag = tags.find(t => t.id === activeTagId) ?? null;
+
+  // Сбрасываем флаг истечения при переходе к новой задаче
+  useEffect(() => { setIsExpired(false); }, [task?.id]);
 
   // Загружаем метки разметки из датасета и первую задачу при монтировании.
   useEffect(() => {
@@ -92,14 +97,22 @@ export function WorkspacePage() {
   }, [task, tasks.length]);
 
   const handleSave = useCallback(async () => {
-    if (!task) return;
-    await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
-    setSavedTaskIds(prev => new Set(prev).add(task.id));
-  }, [task]);
+    if (!task || isExpired) return;
+    try {
+      await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
+      setSavedTaskIds(prev => new Set(prev).add(task.id));
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('410')) {
+        setIsExpired(true);
+      } else {
+        throw err;
+      }
+    }
+  }, [task, isExpired]);
 
   const canGoPrev = taskIndex > 0;
-  // Вперёд — только если текущая задача сохранена
-  const canGoNext = isCurrentTaskSaved && (taskIndex < tasks.length - 1 || hasMoreTasks);
+  // Вперёд — если задача сохранена ИЛИ истекла (пользователь должен иметь возможность уйти)
+  const canGoNext = (isCurrentTaskSaved || isExpired) && (taskIndex < tasks.length - 1 || hasMoreTasks);
 
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};
@@ -134,6 +147,9 @@ export function WorkspacePage() {
             <span className={styles.taskIndex}>
               {taskIndex + 1} / {tasks.length}
             </span>
+            {task?.expiresAt && (
+              <ExpiryTimer expiresAt={task.expiresAt} onExpire={() => setIsExpired(true)} />
+            )}
           </span>
           <button
             className={styles.navButton}
@@ -160,8 +176,13 @@ export function WorkspacePage() {
             onSelect={setActiveTagId}
           />
           <div className={styles.sidebarBottom}>
-            <button className={styles.saveButton} onClick={handleSave} title="Сохранить разметку">
-              Сохранить
+            <button
+              className={styles.saveButton}
+              onClick={handleSave}
+              disabled={isExpired}
+              title={isExpired ? 'Время на выполнение задания истекло' : 'Сохранить разметку'}
+            >
+              {isExpired ? 'Истекло' : 'Сохранить'}
             </button>
           </div>
         </aside>

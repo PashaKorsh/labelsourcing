@@ -1,8 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../config/routes';
 import styles from './PageHeader.module.css';
-
-const AVATAR_URL = 'https://picsum.photos/seed/labelsourcing-avatar/80/80';
+import profileLogo from '/src/assets/profile-image-stock-white-theme.png';
 
 const NAV_ITEMS = [
   { label: 'Датасеты',     path: ROUTES.home },
@@ -33,7 +32,7 @@ export function PageHeader() {
         onClick={() => navigate(ROUTES.profile)}
         aria-label="Профиль"
       >
-        <img src={AVATAR_URL} alt="" className={styles.avatarImage} />
+        <img src={profileLogo} alt="" className={styles.avatarImage} />
       </button>
     </nav>
   );

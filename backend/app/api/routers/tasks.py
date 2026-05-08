@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -85,6 +86,15 @@ async def submit_label(
             status_code=400,
             detail="Нет активного задания для этой задачи. Сначала получите задачу через /next."
         )
+
+    # Ленивая проверка истечения: помечаем expired и исправляем счётчик
+    if assignment.status == AssignmentStatus.IN_PROGRESS and assignment.expires_at < datetime.utcnow():
+        task_obj = await db.get(Task, task_id)
+        if task_obj:
+            task_obj.active_assignments = max(0, task_obj.active_assignments - 1)
+        assignment.status = AssignmentStatus.EXPIRED
+        await db.commit()
+        raise HTTPException(status_code=410, detail="Время на выполнение задания истекло. Получите новую задачу.")
 
     # Проверяем, есть ли уже сохранённая разметка для этого ассайнмента
     label_stmt = select(Label).where(Label.assignment_id == assignment.id)

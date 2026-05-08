@@ -16,7 +16,7 @@ from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdat
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
-ASSIGNMENT_EXPIRY_MINUTES = 30
+ASSIGNMENT_EXPIRY_MINUTES = 10
 
 
 def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
@@ -252,6 +252,7 @@ async def get_next_task(
             expires_at=expires_at,
         ))
         task.active_assignments += 1
+        task.expires_at = expires_at
         result_tasks.append(task)
 
     if not result_tasks:
@@ -346,6 +347,51 @@ async def get_dataset_detail(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
     return dataset
+
+
+@router.delete("/{dataset_id}/progress/{user_id}", status_code=204)
+async def reset_user_progress(
+        dataset_id: uuid.UUID,
+        user_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        _: User = Depends(require_roles(["admin"]))
+):
+    """[DEV] Сбросить весь прогресс пользователя по датасету: удалить assignments (cascade → labels),
+    скорректировать счётчики задач, удалить user_dataset_access. Только для администраторов."""
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    stmt = (
+        select(Assignment)
+        .join(Task, Assignment.task_id == Task.id)
+        .where(Task.dataset_id == dataset_id)
+        .where(Assignment.user_id == user_id)
+    )
+    assignments = (await db.execute(stmt)).scalars().all()
+
+    for assignment in assignments:
+        task = await db.get(Task, assignment.task_id)
+        if task is None:
+            continue
+        if assignment.status == AssignmentStatus.DONE:
+            task.completed_answers = max(0, task.completed_answers - 1)
+            if task.completed_answers < dataset.required_answers:
+                task.status = TaskStatus.PENDING
+        elif assignment.status == AssignmentStatus.IN_PROGRESS:
+            task.active_assignments = max(0, task.active_assignments - 1)
+        await db.delete(assignment)  # каскадно удаляет label
+
+    access = (await db.execute(
+        select(UserDatasetAccess).where(
+            UserDatasetAccess.user_id == user_id,
+            UserDatasetAccess.dataset_id == dataset_id,
+        )
+    )).scalar_one_or_none()
+    if access:
+        await db.delete(access)
+
+    await db.commit()
 
 
 @router.patch("/{dataset_id}", response_model=DatasetResponse)

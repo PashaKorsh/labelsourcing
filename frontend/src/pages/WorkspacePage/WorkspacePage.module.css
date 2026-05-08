@@ -137,6 +137,14 @@
   background: rgba(99, 102, 241, 0.5);
 }
 
+.saveButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+  color: #6b6b8a;
+}
+
 /* ── Canvas area ─────────────────────────────────── */
 
 .canvasArea {

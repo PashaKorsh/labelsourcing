@@ -18,7 +18,7 @@ app = FastAPI(
     description="API для краудсорсинговой платформы разметки данных",
     version="0.1.0",
     lifespan=lifespan,
-    root_path="/api",
+    root_path="/api/v1",
 )
 
 app.add_middleware(

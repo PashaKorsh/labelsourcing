@@ -43,12 +43,13 @@ export function UsersPage() {
                 )}
                 <div className={styles.info}>
                   <p className={styles.name}>{user.name ?? user.email}</p>
-                  <p className={styles.email}>{user.email}</p>
-                </div>
-                <div className={styles.roles}>
-                  {user.tags.map((tag) => (
-                    <RoleBadge key={tag.id} role={tag} />
-                  ))}
+                  {user.tags.length > 0 && (
+                    <div className={styles.tags}>
+                      {user.tags.map((tag) => (
+                        <RoleBadge key={tag.id} role={tag} />
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"

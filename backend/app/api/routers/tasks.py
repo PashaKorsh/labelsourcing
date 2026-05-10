@@ -20,6 +20,9 @@ async def create_task(
     admin_user: User = Depends(require_roles(["admin"]))
 ):
     """Добавить одну задачу в датасет"""
+    dataset = await db.get(Dataset, task_in.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
     new_task = Task(
         dataset_id=task_in.dataset_id,
         url=task_in.url,
@@ -27,6 +30,7 @@ async def create_task(
         task_metadata=task_in.task_metadata,
     )
     db.add(new_task)
+    dataset.tasks_count += 1
     await db.commit()
     await db.refresh(new_task)
     return new_task
@@ -39,11 +43,15 @@ async def create_tasks_batch(
     admin_user: User = Depends(require_roles(["admin"]))
 ):
     """Массовая загрузка задач в датасет"""
+    dataset = await db.get(Dataset, batch_in.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
     new_tasks = [
         Task(dataset_id=batch_in.dataset_id, url=url, type=batch_in.type)
         for url in batch_in.urls
     ]
     db.add_all(new_tasks)
+    dataset.tasks_count += len(new_tasks)
     await db.commit()
     return {"status": "success", "added": len(new_tasks)}
 
@@ -58,6 +66,9 @@ async def delete_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
+    dataset = await db.get(Dataset, task.dataset_id)
+    if dataset:
+        dataset.tasks_count = max(0, dataset.tasks_count - 1)
     await db.delete(task)
     await db.commit()
 

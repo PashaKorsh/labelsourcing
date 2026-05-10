@@ -25,6 +25,7 @@ CREATE TABLE datasets (
     required_answers INT NOT NULL DEFAULT 3,
     status VARCHAR(50) DEFAULT 'active',
     default_labeling_limit INT DEFAULT 50,
+    tasks_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
@@ -36,6 +37,7 @@ CREATE TABLE datasets (
     - **Варианты:** `active` (идет раздача), `paused` (остановлено), `completed` (все задачи размечены).
 - **`default_labeling_limit`**: Базовый лимит задач, который будет назначен пользователю при его первом обращении к этому датасету. Позволяет
     гибко настраивать квоты для разных проектов (в одном проекте давать по 50 задач, в другом по 500)
+- **`tasks_count`**: Денормализованный счётчик задач в датасете. Обновляется при добавлении/удалении задач (POST /tasks/, POST /tasks/batch, DELETE /tasks/{id}). Используется вместо COUNT(*) JOIN с таблицей tasks.
 - **`created_at`**: Дата создания проекта.
 ---
 ### 3. Таблица `tasks`

@@ -78,6 +78,7 @@ class Dataset(Base):
     required_answers: Mapped[int] = mapped_column(Integer, server_default="3")
     default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status", values_callable=lambda x: [e.value for e in x]), default=DatasetStatus.ACTIVE)
+    tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

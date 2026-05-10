@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case, exists
+from sqlalchemy import select, func, exists
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 import uuid
@@ -31,24 +31,10 @@ async def _get_dataset_with_counts(
     dataset_id: uuid.UUID,
     user_id: uuid.UUID | None = None,
 ) -> Dataset | None:
-    stmt = (
-        select(
-            Dataset,
-            func.count(Task.id).label("tasks_count"),
-            func.sum(case((Task.completed_answers > 0, 1), else_=0)).label("labeled_count"),
-        )
-        .outerjoin(Task, Dataset.id == Task.dataset_id)
-        .where(Dataset.id == dataset_id)
-        .group_by(Dataset.id)
-        .options(selectinload(Dataset.tags))
-    )
-    result = await db.execute(stmt)
-    row = result.first()
-    if not row:
+    stmt = select(Dataset).where(Dataset.id == dataset_id).options(selectinload(Dataset.tags))
+    dataset = (await db.execute(stmt)).scalar_one_or_none()
+    if not dataset:
         return None
-    dataset = row[0]
-    dataset.tasks_count = row[1]
-    dataset.labeled_count = row[2] or 0
     dataset.user_done = False
 
     if user_id is not None:
@@ -101,13 +87,7 @@ async def get_datasets(
         current_user: User = Depends(get_current_user)
 ):
     stmt = (
-        select(
-            Dataset,
-            func.count(Task.id).label("tasks_count"),
-            func.sum(case((Task.completed_answers > 0, 1), else_=0)).label("labeled_count"),
-        )
-        .outerjoin(Task, Dataset.id == Task.dataset_id)
-        .group_by(Dataset.id)
+        select(Dataset)
         .options(selectinload(Dataset.tags))
         .limit(limit)
         .offset(offset)
@@ -119,10 +99,7 @@ async def get_datasets(
     result = await db.execute(stmt)
 
     datasets_with_counts = []
-    for row in result.all():
-        dataset = row[0]
-        dataset.tasks_count = row[1]
-        dataset.labeled_count = row[2] or 0
+    for dataset in result.scalars().all():
         dataset.user_done = False
         datasets_with_counts.append(dataset)
 
@@ -196,13 +173,8 @@ async def get_next_task(
     )
     access = (await db.execute(access_stmt)).scalar_one()
 
-    total_tasks = (
-        await db.execute(select(func.count()).where(Task.dataset_id == dataset_id))
-    ).scalar_one()
-
-    # Проверяем права и квоту — оба случая равнозначны для пользователя.
     # Лимит не может превышать количество задач в датасете.
-    effective_limit = min(access.labeling_limit, total_tasks)
+    effective_limit = min(access.labeling_limit, dataset.tasks_count)
     if not access.can_label or access.labeled_count >= effective_limit:
         await db.rollback()
         return []

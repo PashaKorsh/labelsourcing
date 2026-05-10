@@ -8,6 +8,7 @@ interface TaskDto {
   id: string;
   dataset_id: string;
   url: string;
+  type?: string;
   task_metadata?: Record<string, unknown>;
   expires_at?: string;
 }
@@ -34,6 +35,7 @@ export class ApiTaskService implements TaskService {
         id: dto.id,
         datasetId: dto.dataset_id,
         imageUrl: dto.url,
+        type: dto.type as AnnotationTask['type'],
         metadata: dto.task_metadata,
         expiresAt: dto.expires_at,
       };
@@ -103,6 +105,13 @@ export class ApiTaskService implements TaskService {
     await apiFetch(API.tasks.delete(taskId), { method: 'DELETE' });
     const idx = this.tasks.findIndex(t => t.id === taskId);
     if (idx !== -1) this.tasks.splice(idx, 1);
+  }
+
+  async submitValidation(taskId: string, isCorrect: boolean): Promise<void> {
+    await apiFetch(API.tasks.saveLabel(taskId), {
+      method: 'PUT',
+      body: JSON.stringify({ data: { is_correct: isCorrect } }),
+    });
   }
 
   exportAllAnnotations(): void {

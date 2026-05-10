@@ -60,6 +60,10 @@ export class MockTaskService implements TaskService {
     if (idx !== -1) this.tasks.splice(idx, 1);
   }
 
+  async submitValidation(_taskId: string, isCorrect: boolean): Promise<void> {
+    console.log('[MockTaskService] submitValidation:', _taskId, isCorrect);
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

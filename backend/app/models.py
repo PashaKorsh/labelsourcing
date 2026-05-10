@@ -27,6 +27,7 @@ class TaskStatus(str, enum.Enum):
 
 class TaskType(str, enum.Enum):
     ANNOTATION = "annotation"
+    VALIDATION = "validation"
 
 
 class DatasetStatus(str, enum.Enum):
@@ -79,6 +80,8 @@ class Dataset(Base):
     default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status", values_callable=lambda x: [e.value for e in x]), default=DatasetStatus.ACTIVE)
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    requires_validation: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    validation_quorum: Mapped[int] = mapped_column(Integer, server_default="1")
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

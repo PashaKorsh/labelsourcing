@@ -32,4 +32,10 @@ export interface TaskService {
 
   /** Удаляет задачу по ID. */
   deleteTask(taskId: string): Promise<void>;
+
+  /**
+   * Отправляет вердикт валидации.
+   * Использует тот же эндпоинт PUT /tasks/{id}/labels с данными {is_correct: boolean}.
+   */
+  submitValidation(taskId: string, isCorrect: boolean): Promise<void>;
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { AnnotationCanvas } from '../../components/AnnotationCanvas';
+import { ReadOnlyAnnotationCanvas } from '../../components/ReadOnlyAnnotationCanvas';
 import { ToolSelector } from '../../components/ToolSelector';
 import { TagSelector } from '../../components/TagSelector';
 import { HintsBar } from '../../components/HintsBar';
@@ -11,6 +12,8 @@ import { useDatasetId } from '../../hooks/useRouteParams';
 import { useIsExpired } from '../../hooks/useIsExpired';
 import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
+import type { SerializedShape } from '../../utils/annotationSerializer';
+import { deserializeAnnotations } from '../../utils/annotationDeserializer';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import { isExpiredAt } from '../../utils/time';
@@ -25,9 +28,19 @@ const DEFAULT_TAGS: Tag[] = [
   { id: 'object', label: 'Объект', color: '#f59e0b', hotkey: '4' },
 ];
 
+interface ValidationState {
+  annotations: ImageAnnotation[];
+  verdict: boolean | null; // true = approved, false = rejected
+  submitting: boolean;
+  imageError: string | null;
+}
+
+function makeEmptyValidation(): ValidationState {
+  return { annotations: [], verdict: null, submitting: false, imageError: null };
+}
+
 export function WorkspacePage() {
   const datasetId = useDatasetId();
-  // Мок инициализирует задачи сразу; API-сервис начинает с пустого списка.
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [labelingLimit, setLabelingLimit] = useState<number | null>(null);
@@ -37,18 +50,17 @@ export function WorkspacePage() {
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [activeTagId, setActiveTagId] = useState<string | null>(DEFAULT_TAGS[0].id);
+  const [validationState, setValidationState] = useState<ValidationState>(makeEmptyValidation);
 
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
 
   const task = tasks[taskIndex] ?? null;
   const activeTag = tags.find(t => t.id === activeTagId) ?? null;
+  const isValidationTask = task?.type === 'validation';
 
-  // Вычисляется реактивно из expiresAt и текущего времени — не хранит ручное состояние.
-  // Корректно обновляется при навигации между задачами без сброса через useEffect.
   const isExpired = useIsExpired(task?.expiresAt);
 
-  // Загружаем метки разметки из датасета и первую задачу при монтировании.
   useEffect(() => {
     if (!datasetId) return;
 
@@ -75,6 +87,35 @@ export function WorkspacePage() {
       .catch(err => console.error('[WorkspacePage] init:', err));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // При смене validation-задачи: предзагружаем изображение и десериализуем аннотации.
+  // Предзагрузка нужна, чтобы знать натуральный размер изображения до монтирования холста.
+  useEffect(() => {
+    if (!task || !isValidationTask) return;
+
+    setValidationState(makeEmptyValidation());
+
+    const annotations = (task.metadata?.annotations ?? []) as SerializedShape[];
+    const url = task.imageUrl;
+    let cancelled = false;
+
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      if (cancelled) return;
+      const deserialized = deserializeAnnotations(annotations, img.naturalWidth, img.naturalHeight);
+      setValidationState(prev => ({ ...prev, annotations: deserialized }));
+    };
+
+    img.onerror = () => {
+      if (cancelled) return;
+      setValidationState(prev => ({ ...prev, imageError: `Не удалось загрузить изображение: ${url}` }));
+    };
+
+    img.src = url;
+    return () => { cancelled = true; };
+  }, [task?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleAnnotationsChange = useCallback((annotations: ImageAnnotation[]) => {
     annotationsRef.current = annotations;
   }, []);
@@ -88,13 +129,11 @@ export function WorkspacePage() {
   const navigateTo = useCallback(async (nextIndex: number) => {
     if (!task) return;
 
-    // Удаляем истёкшие несохранённые задачи из массива перед навигацией
     const isDead = (t: AnnotationTask) => !savedTaskIds.has(t.id) && isExpiredAt(t.expiresAt);
     const cleanedTasks = tasks.filter(t => !isDead(t));
     const removedBefore = tasks.slice(0, nextIndex).filter(isDead).length;
     const adjustedNext = nextIndex - removedBefore;
 
-    // Если нужно догружать — делаем это до setTasks, чтобы не мелькал CompletedScreen
     if (adjustedNext >= cleanedTasks.length) {
       const newTask = await taskService.loadNextTask(datasetId ?? '').catch(err => {
         console.error('[WorkspacePage] loadNextTask:', err);
@@ -120,24 +159,40 @@ export function WorkspacePage() {
       setSavedTaskIds(prev => new Set(prev).add(task.id));
     } catch (err) {
       if (!(err instanceof Error && err.message.startsWith('410'))) throw err;
-      // 410 — задание истекло; isExpired обновится само через useIsExpired
     }
   }, [task, isExpired]);
 
+  const handleValidationVerdict = useCallback(async (isCorrect: boolean) => {
+    if (!task || validationState.submitting) return;
+    setValidationState(prev => ({ ...prev, verdict: isCorrect, submitting: true }));
+    try {
+      await taskService.submitValidation(task.id, isCorrect);
+      setSavedTaskIds(prev => new Set(prev).add(task.id));
+    } catch (err) {
+      console.error('[WorkspacePage] submitValidation:', err);
+    } finally {
+      setValidationState(prev => ({ ...prev, submitting: false }));
+    }
+  }, [task, validationState.submitting]);
+
   const canGoPrev = taskIndex > 0;
-  // Вперёд — если задача сохранена ИЛИ истекла (пользователь должен иметь возможность уйти)
   const canGoNext = (isCurrentTaskSaved || isExpired) && (taskIndex < tasks.length - 1 || hasMoreTasks);
 
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};
-    for (const tool of IMAGE_DRAWING_TOOLS) {
-      if (tool.hotkey) map[tool.hotkey] = () => setActiveTool(tool.id);
-    }
-    for (const tag of tags) {
-      if (tag.hotkey) map[tag.hotkey] = () => setActiveTagId(tag.id);
+    if (!isValidationTask) {
+      for (const tool of IMAGE_DRAWING_TOOLS) {
+        if (tool.hotkey) map[tool.hotkey] = () => setActiveTool(tool.id);
+      }
+      for (const tag of tags) {
+        if (tag.hotkey) map[tag.hotkey] = () => setActiveTagId(tag.id);
+      }
+    } else {
+      map['s'] = () => handleValidationVerdict(true);
+      map['a'] = () => handleValidationVerdict(false);
     }
     return map;
-  }, [tags]);
+  }, [isValidationTask, tags, handleValidationVerdict]);
   useHotkeys(hotkeys);
 
   return (
@@ -157,14 +212,15 @@ export function WorkspacePage() {
             ← Пред
           </button>
           <span className={styles.taskCounter}>
-            {task
-              ? (task.metadata?.name as string | undefined) ?? `Задача ${taskOffset + taskIndex + 1}`
-              : 'Готово'}
-            {task && (
-              <span className={styles.taskIndex}>
-                {taskOffset + taskIndex + 1} / {labelingLimit ?? tasks.length}
-              </span>
-            )}
+            {task ? (
+              <>
+                {(task.metadata?.name as string | undefined) ?? `Задача ${taskOffset + taskIndex + 1}`}
+                {isValidationTask && <span className={styles.validationBadge}>Валидация</span>}
+                <span className={styles.taskIndex}>
+                  {taskOffset + taskIndex + 1} / {labelingLimit ?? tasks.length}
+                </span>
+              </>
+            ) : 'Готово'}
             {task?.expiresAt && <ExpiryTimer expiresAt={task.expiresAt} />}
           </span>
           <button
@@ -178,55 +234,102 @@ export function WorkspacePage() {
         </nav>
       </header>
 
-      <div className={styles.body}>
-        <aside className={styles.sidebar}>
-          <ToolSelector
-            tools={IMAGE_DRAWING_TOOLS}
-            activeTool={activeTool}
-            onSelect={setActiveTool}
-          />
-          <div className={styles.divider} />
-          <TagSelector
-            tags={tags}
-            activeTagId={activeTagId}
-            onSelect={setActiveTagId}
-          />
-          <div className={styles.sidebarBottom}>
-            <button
-              className={styles.saveButton}
-              onClick={handleSave}
-              disabled={isExpired}
-              title={isExpired ? 'Время на выполнение задания истекло' : 'Сохранить разметку'}
-            >
-              {isExpired ? 'Истекло' : 'Сохранить'}
-            </button>
-          </div>
-        </aside>
-
-        <main className={styles.canvasArea}>
-          <div className={styles.canvasContent}>
-            {!task ? (
-              tasks.length === 0 && hasMoreTasks
-                ? <div className={styles.status}>Загрузка…</div>
-                : <CompletedScreen />
+      {isValidationTask ? (
+        // ── Validation mode ────────────────────────────────────────
+        <div className={styles.validationBody}>
+          <div className={styles.validationCanvasArea}>
+            {validationState.imageError ? (
+              <div className={styles.status}>{validationState.imageError}</div>
             ) : (
-              <AnnotationCanvas
-                key={task.id}
-                imageUrl={task.imageUrl}
-                activeTool={activeTool}
-                activeTag={activeTag}
+              <ReadOnlyAnnotationCanvas
+                key={task!.id}
+                imageUrl={task!.imageUrl}
+                initialAnnotations={validationState.annotations}
                 tags={tags}
-                initialAnnotations={taskService.getAnnotations(task.id)}
-                onAnnotationsChange={handleAnnotationsChange}
-                onImageSizeChange={handleImageSizeChange}
-                onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
-                onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
               />
             )}
           </div>
-          <HintsBar activeTool={activeTool} />
-        </main>
-      </div>
+
+          <div className={styles.verdictBar}>
+            <div className={styles.verdictHints}>
+              <span>S — корректно</span>
+              <span>A — некорректно</span>
+              <span>D / F — навигация</span>
+            </div>
+            <div className={styles.verdictButtons}>
+              <button
+                className={styles.rejectButton}
+                data-active={validationState.verdict === false}
+                onClick={() => handleValidationVerdict(false)}
+                disabled={validationState.submitting}
+                title="Разметка некорректна (A)"
+              >
+                ✗ Некорректно
+              </button>
+              <button
+                className={styles.approveButton}
+                data-active={validationState.verdict === true}
+                onClick={() => handleValidationVerdict(true)}
+                disabled={validationState.submitting}
+                title="Разметка корректна (S)"
+              >
+                ✓ Корректно
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // ── Annotation mode ────────────────────────────────────────
+        <div className={styles.body}>
+          <aside className={styles.sidebar}>
+            <ToolSelector
+              tools={IMAGE_DRAWING_TOOLS}
+              activeTool={activeTool}
+              onSelect={setActiveTool}
+            />
+            <div className={styles.divider} />
+            <TagSelector
+              tags={tags}
+              activeTagId={activeTagId}
+              onSelect={setActiveTagId}
+            />
+            <div className={styles.sidebarBottom}>
+              <button
+                className={styles.saveButton}
+                onClick={handleSave}
+                disabled={isExpired}
+                title={isExpired ? 'Время на выполнение задания истекло' : 'Сохранить разметку'}
+              >
+                {isExpired ? 'Истекло' : 'Сохранить'}
+              </button>
+            </div>
+          </aside>
+
+          <main className={styles.canvasArea}>
+            <div className={styles.canvasContent}>
+              {!task ? (
+                tasks.length === 0 && hasMoreTasks
+                  ? <div className={styles.status}>Загрузка…</div>
+                  : <CompletedScreen />
+              ) : (
+                <AnnotationCanvas
+                  key={task.id}
+                  imageUrl={task.imageUrl}
+                  activeTool={activeTool}
+                  activeTag={activeTag}
+                  tags={tags}
+                  initialAnnotations={taskService.getAnnotations(task.id)}
+                  onAnnotationsChange={handleAnnotationsChange}
+                  onImageSizeChange={handleImageSizeChange}
+                  onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
+                  onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
+                />
+              )}
+            </div>
+            <HintsBar activeTool={activeTool} />
+          </main>
+        </div>
+      )}
     </div>
   );
 }

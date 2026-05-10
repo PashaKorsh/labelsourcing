@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { AnnotationCanvas } from '../../components/AnnotationCanvas';
 import { ReadOnlyAnnotationCanvas } from '../../components/ReadOnlyAnnotationCanvas';
@@ -17,6 +18,7 @@ import { deserializeAnnotations } from '../../utils/annotationDeserializer';
 import { useHotkeys } from '../../hooks/useHotkeys';
 import type { HotkeyMap } from '../../hooks/useHotkeys';
 import { isExpiredAt } from '../../utils/time';
+import { ROUTES, buildRoute } from '../../config/routes';
 import styles from './WorkspacePage.module.css';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { CompletedScreen } from '../../components/CompletedScreen';
@@ -41,6 +43,8 @@ function makeEmptyValidation(): ValidationState {
 
 export function WorkspacePage() {
   const datasetId = useDatasetId();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [labelingLimit, setLabelingLimit] = useState<number | null>(null);
@@ -60,6 +64,17 @@ export function WorkspacePage() {
   const isValidationTask = task?.type === 'validation';
 
   const isExpired = useIsExpired(task?.expiresAt);
+
+  // Синхронизируем URL с типом текущей задачи
+  useEffect(() => {
+    if (!datasetId || !task) return;
+    const isOnValidationRoute = location.pathname.endsWith('/validation');
+    if (task.type === 'validation' && !isOnValidationRoute) {
+      navigate(buildRoute(ROUTES.datasetValidation, { datasetId }), { replace: true });
+    } else if (task.type !== 'validation' && isOnValidationRoute) {
+      navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId }), { replace: true });
+    }
+  }, [task?.id, task?.type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!datasetId) return;

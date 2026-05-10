@@ -102,6 +102,7 @@ async def yandex_callback(
                 "code": code,
                 "client_id": settings.YANDEX_CLIENT_ID,
                 "client_secret": settings.YANDEX_CLIENT_SECRET,
+                "force_confirm": "yes"
             })
             token_resp.raise_for_status()
             yandex_token = token_resp.json()["access_token"]

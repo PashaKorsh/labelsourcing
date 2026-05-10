@@ -73,6 +73,7 @@ async def yandex_login(
         "client_id": settings.YANDEX_CLIENT_ID,
         "redirect_uri": settings.YANDEX_REDIRECT_URI,
         "state": state,
+        "force_confirm": "yes"
     })
     return RedirectResponse(f"{YANDEX_AUTH_URL}?{params}")
 
@@ -101,8 +102,7 @@ async def yandex_callback(
                 "grant_type": "authorization_code",
                 "code": code,
                 "client_id": settings.YANDEX_CLIENT_ID,
-                "client_secret": settings.YANDEX_CLIENT_SECRET,
-                "force_confirm": "yes"
+                "client_secret": settings.YANDEX_CLIENT_SECRET
             })
             token_resp.raise_for_status()
             yandex_token = token_resp.json()["access_token"]

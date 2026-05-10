@@ -4,7 +4,7 @@ import base64
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +50,13 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@router.post("/logout")
+async def logout(response: Response):
+    """Выход из системы — удаляет cookie с токеном"""
+    response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
+    return {"ok": True}
+
+
 @router.get("/yandex/login")
 async def yandex_login(
     success_url: str = Query(default="/"),
@@ -66,6 +73,7 @@ async def yandex_login(
         "client_id": settings.YANDEX_CLIENT_ID,
         "redirect_uri": settings.YANDEX_REDIRECT_URI,
         "state": state,
+        "force_confirm": "yes"
     })
     return RedirectResponse(f"{YANDEX_AUTH_URL}?{params}")
 
@@ -94,7 +102,7 @@ async def yandex_callback(
                 "grant_type": "authorization_code",
                 "code": code,
                 "client_id": settings.YANDEX_CLIENT_ID,
-                "client_secret": settings.YANDEX_CLIENT_SECRET,
+                "client_secret": settings.YANDEX_CLIENT_SECRET
             })
             token_resp.raise_for_status()
             yandex_token = token_resp.json()["access_token"]
@@ -114,19 +122,34 @@ async def yandex_callback(
     if not email:
         return RedirectResponse(error_url)
 
+    # Извлекаем имя и аватар из ответа Яндекса
+    yandex_name = user_info.get("real_name") or user_info.get("display_name")
+    avatar_id = user_info.get("default_avatar_id")
+    is_avatar_empty = user_info.get("is_avatar_empty", True)
+    yandex_avatar_url = (
+        f"https://avatars.yandex.net/get-yapic/{avatar_id}/islands-200"
+        if avatar_id and not is_avatar_empty
+        else None
+    )
+
     stmt = select(User).where(User.email == email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
     if not user:
-        # Пользователь входит только через Яндекс — пароль не используется
         user = User(
             email=email,
             password=get_password_hash(str(uuid.uuid4())),
+            name=yandex_name,
+            avatar_url=yandex_avatar_url,
         )
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
+    else:
+        user.name = yandex_name
+        user.avatar_url = yandex_avatar_url
+
+    await db.commit()
+    await db.refresh(user)
 
     access_token = create_access_token(data={"sub": str(user.id)})
     response = RedirectResponse(success_url)

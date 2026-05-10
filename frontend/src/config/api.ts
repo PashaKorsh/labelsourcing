@@ -5,6 +5,7 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 export const API = {
   auth: {
     login:          () => `${API_BASE}/api/v1/auth/login`,
+    logout:         () => `${API_BASE}/api/v1/auth/logout`,
     yandexLogin:    () => `${API_BASE}/api/v1/auth/yandex/login`,
     yandexCallback: () => `${API_BASE}/api/v1/auth/yandex/callback`,
   },
@@ -41,7 +42,7 @@ export const API = {
   },
 } as const;
 
-// Обёртка fetch с автоматической подстановкой JWT-токена из localStorage.
+// Обёртка fetch с автоматической подстановкой cookie и обработкой 401.
 export async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
   const res = await fetch(url, {
     ...options,
@@ -51,6 +52,11 @@ export async function apiFetch(url: string, options?: RequestInit): Promise<Resp
       ...options?.headers,
     },
   });
+  if (res.status === 401) {
+    // Уведомляем AuthProvider — он почистит localStorage и редиректнет на /login
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    throw new Error('401: Unauthorized');
+  }
   if (!res.ok) {
     const detail = await res.text().catch(() => res.statusText);
     throw new Error(`${res.status}: ${detail}`);

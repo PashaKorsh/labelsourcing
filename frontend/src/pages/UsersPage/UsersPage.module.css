@@ -50,14 +50,9 @@
   line-height: 1.2;
 }
 
-.email {
-  font-size: 13px;
-  color: #6f6f6f;
-  margin: 0;
-}
-
-.roles {
+.tags {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 

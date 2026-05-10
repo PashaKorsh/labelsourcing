@@ -28,7 +28,6 @@ class DatasetResponse(BaseModel):
     default_labeling_limit: int = 50
     status: str = "active"
     tasks_count: int = 0
-    labeled_count: int = 0
     user_done: bool = False
     user_labeling_limit: int | None = None
     user_labeled_count: int | None = None

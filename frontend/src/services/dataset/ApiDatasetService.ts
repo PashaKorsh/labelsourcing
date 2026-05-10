@@ -63,10 +63,8 @@ export class ApiDatasetService implements DatasetService {
     return dtos.map(mapDto);
   }
 
-  async listMine(search?: string): Promise<Dataset[]> {
-    const meRes = await apiFetch(API.users.me());
-    const me: { id: string } = await meRes.json();
-    return this.list({ ownerId: me.id, search });
+  async listMine(ownerId: string, search?: string): Promise<Dataset[]> {
+    return this.list({ ownerId, search });
   }
 
   async get(id: string): Promise<Dataset> {

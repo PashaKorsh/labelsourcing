@@ -86,7 +86,7 @@ export class MockDatasetService implements DatasetService {
     return result;
   }
 
-  async listMine(search?: string): Promise<Dataset[]> {
+  async listMine(_ownerId: string, search?: string): Promise<Dataset[]> {
     let result = [...this.mineDatasets];
     if (search) {
       const q = search.toLowerCase();

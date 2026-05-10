@@ -73,5 +73,10 @@ async def update_user_access(
         target_user.tags = list(tags_result.scalars().all())
 
     await db.commit()
-    await db.refresh(target_user)
-    return target_user
+    # db.refresh не загружает relationships — делаем новый select
+    stmt = select(User).options(
+        selectinload(User.roles),
+        selectinload(User.tags),
+    ).where(User.id == user_id)
+    result = await db.execute(stmt)
+    return result.scalar_one()

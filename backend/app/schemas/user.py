@@ -14,8 +14,9 @@ class RoleResponse(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None
     created_at: datetime
-    # Подтягиваем связи, чтобы отдавать юзера сразу с его ролями и тегами
     roles: List[RoleResponse] = []
     tags: List[TagResponse] = []
 

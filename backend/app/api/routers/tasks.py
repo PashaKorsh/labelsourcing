@@ -20,6 +20,9 @@ async def create_task(
     admin_user: User = Depends(require_roles(["admin"]))
 ):
     """Добавить одну задачу в датасет"""
+    dataset = await db.get(Dataset, task_in.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
     new_task = Task(
         dataset_id=task_in.dataset_id,
         url=task_in.url,
@@ -27,6 +30,7 @@ async def create_task(
         task_metadata=task_in.task_metadata,
     )
     db.add(new_task)
+    dataset.tasks_count += 1
     await db.commit()
     await db.refresh(new_task)
     return new_task
@@ -39,11 +43,15 @@ async def create_tasks_batch(
     admin_user: User = Depends(require_roles(["admin"]))
 ):
     """Массовая загрузка задач в датасет"""
+    dataset = await db.get(Dataset, batch_in.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
     new_tasks = [
         Task(dataset_id=batch_in.dataset_id, url=url, type=batch_in.type)
         for url in batch_in.urls
     ]
     db.add_all(new_tasks)
+    dataset.tasks_count += len(new_tasks)
     await db.commit()
     return {"status": "success", "added": len(new_tasks)}
 
@@ -58,6 +66,28 @@ async def delete_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
+
+    # Корректируем labeled_count у всех, кто выполнил эту задачу,
+    # иначе они могут оказаться заблокированы из-за завышенного счётчика.
+    done_assignments = (await db.execute(
+        select(Assignment).where(
+            Assignment.task_id == task_id,
+            Assignment.status == AssignmentStatus.DONE,
+        )
+    )).scalars().all()
+    for assignment in done_assignments:
+        access = (await db.execute(
+            select(UserDatasetAccess).where(
+                UserDatasetAccess.user_id == assignment.user_id,
+                UserDatasetAccess.dataset_id == task.dataset_id,
+            )
+        )).scalar_one_or_none()
+        if access:
+            access.labeled_count = max(0, access.labeled_count - 1)
+
+    dataset = await db.get(Dataset, task.dataset_id)
+    if dataset:
+        dataset.tasks_count = max(0, dataset.tasks_count - 1)
     await db.delete(task)
     await db.commit()
 

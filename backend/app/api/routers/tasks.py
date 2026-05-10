@@ -66,6 +66,25 @@ async def delete_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
+
+    # Корректируем labeled_count у всех, кто выполнил эту задачу,
+    # иначе они могут оказаться заблокированы из-за завышенного счётчика.
+    done_assignments = (await db.execute(
+        select(Assignment).where(
+            Assignment.task_id == task_id,
+            Assignment.status == AssignmentStatus.DONE,
+        )
+    )).scalars().all()
+    for assignment in done_assignments:
+        access = (await db.execute(
+            select(UserDatasetAccess).where(
+                UserDatasetAccess.user_id == assignment.user_id,
+                UserDatasetAccess.dataset_id == task.dataset_id,
+            )
+        )).scalar_one_or_none()
+        if access:
+            access.labeled_count = max(0, access.labeled_count - 1)
+
     dataset = await db.get(Dataset, task.dataset_id)
     if dataset:
         dataset.tasks_count = max(0, dataset.tasks_count - 1)

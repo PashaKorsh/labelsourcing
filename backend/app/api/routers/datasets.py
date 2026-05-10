@@ -237,6 +237,11 @@ async def get_next_task(
         )).scalar_one_or_none()
 
         if existing_assignment:
+            # Если ассайнмент был помечен expired через submit_label — active_assignments
+            # уже декрементировали тогда, восстанавливаем для нового периода.
+            # Если status=in_progress (истёк без попытки сабмита) — счётчик не трогали, не трогаем и сейчас.
+            if existing_assignment.status == AssignmentStatus.EXPIRED:
+                task.active_assignments += 1
             existing_assignment.status = AssignmentStatus.IN_PROGRESS
             existing_assignment.expires_at = expires_at
             existing_assignment.assigned_at = datetime.utcnow()

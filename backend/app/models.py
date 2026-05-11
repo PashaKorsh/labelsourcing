@@ -180,7 +180,6 @@ class UserDatasetAccess(Base):
     labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     labeled_count: Mapped[int] = mapped_column(Integer, server_default="0")
     can_label: Mapped[bool] = mapped_column(Boolean, server_default="true")
-    can_validate: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     user: Mapped["User"] = relationship(back_populates="dataset_accesses")
     dataset: Mapped["Dataset"] = relationship(back_populates="user_accesses")

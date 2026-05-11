@@ -33,7 +33,6 @@ class DatasetResponse(BaseModel):
     requires_validation: bool = False
     validation_quorum: int = 1
     user_done: bool = False
-    user_can_validate: bool = False
     user_labeling_limit: int | None = None
     user_labeled_count: int | None = None
     tags: list[TagResponse] = []

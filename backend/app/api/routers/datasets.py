@@ -49,7 +49,6 @@ async def _get_dataset_with_counts(
         )).scalar_one_or_none()
         dataset.user_done = _compute_user_done(access, dataset.tasks_count)
         if access is not None:
-            dataset.user_can_validate = access.can_validate
             dataset.user_labeling_limit = min(access.labeling_limit, dataset.tasks_count)
             dataset.user_labeled_count = access.labeled_count
 
@@ -123,7 +122,6 @@ async def get_datasets(
         for dataset in datasets_with_counts:
             access = access_map.get(dataset.id)
             dataset.user_done = _compute_user_done(access, dataset.tasks_count)
-            dataset.user_can_validate = access.can_validate if access else False
 
     return datasets_with_counts
 
@@ -249,7 +247,7 @@ async def get_next_task(
     result_tasks: list[Task] = []
 
     # Validation-задачи в приоритете
-    if access.can_validate and dataset.requires_validation:
+    if dataset.requires_validation:
         val_task_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -257,7 +255,7 @@ async def get_next_task(
             .where(Task.status == TaskStatus.PENDING)
             .where(live_count_sq < dataset.validation_quorum)
             .where(~user_busy_sq)
-            # Запрет самовалидации: annotator_id из метадаты != текущий пользователь
+            # Запрет самовалидации: нельзя оценивать собственную разметку
             .where(
                 cast(Task.task_metadata['annotator_id'], String) != f'"{current_user.id}"'
             )
@@ -418,6 +416,7 @@ async def get_dataset_tasks(
     query = (
         select(Task)
         .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.ANNOTATION)
         .limit(limit)
         .offset(offset)
     )
@@ -462,7 +461,6 @@ async def upsert_user_access(
             dataset_id=dataset_id,
             labeling_limit=update_in.labeling_limit if update_in.labeling_limit is not None else dataset.default_labeling_limit,
             can_label=update_in.can_label if update_in.can_label is not None else True,
-            can_validate=update_in.can_validate if update_in.can_validate is not None else False,
         )
         db.add(access)
     else:
@@ -470,8 +468,6 @@ async def upsert_user_access(
             access.labeling_limit = update_in.labeling_limit
         if update_in.can_label is not None:
             access.can_label = update_in.can_label
-        if update_in.can_validate is not None:
-            access.can_validate = update_in.can_validate
 
     await db.commit()
     await db.refresh(access)

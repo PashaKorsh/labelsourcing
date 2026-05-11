@@ -8,7 +8,6 @@ class UserDatasetAccessResponse(BaseModel):
     labeling_limit: int
     labeled_count: int
     can_label: bool
-    can_validate: bool
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -16,4 +15,3 @@ class UserDatasetAccessResponse(BaseModel):
 class UserDatasetAccessUpdate(BaseModel):
     labeling_limit: int | None = None
     can_label: bool | None = None
-    can_validate: bool | None = None

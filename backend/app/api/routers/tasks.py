@@ -81,7 +81,7 @@ async def create_task(
     new_task = Task(
         dataset_id=task_in.dataset_id,
         url=task_in.url,
-        type=task_in.type,
+        type=TaskType.ANNOTATION,
         task_metadata=task_in.task_metadata,
     )
     db.add(new_task)
@@ -102,7 +102,7 @@ async def create_tasks_batch(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
     new_tasks = [
-        Task(dataset_id=batch_in.dataset_id, url=url, type=batch_in.type)
+        Task(dataset_id=batch_in.dataset_id, url=url, type=TaskType.ANNOTATION)
         for url in batch_in.urls
     ]
     db.add_all(new_tasks)
@@ -121,6 +121,9 @@ async def delete_task(
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
+
+    if task.type == TaskType.VALIDATION:
+        raise HTTPException(status_code=400, detail="Validation-задачи управляются автоматически и не могут быть удалены напрямую.")
 
     # Корректируем labeled_count у всех, кто выполнил эту аннотационную задачу
     if task.type == TaskType.ANNOTATION:

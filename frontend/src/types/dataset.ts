@@ -9,7 +9,6 @@ export interface Dataset {
   imageUrl?: string;
   completed?: boolean;
   userDone?: boolean;
-  userCanValidate?: boolean;
   taskCount?: number;
   userLabelingLimit?: number;
   userLabeledCount?: number;

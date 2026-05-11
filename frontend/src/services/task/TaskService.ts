@@ -8,7 +8,7 @@ export interface TaskService {
    * Мок — no-op (задачи предзагружены).
    * API — GET /api/v1/datasets/{id}/next?count=N
    */
-  loadNextTask(datasetId: string, count?: number): Promise<AnnotationTask | null>;
+  loadNextTask(datasetId: string, count?: number, mode?: 'annotation' | 'validation'): Promise<AnnotationTask | null>;
 
   /** Возвращает кэшированный список задач. */
   getTasks(): readonly AnnotationTask[];

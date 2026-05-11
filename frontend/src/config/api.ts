@@ -20,7 +20,11 @@ export const API = {
     detail: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
     update: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
     tasks:  (id: string) => `${API_BASE}/api/v1/datasets/${id}/tasks`,
-    next:   (id: string, count = 1) => `${API_BASE}/api/v1/datasets/${id}/next?count=${count}`,
+    next:   (id: string, count = 1, mode?: 'annotation' | 'validation') => {
+      const qs = new URLSearchParams({ count: String(count) });
+      if (mode) qs.set('mode', mode);
+      return `${API_BASE}/api/v1/datasets/${id}/next?${qs}`;
+    },
     stats:  (id: string) => `${API_BASE}/api/v1/datasets/${id}/stats`,
     export: (id: string) => `${API_BASE}/api/v1/datasets/${id}/export`,
   },

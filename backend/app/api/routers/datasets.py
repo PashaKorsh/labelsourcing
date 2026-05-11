@@ -49,6 +49,7 @@ async def _get_dataset_with_counts(
         )).scalar_one_or_none()
         dataset.user_done = _compute_user_done(access, dataset.tasks_count)
         if access is not None:
+            dataset.user_can_validate = access.can_validate
             dataset.user_labeling_limit = min(access.labeling_limit, dataset.tasks_count)
             dataset.user_labeled_count = access.labeled_count
 
@@ -120,7 +121,9 @@ async def get_datasets(
             a.dataset_id: a for a in access_result.scalars()
         }
         for dataset in datasets_with_counts:
-            dataset.user_done = _compute_user_done(access_map.get(dataset.id), dataset.tasks_count)
+            access = access_map.get(dataset.id)
+            dataset.user_done = _compute_user_done(access, dataset.tasks_count)
+            dataset.user_can_validate = access.can_validate if access else False
 
     return datasets_with_counts
 
@@ -193,11 +196,14 @@ async def _assign_task(
 async def get_next_task(
         dataset_id: uuid.UUID,
         count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST),
+        mode: Optional[str] = Query(default=None, pattern="^(annotation|validation)$"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     """Бронирует и возвращает доступные задачи.
-    Validation-задачи имеют приоритет перед annotation при наличии can_validate.
+    mode='annotation' — только аннотационные задачи.
+    mode='validation' — только валидационные задачи.
+    mode=None — автоматически: validation в приоритете, annotation как fallback.
     """
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
@@ -244,8 +250,11 @@ async def get_next_task(
     user_busy_sq = _make_user_busy_subquery(current_user.id)
     result_tasks: list[Task] = []
 
-    # Сначала пытаемся выдать validation-задачи (приоритет)
-    if dataset.requires_validation and access.can_validate:
+    want_validation = mode == 'validation' or (mode is None and dataset.requires_validation and access.can_validate)
+    want_annotation = mode == 'annotation' or mode is None
+
+    # Выдаём validation-задачи
+    if want_validation and access.can_validate and dataset.requires_validation:
         val_task_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -271,9 +280,9 @@ async def get_next_task(
             await _assign_task(db, task, current_user.id, expires_at)
             result_tasks.append(task)
 
-    # Если validation-задачи не выдали нужное количество — добираем annotation
+    # Выдаём annotation-задачи (если mode=annotation, или auto-режим и validation не дал результата)
     remaining = count - len(result_tasks)
-    if remaining > 0 and access.can_label:
+    if remaining > 0 and want_annotation and access.can_label:
         effective_limit = min(access.labeling_limit, dataset.tasks_count)
         if access.labeled_count < effective_limit:
             ann_task_stmt = (

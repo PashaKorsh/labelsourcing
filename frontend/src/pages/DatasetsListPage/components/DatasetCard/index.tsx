@@ -18,6 +18,10 @@ export function DatasetCard({ dataset }: Props) {
     navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId: dataset.id }));
   };
 
+  const handleValidate = () => {
+    navigate(buildRoute(ROUTES.datasetValidation, { datasetId: dataset.id }));
+  };
+
   return (
     <div className={styles.card}>
       {dataset.imageUrl && (
@@ -40,11 +44,21 @@ export function DatasetCard({ dataset }: Props) {
               <RoleBadge key={tag.id} role={tag} />
             ))}
           </div>
-          {isDone ? (
-            <span className={styles.doneBadge}>✓ Выполнено</span>
-          ) : (
-            <PlayButton onClick={handlePlay} />
-          )}
+          <div className={styles.actions}>
+            <button
+              className={styles.validateButton}
+              onClick={handleValidate}
+              disabled={!dataset.userCanValidate}
+              title={dataset.userCanValidate ? 'Перейти к валидации' : 'Валидация недоступна'}
+            >
+              Валидация
+            </button>
+            {isDone ? (
+              <span className={styles.doneBadge}>✓ Выполнено</span>
+            ) : (
+              <PlayButton onClick={handlePlay} />
+            )}
+          </div>
         </div>
       </div>
     </div>

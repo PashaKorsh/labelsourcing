@@ -22,8 +22,8 @@ export class ApiTaskService implements TaskService {
   // При восстановлении сессии бэк вернёт уже взятые in_progress задачи —
   // дедупликация предотвращает дубликаты в массиве.
   // Возвращает первую новую задачу или null, если всё уже в кэше / задач нет.
-  async loadNextTask(datasetId: string, count = 1, mode?: 'annotation' | 'validation'): Promise<AnnotationTask | null> {
-    const res = await apiFetch(API.datasets.next(datasetId, count, mode));
+  async loadNextTask(datasetId: string, count = 1): Promise<AnnotationTask | null> {
+    const res = await apiFetch(API.datasets.next(datasetId, count));
     const dtos: TaskDto[] = await res.json();
     if (!dtos.length) return null;
 

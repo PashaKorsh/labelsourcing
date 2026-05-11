@@ -18,12 +18,13 @@ interface Props {
   hasMoreTasks: boolean;
   tags: Tag[];
   isExpired: boolean;
+  isSaved: boolean;
   onSaved: () => void;
   onPrev?: () => void;
   onNext?: () => void;
 }
 
-export function AnnotationView({ task, hasMoreTasks, tags, isExpired, onSaved, onPrev, onNext }: Props) {
+export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, onSaved, onPrev, onNext }: Props) {
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [activeTagId, setActiveTagId] = useState<string | null>(tags[0]?.id ?? null);
 
@@ -62,6 +63,14 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, onSaved, o
   }, [tags]);
   useHotkeys(hotkeys);
 
+  const saveLabel = isSaved
+    ? 'Отправлено'
+    : (isExpired ? 'Истекло' : 'Отправить');
+
+  const saveTitle = isSaved
+    ? 'Разметка отправлена'
+    : (isExpired ? 'Время на выполнение истекло' : 'Отправить разметку');
+
   return (
     <div className={styles.body}>
       <aside className={styles.sidebar}>
@@ -72,10 +81,10 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, onSaved, o
           <button
             className={styles.saveButton}
             onClick={handleSave}
-            disabled={isExpired}
-            title={isExpired ? 'Время на выполнение задания истекло' : 'Сохранить разметку'}
+            disabled={isSaved || isExpired}
+            title={saveTitle}
           >
-            {isExpired ? 'Истекло' : 'Сохранить'}
+            {saveLabel}
           </button>
         </div>
       </aside>

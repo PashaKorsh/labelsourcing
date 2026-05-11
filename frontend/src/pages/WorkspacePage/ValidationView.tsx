@@ -14,6 +14,7 @@ interface ValidationState {
   annotations: ImageAnnotation[];
   verdict: boolean | null;
   submitting: boolean;
+  submitted: boolean;
   imageError: string | null;
 }
 
@@ -28,12 +29,13 @@ export function ValidationView({ task, tags, onSaved }: Props) {
     annotations: [],
     verdict: null,
     submitting: false,
+    submitted: false,
     imageError: null,
   });
 
   // Предзагрузка изображения: нужны натуральные размеры для денормализации координат
   useEffect(() => {
-    setState({ annotations: [], verdict: null, submitting: false, imageError: null });
+    setState({ annotations: [], verdict: null, submitting: false, submitted: false, imageError: null });
 
     const serialized = (task.metadata?.annotations ?? []) as SerializedShape[];
     let cancelled = false;
@@ -57,17 +59,17 @@ export function ValidationView({ task, tags, onSaved }: Props) {
   }, [task.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleVerdict = useCallback(async (isCorrect: boolean) => {
-    if (state.submitting) return;
+    if (state.submitting || state.submitted) return;
     setState(prev => ({ ...prev, verdict: isCorrect, submitting: true }));
     try {
       await taskService.submitValidation(task.id, isCorrect);
+      setState(prev => ({ ...prev, submitting: false, submitted: true }));
       onSaved();
     } catch (err) {
       console.error('[ValidationView] submitValidation:', err);
-    } finally {
       setState(prev => ({ ...prev, submitting: false }));
     }
-  }, [task.id, state.submitting, onSaved]);
+  }, [task.id, state.submitting, state.submitted, onSaved]);
 
   const hotkeys = useMemo<HotkeyMap>(() => ({
     s: () => handleVerdict(true),
@@ -101,7 +103,7 @@ export function ValidationView({ task, tags, onSaved }: Props) {
             className={styles.rejectButton}
             data-active={state.verdict === false}
             onClick={() => handleVerdict(false)}
-            disabled={state.submitting}
+            disabled={state.submitting || state.submitted}
             title="Разметка некорректна (A)"
           >
             ✗ Некорректно
@@ -110,7 +112,7 @@ export function ValidationView({ task, tags, onSaved }: Props) {
             className={styles.approveButton}
             data-active={state.verdict === true}
             onClick={() => handleVerdict(true)}
-            disabled={state.submitting}
+            disabled={state.submitting || state.submitted}
             title="Разметка корректна (S)"
           >
             ✓ Корректно

@@ -58,6 +58,15 @@ async def _process_validation_verdict(
     if annotation_task.completed_answers < dataset.required_answers:
         annotation_task.status = TaskStatus.PENDING
 
+    # Возвращаем слот в счётчик разметки аннотатора
+    access_stmt = select(UserDatasetAccess).where(
+        UserDatasetAccess.user_id == annotation_assignment.user_id,
+        UserDatasetAccess.dataset_id == annotation_task.dataset_id,
+    )
+    access = (await db.execute(access_stmt)).scalar_one_or_none()
+    if access is not None:
+        access.labeled_count = max(0, access.labeled_count - 1)
+
 
 @router.post("/", response_model=TaskResponse)
 async def create_task(
@@ -135,6 +144,24 @@ async def delete_task(
         if dataset:
             dataset.tasks_count = max(0, dataset.tasks_count - 1)
 
+        # Удаляем validation-задачи, созданные из аннотаций этой задачи
+        label_ids = (await db.execute(
+            select(Label.id)
+            .join(Assignment, Label.assignment_id == Assignment.id)
+            .where(Assignment.task_id == task_id)
+        )).scalars().all()
+
+        if label_ids:
+            label_id_strs = [str(lid) for lid in label_ids]
+            val_tasks = (await db.execute(
+                select(Task)
+                .where(Task.dataset_id == task.dataset_id)
+                .where(Task.type == TaskType.VALIDATION)
+                .where(Task.task_metadata['annotation_label_id'].astext.in_(label_id_strs))
+            )).scalars().all()
+            for vt in val_tasks:
+                await db.delete(vt)
+
     await db.delete(task)
     await db.commit()
 
@@ -169,17 +196,14 @@ async def submit_label(
         await db.commit()
         raise HTTPException(status_code=410, detail="Время на выполнение задания истекло. Получите новую задачу.")
 
-    # Повторный сабмит — просто обновляем результат
+    # Повторная отправка запрещена
     label_stmt = select(Label).where(Label.assignment_id == assignment.id)
     existing_label = (await db.execute(label_stmt)).scalar_one_or_none()
 
     if existing_label is not None:
-        existing_label.result = label_in.data
-        await db.commit()
-        await db.refresh(existing_label)
-        return existing_label
+        raise HTTPException(status_code=409, detail="Разметка уже отправлена и не может быть изменена.")
 
-    # Первый сабмит
+    # Первый (и единственный) сабмит
     label = Label(assignment_id=assignment.id, result=label_in.data)
     db.add(label)
 
@@ -211,27 +235,31 @@ async def submit_label(
             if access is not None:
                 access.labeled_count += 1
 
-            # Создаём validation-задачу для каждой аннотации, если датасет это требует
-            if dataset.requires_validation:
-                annotations_data = label_in.data.get('result', [])
-                validation_task = Task(
-                    dataset_id=dataset.id,
-                    url=task.url,
-                    type=TaskType.VALIDATION,
-                    task_metadata={
-                        'annotation_label_id': None,  # заполним после flush
-                        'annotator_id': str(current_user.id),
-                        'annotations': annotations_data,
-                    },
+            # Создаём validation-задачи только когда собрано required_answers аннотаций.
+            # Для каждой аннотации — отдельная задача, чтобы валидатор оценивал их по одной.
+            if dataset.requires_validation and task.completed_answers >= dataset.required_answers:
+                await db.flush()  # нужен, чтобы label.id был доступен
+
+                all_labels_stmt = (
+                    select(Label, Assignment)
+                    .join(Assignment, Label.assignment_id == Assignment.id)
+                    .where(Assignment.task_id == task.id)
+                    .where(Assignment.status == AssignmentStatus.DONE)
                 )
-                db.add(validation_task)
-                await db.flush()
-                # Обновляем ID лейбла в метадате после flush (теперь label.id доступен)
-                validation_task.task_metadata = {
-                    'annotation_label_id': str(label.id),
-                    'annotator_id': str(current_user.id),
-                    'annotations': annotations_data,
-                }
+                all_rows = (await db.execute(all_labels_stmt)).all()
+
+                for done_label, done_assignment in all_rows:
+                    ann_data = done_label.result.get('result', [])
+                    db.add(Task(
+                        dataset_id=dataset.id,
+                        url=task.url,
+                        type=TaskType.VALIDATION,
+                        task_metadata={
+                            'annotation_label_id': str(done_label.id),
+                            'annotator_id': str(done_assignment.user_id),
+                            'annotations': ann_data,
+                        },
+                    ))
 
     await db.commit()
     await db.refresh(label)

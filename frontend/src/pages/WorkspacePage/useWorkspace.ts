@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
 import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
 import { taskService, datasetService } from '../../services';
@@ -16,11 +15,6 @@ const DEFAULT_TAGS: Tag[] = [
 
 export function useWorkspace() {
   const datasetId = useDatasetId();
-  const location = useLocation();
-
-  const mode: 'annotation' | 'validation' = location.pathname.endsWith('/validation')
-    ? 'validation'
-    : 'annotation';
 
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
@@ -36,7 +30,7 @@ export function useWorkspace() {
   useEffect(() => {
     if (!datasetId) return;
 
-    taskService.loadNextTask(datasetId, 3, mode)
+    taskService.loadNextTask(datasetId, 3)
       .then(newTask => {
         if (newTask) setTasks(taskService.getTasks());
         else setHasMoreTasks(false);
@@ -71,7 +65,7 @@ export function useWorkspace() {
     const adjustedNext = nextIndex - removedBefore;
 
     if (adjustedNext >= cleanedTasks.length) {
-      const newTask = await taskService.loadNextTask(datasetId ?? '', 1, mode).catch(err => {
+      const newTask = await taskService.loadNextTask(datasetId ?? '', 1).catch(err => {
         console.error('[WorkspacePage] loadNextTask:', err);
         return null;
       });
@@ -86,7 +80,7 @@ export function useWorkspace() {
     }
 
     setTaskIndex(adjustedNext);
-  }, [task, tasks, savedTaskIds, datasetId, mode]);
+  }, [task, tasks, savedTaskIds, datasetId]);
 
   const isCurrentTaskSaved = task ? savedTaskIds.has(task.id) : false;
   const canGoPrev = taskIndex > 0;

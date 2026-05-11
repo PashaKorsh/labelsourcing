@@ -196,14 +196,12 @@ async def _assign_task(
 async def get_next_task(
         dataset_id: uuid.UUID,
         count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST),
-        mode: Optional[str] = Query(default=None, pattern="^(annotation|validation)$"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     """Бронирует и возвращает доступные задачи.
-    mode='annotation' — только аннотационные задачи.
-    mode='validation' — только валидационные задачи.
-    mode=None — автоматически: validation в приоритете, annotation как fallback.
+    Приоритет: validation-задачи → annotation-задачи.
+    Типы не смешиваются в рамках одного запроса.
     """
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
@@ -250,11 +248,8 @@ async def get_next_task(
     user_busy_sq = _make_user_busy_subquery(current_user.id)
     result_tasks: list[Task] = []
 
-    want_validation = mode == 'validation' or (mode is None and dataset.requires_validation and access.can_validate)
-    want_annotation = mode == 'annotation' or mode is None
-
-    # Выдаём validation-задачи
-    if want_validation and access.can_validate and dataset.requires_validation:
+    # Validation-задачи в приоритете
+    if access.can_validate and dataset.requires_validation:
         val_task_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -280,9 +275,8 @@ async def get_next_task(
             await _assign_task(db, task, current_user.id, expires_at)
             result_tasks.append(task)
 
-    # Выдаём annotation-задачи (если mode=annotation, или auto-режим и validation не дал результата)
-    remaining = count - len(result_tasks)
-    if remaining > 0 and want_annotation and access.can_label:
+    # Annotation-задачи — только если валидации не нашлось
+    if not result_tasks and access.can_label:
         effective_limit = min(access.labeling_limit, dataset.tasks_count)
         if access.labeled_count < effective_limit:
             ann_task_stmt = (
@@ -297,7 +291,7 @@ async def get_next_task(
                 .with_for_update(skip_locked=True)
             )
 
-            for _ in range(remaining):
+            for _ in range(count):
                 if result_tasks:
                     await db.flush()
                 task = (await db.execute(ann_task_stmt)).scalar_one_or_none()

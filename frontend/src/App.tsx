@@ -30,7 +30,6 @@ export default function App() {
             <Route path={ROUTES.datasetNew}        element={<P><DatasetNewPage /></P>} />
             <Route path={ROUTES.datasetEdit}       element={<P><DatasetEditPage /></P>} />
             <Route path={ROUTES.datasetAnnotation} element={<P><WorkspacePage /></P>} />
-            <Route path={ROUTES.datasetValidation} element={<P><WorkspacePage /></P>} />
             <Route path={ROUTES.users}             element={<P><UsersPage /></P>} />
             <Route path={ROUTES.tags}              element={<P><TagsPage /></P>} />
             <Route path="*"                        element={<Navigate to={ROUTES.login} replace />} />

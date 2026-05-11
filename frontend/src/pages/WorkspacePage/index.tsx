@@ -17,6 +17,7 @@ export function WorkspacePage() {
     isExpired,
     canGoPrev,
     canGoNext,
+    isCurrentTaskSaved,
     markSaved,
     navigateTo,
   } = useWorkspace();
@@ -74,6 +75,7 @@ export function WorkspacePage() {
           hasMoreTasks={hasMoreTasks}
           tags={tags}
           isExpired={isExpired}
+          isSaved={isCurrentTaskSaved}
           onSaved={() => task && markSaved(task.id)}
           onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
           onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}

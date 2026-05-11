@@ -12,6 +12,7 @@ import styles from './ValidationView.module.css';
 
 interface ValidationState {
   annotations: ImageAnnotation[];
+  ready: boolean;
   verdict: boolean | null;
   submitting: boolean;
   submitted: boolean;
@@ -27,6 +28,7 @@ interface Props {
 export function ValidationView({ task, tags, onSaved }: Props) {
   const [state, setState] = useState<ValidationState>({
     annotations: [],
+    ready: false,
     verdict: null,
     submitting: false,
     submitted: false,
@@ -35,7 +37,7 @@ export function ValidationView({ task, tags, onSaved }: Props) {
 
   // Предзагрузка изображения: нужны натуральные размеры для денормализации координат
   useEffect(() => {
-    setState({ annotations: [], verdict: null, submitting: false, submitted: false, imageError: null });
+    setState({ annotations: [], ready: false, verdict: null, submitting: false, submitted: false, imageError: null });
 
     const serialized = (task.metadata?.annotations ?? []) as SerializedShape[];
     let cancelled = false;
@@ -46,7 +48,7 @@ export function ValidationView({ task, tags, onSaved }: Props) {
     img.onload = () => {
       if (cancelled) return;
       const annotations = deserializeAnnotations(serialized, img.naturalWidth, img.naturalHeight);
-      setState(prev => ({ ...prev, annotations }));
+      setState(prev => ({ ...prev, annotations, ready: true }));
     };
 
     img.onerror = () => {
@@ -82,14 +84,16 @@ export function ValidationView({ task, tags, onSaved }: Props) {
       <div className={styles.canvasArea}>
         {state.imageError
           ? <div className={styles.status}>{state.imageError}</div>
-          : (
-            <ReadOnlyAnnotationCanvas
-              key={task.id}
-              imageUrl={task.imageUrl}
-              initialAnnotations={state.annotations}
-              tags={tags}
-            />
-          )
+          : !state.ready
+            ? <div className={styles.status}>Загрузка…</div>
+            : (
+              <ReadOnlyAnnotationCanvas
+                key={task.id}
+                imageUrl={task.imageUrl}
+                initialAnnotations={state.annotations}
+                tags={tags}
+              />
+            )
         }
       </div>
 

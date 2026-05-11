@@ -173,7 +173,7 @@ async def _assign_task(
     )).scalar_one_or_none()
 
     if existing:
-        if existing.status == AssignmentStatus.EXPIRED:
+        if existing.status in (AssignmentStatus.EXPIRED, AssignmentStatus.REJECTED):
             task.active_assignments += 1
         existing.status = AssignmentStatus.IN_PROGRESS
         existing.expires_at = expires_at

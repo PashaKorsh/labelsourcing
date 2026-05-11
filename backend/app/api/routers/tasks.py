@@ -58,6 +58,9 @@ async def _process_validation_verdict(
     if annotation_task.completed_answers < dataset.required_answers:
         annotation_task.status = TaskStatus.PENDING
 
+    # Удаляем отклонённый лейбл
+    await db.delete(annotation_label)
+
     # Возвращаем слот в счётчик разметки аннотатора
     access_stmt = select(UserDatasetAccess).where(
         UserDatasetAccess.user_id == annotation_assignment.user_id,

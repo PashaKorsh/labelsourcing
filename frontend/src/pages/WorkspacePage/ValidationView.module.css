@@ -46,6 +46,30 @@
   gap: 16px;
 }
 
+.submitButton {
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  transition: background 0.15s, border-color 0.15s;
+  margin-left: 8px;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.submitButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .approveButton,
 .rejectButton {
   padding: 8px 20px;

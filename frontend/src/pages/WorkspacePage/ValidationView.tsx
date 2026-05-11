@@ -35,7 +35,6 @@ export function ValidationView({ task, tags, onSaved }: Props) {
     imageError: null,
   });
 
-  // Предзагрузка изображения: нужны натуральные размеры для денормализации координат
   useEffect(() => {
     setState({ annotations: [], ready: false, verdict: null, submitting: false, submitted: false, imageError: null });
 
@@ -60,24 +59,32 @@ export function ValidationView({ task, tags, onSaved }: Props) {
     return () => { cancelled = true; };
   }, [task.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleVerdict = useCallback(async (isCorrect: boolean) => {
+  const selectVerdict = useCallback((isCorrect: boolean) => {
     if (state.submitting || state.submitted) return;
-    setState(prev => ({ ...prev, verdict: isCorrect, submitting: true }));
+    setState(prev => ({ ...prev, verdict: isCorrect }));
+  }, [state.submitting, state.submitted]);
+
+  const handleSubmit = useCallback(async () => {
+    if (state.verdict === null || state.submitting || state.submitted) return;
+    setState(prev => ({ ...prev, submitting: true }));
     try {
-      await taskService.submitValidation(task.id, isCorrect);
+      await taskService.submitValidation(task.id, state.verdict);
       setState(prev => ({ ...prev, submitting: false, submitted: true }));
       onSaved();
     } catch (err) {
       console.error('[ValidationView] submitValidation:', err);
       setState(prev => ({ ...prev, submitting: false }));
     }
-  }, [task.id, state.submitting, state.submitted, onSaved]);
+  }, [task.id, state.verdict, state.submitting, state.submitted, onSaved]);
 
   const hotkeys = useMemo<HotkeyMap>(() => ({
-    s: () => handleVerdict(true),
-    a: () => handleVerdict(false),
-  }), [handleVerdict]);
+    s: () => selectVerdict(true),
+    a: () => selectVerdict(false),
+    g: handleSubmit,
+  }), [selectVerdict, handleSubmit]);
   useHotkeys(hotkeys);
+
+  const submitLabel = state.submitted ? 'Отправлено' : (state.submitting ? 'Отправка…' : 'Отправить');
 
   return (
     <div className={styles.container}>
@@ -101,12 +108,13 @@ export function ValidationView({ task, tags, onSaved }: Props) {
         <div className={styles.hints}>
           <span>S — корректно</span>
           <span>A — некорректно</span>
+          <span>G — отправить</span>
         </div>
         <div className={styles.buttons}>
           <button
             className={styles.rejectButton}
             data-active={state.verdict === false}
-            onClick={() => handleVerdict(false)}
+            onClick={() => selectVerdict(false)}
             disabled={state.submitting || state.submitted}
             title="Разметка некорректна (A)"
           >
@@ -115,11 +123,19 @@ export function ValidationView({ task, tags, onSaved }: Props) {
           <button
             className={styles.approveButton}
             data-active={state.verdict === true}
-            onClick={() => handleVerdict(true)}
+            onClick={() => selectVerdict(true)}
             disabled={state.submitting || state.submitted}
             title="Разметка корректна (S)"
           >
             ✓ Корректно
+          </button>
+          <button
+            className={styles.submitButton}
+            onClick={handleSubmit}
+            disabled={state.verdict === null || state.submitting || state.submitted}
+            title="Отправить вердикт (Enter)"
+          >
+            {submitLabel}
           </button>
         </div>
       </div>

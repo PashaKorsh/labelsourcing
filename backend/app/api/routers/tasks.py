@@ -150,23 +150,15 @@ async def delete_task(
         if dataset:
             dataset.tasks_count = max(0, dataset.tasks_count - 1)
 
-        # Удаляем validation-задачи, созданные из аннотаций этой задачи
-        label_ids = (await db.execute(
-            select(Label.id)
-            .join(Assignment, Label.assignment_id == Assignment.id)
-            .where(Assignment.task_id == task_id)
+        # Удаляем validation-задачи
+        val_tasks = (await db.execute(
+            select(Task)
+            .where(Task.dataset_id == task.dataset_id)
+            .where(Task.type == TaskType.VALIDATION)
+            .where(Task.task_metadata['annotation_task_id'].astext == f'"{task_id}"')
         )).scalars().all()
-
-        if label_ids:
-            label_id_strs = [str(lid) for lid in label_ids]
-            val_tasks = (await db.execute(
-                select(Task)
-                .where(Task.dataset_id == task.dataset_id)
-                .where(Task.type == TaskType.VALIDATION)
-                .where(Task.task_metadata['annotation_label_id'].astext.in_(label_id_strs))
-            )).scalars().all()
-            for vt in val_tasks:
-                await db.delete(vt)
+        for vt in val_tasks:
+            await db.delete(vt)
 
     await db.delete(task)
     await db.commit()
@@ -261,6 +253,7 @@ async def submit_label(
                         url=task.url,
                         type=TaskType.VALIDATION,
                         task_metadata={
+                            'annotation_task_id': str(task.id),
                             'annotation_label_id': str(done_label.id),
                             'annotator_id': str(done_assignment.user_id),
                             'annotations': ann_data,

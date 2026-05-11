@@ -10,6 +10,7 @@ const DRAWING_HINTS: HotkeyHint[] = [
   { key: 'X',       description: 'Повтор' },
   { key: 'D',       description: 'Пред. задача' },
   { key: 'F',       description: 'След. задача' },
+  { key: 'G',       description: 'Отправить' },
 ];
 
 // Подсказки, специфичные для конкретного инструмента (по tool id)

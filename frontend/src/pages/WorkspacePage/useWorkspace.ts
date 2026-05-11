@@ -70,16 +70,24 @@ export function useWorkspace() {
         return null;
       });
       if (newTask) {
-        setTasks(taskService.getTasks().filter(t => !isDead(t)));
+        const freshTasks = taskService.getTasks().filter(t => !isDead(t));
+        setTasks(freshTasks);
+        // Если задача уже была в savedTaskIds — она была переиздана после отклонения валидацией.
+        // Сбрасываем saved-статус, чтобы кнопка снова стала активной.
+        if (savedTaskIds.has(newTask.id)) {
+          setSavedTaskIds(prev => { const s = new Set(prev); s.delete(newTask.id); return s; });
+        }
+        const newIdx = freshTasks.findIndex(t => t.id === newTask.id);
+        setTaskIndex(newIdx >= 0 ? newIdx : adjustedNext);
       } else {
         if (cleanedTasks.length !== tasks.length) setTasks(cleanedTasks);
         setHasMoreTasks(false);
+        setTaskIndex(adjustedNext);
       }
-    } else if (cleanedTasks.length !== tasks.length) {
-      setTasks(cleanedTasks);
+    } else {
+      if (cleanedTasks.length !== tasks.length) setTasks(cleanedTasks);
+      setTaskIndex(adjustedNext);
     }
-
-    setTaskIndex(adjustedNext);
   }, [task, tasks, savedTaskIds, datasetId]);
 
   const isCurrentTaskSaved = task ? savedTaskIds.has(task.id) : false;

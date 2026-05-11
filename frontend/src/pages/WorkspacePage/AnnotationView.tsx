@@ -59,8 +59,9 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
     for (const tag of tags) {
       if (tag.hotkey) map[tag.hotkey] = () => setActiveTagId(tag.id);
     }
+    map['g'] = handleSave;
     return map;
-  }, [tags]);
+  }, [tags, handleSave]);
   useHotkeys(hotkeys);
 
   const saveLabel = isSaved

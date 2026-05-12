@@ -36,12 +36,15 @@ function ReadOnlyController({
 
   useEffect(() => {
     if (!anno || !sizeReady || initialAnnotations.length === 0) return;
-    // rAF даёт Annotorious один тик, чтобы его ResizeObserver обработал новый displayStyle
-    // до того, как мы передаём аннотации — иначе масштаб вычисляется некорректно.
-    const raf = requestAnimationFrame(() => {
-      anno.setAnnotations(initialAnnotations);
+    // Двойной rAF: ResizeObserver Annotorious и первый rAF могут оказаться в одном фрейме.
+    // Второй rAF гарантирует, что первый фрейм (с пересчётом масштаба) уже завершён.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        anno.setAnnotations(initialAnnotations);
+      });
     });
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anno, sizeReady]); // initialAnnotations стабильны благодаря key на родителе
 

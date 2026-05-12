@@ -152,15 +152,17 @@ export function AnnotatorController({
     }
   }, [anno, activeTool]);
 
-  // Восстановление сохранённых аннотаций — ждём и anno, и sizeReady,
-  // чтобы displayStyle уже был применён к <img>. rAF даёт ResizeObserver Annotorious
-  // один тик на пересчёт масштаба до передачи аннотаций.
+  // Восстановление сохранённых аннотаций — ждём anno и sizeReady, затем двойной rAF,
+  // чтобы ResizeObserver Annotorious точно успел пересчитать масштаб.
   useEffect(() => {
     if (!anno || !sizeReady || initialAnnotations.length === 0) return;
-    const raf = requestAnimationFrame(() => {
-      anno.setAnnotations(initialAnnotations);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        anno.setAnnotations(initialAnnotations);
+      });
     });
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anno, sizeReady]); // initialAnnotations стабильны благодаря key на родителе
 

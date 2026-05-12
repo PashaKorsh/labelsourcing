@@ -30,9 +30,19 @@ export function useWorkspace() {
   useEffect(() => {
     if (!datasetId) return;
 
-    // Сбрасываем кэш перед загрузкой, чтобы не показывать устаревшие завершённые задачи
-    // при возврате на страницу после отправки разметки.
+    // Сбрасываем весь стейт при смене датасета (или при монтировании).
+    // Зависимость [datasetId] критична: React Router v6 не размонтирует WorkspacePage
+    // при переходе между /dataset/123 и /dataset/456 — это тот же паттерн маршрута,
+    // компонент переиспользуется. Без [datasetId] кэш и стейт от старого датасета
+    // остались бы видны на новом, что даёт 400 при попытке повторной отправки.
+    setTasks([]);
+    setHasMoreTasks(true);
+    setTaskIndex(0);
+    setSavedTaskIds(new Set());
+    setLabelingLimit(null);
+    setTaskOffset(0);
     taskService.clearCache();
+
     taskService.loadNextTask(datasetId, 3)
       .then(newTask => {
         setTasks(taskService.getTasks());
@@ -53,7 +63,7 @@ export function useWorkspace() {
         }
       })
       .catch(err => console.error('[WorkspacePage] init:', err));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [datasetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const markSaved = useCallback((taskId: string) => {
     setSavedTaskIds(prev => new Set(prev).add(taskId));

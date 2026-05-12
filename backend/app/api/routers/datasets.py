@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, exists, cast, String
+from sqlalchemy import select, func, exists, cast, String, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 import uuid
@@ -498,6 +498,19 @@ async def reset_user_progress(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
+    # 1. Удаляем все validation-задачи, созданные из разметки этого пользователя.
+    #    Это покрывает все состояния аннотации: DONE (валидация ещё идёт),
+    #    REJECTED (валидация завершена, лейбл уже удалён — per-label запрос не работал).
+    #    DB-уровень CASCADE (tasks→assignments→labels) сам чистит дочерние записи.
+    await db.execute(
+        delete(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.VALIDATION)
+        .where(Task.task_metadata['annotator_id'].astext == str(user_id))
+    )
+
+    # 2. Перечитываем ассайнменты после bulk-delete, чтобы не видеть уже удалённые
+    #    ассайнменты валидаторов (cascade удалил их вместе с validation-задачами).
     stmt = (
         select(Assignment)
         .join(Task, Assignment.task_id == Task.id)
@@ -511,29 +524,14 @@ async def reset_user_progress(
         if task is None:
             continue
         if assignment.status == AssignmentStatus.DONE:
-            # Для аннотационных ассайнментов — удаляем связанные validation-задачи,
-            # пока лейбл ещё существует (до каскадного удаления через assignment)
-            if task.type == TaskType.ANNOTATION:
-                label = (await db.execute(
-                    select(Label).where(Label.assignment_id == assignment.id)
-                )).scalar_one_or_none()
-                if label:
-                    val_tasks = (await db.execute(
-                        select(Task)
-                        .where(Task.dataset_id == dataset_id)
-                        .where(Task.type == TaskType.VALIDATION)
-                        .where(Task.task_metadata['annotation_label_id'].astext == str(label.id))
-                    )).scalars().all()
-                    for vt in val_tasks:
-                        await db.delete(vt)
-
             task.completed_answers = max(0, task.completed_answers - 1)
             quorum = dataset.validation_quorum if task.type == TaskType.VALIDATION else dataset.required_answers
             if task.completed_answers < quorum:
                 task.status = TaskStatus.PENDING
         elif assignment.status == AssignmentStatus.IN_PROGRESS:
             task.active_assignments = max(0, task.active_assignments - 1)
-        await db.delete(assignment)  # cascade удаляет label
+        # REJECTED: задача уже откачена в _process_validation_verdict
+        await db.delete(assignment)
 
     access = (await db.execute(
         select(UserDatasetAccess).where(

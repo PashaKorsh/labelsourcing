@@ -24,11 +24,10 @@ interface Props {
   tags: Tag[];
   isSaved: boolean;
   onSaved: () => void;
-  onPrev?: () => void;
   onNext?: () => void;
 }
 
-export function ValidationView({ task, tags, isSaved, onSaved, onPrev, onNext }: Props) {
+export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) {
   const [state, setState] = useState<ValidationState>({
     annotations: [],
     ready: false,
@@ -114,14 +113,6 @@ export function ValidationView({ task, tags, isSaved, onSaved, onPrev, onNext }:
           <span>G — отправить</span>
         </div>
         <div className={styles.buttons}>
-          <button
-            className={styles.navButton}
-            onClick={onPrev}
-            disabled={!onPrev}
-            title="Предыдущая задача (D)"
-          >
-            ← Пред
-          </button>
           <button
             className={styles.rejectButton}
             data-active={state.verdict === false}

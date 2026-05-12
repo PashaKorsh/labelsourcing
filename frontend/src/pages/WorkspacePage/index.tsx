@@ -8,18 +8,15 @@ import styles from './WorkspacePage.module.css';
 export function WorkspacePage() {
   const {
     task,
-    taskIndex,
-    taskOffset,
+    taskNumber,
     hasMoreTasks,
     labelingLimit,
-    tasks,
     tags,
     isExpired,
-    canGoPrev,
     canGoNext,
-    isCurrentTaskSaved,
+    isSaved,
     markSaved,
-    navigateTo,
+    goNext,
   } = useWorkspace();
 
   const isValidationTask = task?.type === 'validation';
@@ -32,21 +29,13 @@ export function WorkspacePage() {
         <ModeSwitcher />
 
         <nav className={styles.taskNav}>
-          <button
-            className={styles.navButton}
-            onClick={() => navigateTo(taskIndex - 1)}
-            disabled={!canGoPrev}
-          >
-            ← Пред
-          </button>
-
           <span className={styles.taskCounter}>
             {task ? (
               <>
-                {(task.metadata?.name as string | undefined) ?? `Задача ${taskOffset + taskIndex + 1}`}
+                {(task.metadata?.name as string | undefined) ?? `Задача ${taskNumber}`}
                 {isValidationTask && <span className={styles.validationBadge}>Валидация</span>}
                 <span className={styles.taskIndex}>
-                  {taskOffset + taskIndex + 1} / {labelingLimit ?? tasks.length}
+                  {taskNumber}{labelingLimit != null ? ` / ${labelingLimit}` : ''}
                 </span>
               </>
             ) : 'Готово'}
@@ -55,7 +44,7 @@ export function WorkspacePage() {
 
           <button
             className={styles.navButton}
-            onClick={() => navigateTo(taskIndex + 1)}
+            onClick={goNext}
             disabled={!canGoNext}
           >
             След →
@@ -67,10 +56,9 @@ export function WorkspacePage() {
         <ValidationView
           task={task!}
           tags={tags}
-          isSaved={isCurrentTaskSaved}
-          onSaved={() => markSaved(task!.id)}
-          onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
-          onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
+          isSaved={isSaved}
+          onSaved={markSaved}
+          onNext={canGoNext ? goNext : undefined}
         />
       ) : (
         <AnnotationView
@@ -78,10 +66,9 @@ export function WorkspacePage() {
           hasMoreTasks={hasMoreTasks}
           tags={tags}
           isExpired={isExpired}
-          isSaved={isCurrentTaskSaved}
-          onSaved={() => task && markSaved(task.id)}
-          onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
-          onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
+          isSaved={isSaved}
+          onSaved={markSaved}
+          onNext={canGoNext ? goNext : undefined}
         />
       )}
     </div>

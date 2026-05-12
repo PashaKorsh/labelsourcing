@@ -118,6 +118,13 @@ export class ApiTaskService implements TaskService {
     this.imageSizeMap.clear();
   }
 
+  removeFromCache(taskId: string): void {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
+    this.annotationsMap.delete(taskId);
+    this.imageSizeMap.delete(taskId);
+  }
+
   async submitValidation(taskId: string, isCorrect: boolean): Promise<void> {
     await apiFetch(API.tasks.saveLabel(taskId), {
       method: 'PUT',

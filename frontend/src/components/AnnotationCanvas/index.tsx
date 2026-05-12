@@ -27,7 +27,6 @@ export interface AnnotationCanvasProps {
   initialAnnotations: ImageAnnotation[];
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
   onImageSizeChange?: (size: { w: number; h: number }) => void;
-  onPrev?: () => void;
   onNext?: () => void;
 }
 
@@ -39,7 +38,6 @@ export function AnnotationCanvas({
   initialAnnotations,
   onAnnotationsChange,
   onImageSizeChange,
-  onPrev,
   onNext,
 }: AnnotationCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -145,7 +143,6 @@ export function AnnotationCanvas({
             onHoverChange={handleHoverChange}
             contextMenu={contextMenu}
             onContextMenuClose={() => setContextMenu(null)}
-            onPrev={onPrev}
             onNext={onNext}
           />
         </Annotorious>

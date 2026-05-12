@@ -102,7 +102,6 @@ export interface AnnotatorControllerProps {
   onHoverChange: (annotation: ImageAnnotation | null) => void;
   contextMenu: ContextMenuState | null;
   onContextMenuClose: () => void;
-  onPrev?: () => void;
   onNext?: () => void;
 }
 
@@ -116,7 +115,6 @@ export function AnnotatorController({
   onHoverChange,
   contextMenu,
   onContextMenuClose,
-  onPrev,
   onNext,
 }: AnnotatorControllerProps) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
@@ -125,12 +123,10 @@ export function AnnotatorController({
   const activeTagRef = useRef(activeTag);
   const onChangeRef = useRef(onAnnotationsChange);
   const onHoverRef = useRef(onHoverChange);
-  const onPrevRef = useRef(onPrev);
   const onNextRef = useRef(onNext);
   useEffect(() => { activeTagRef.current = activeTag; }, [activeTag]);
   useEffect(() => { onChangeRef.current = onAnnotationsChange; }, [onAnnotationsChange]);
   useEffect(() => { onHoverRef.current = onHoverChange; }, [onHoverChange]);
-  useEffect(() => { onPrevRef.current = onPrev; }, [onPrev]);
   useEffect(() => { onNextRef.current = onNext; }, [onNext]);
 
   // Передаём наружу, какая аннотация под курсором (нужно для контекстного меню)
@@ -237,10 +233,7 @@ export function AnnotatorController({
         e.preventDefault(); anno.redo(); return;
       }
 
-      // D — предыдущая задача, F — следующая
-      if (e.code === 'KeyD' && !e.ctrlKey && !e.shiftKey) {
-        e.preventDefault(); onPrevRef.current?.(); return;
-      }
+      // F — следующая задача
       if (e.code === 'KeyF' && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault(); onNextRef.current?.(); return;
       }

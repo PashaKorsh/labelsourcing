@@ -20,11 +20,10 @@ interface Props {
   isExpired: boolean;
   isSaved: boolean;
   onSaved: () => void;
-  onPrev?: () => void;
   onNext?: () => void;
 }
 
-export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, onSaved, onPrev, onNext }: Props) {
+export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, onSaved, onNext }: Props) {
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [activeTagId, setActiveTagId] = useState<string | null>(tags[0]?.id ?? null);
 
@@ -121,7 +120,6 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
                 initialAnnotations={taskService.getAnnotations(task.id)}
                 onAnnotationsChange={handleAnnotationsChange}
                 onImageSizeChange={handleImageSizeChange}
-                onPrev={onPrev}
                 onNext={onNext}
               />
             )

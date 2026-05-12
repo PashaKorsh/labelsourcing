@@ -8,7 +8,6 @@ const DRAWING_HINTS: HotkeyHint[] = [
   { key: 'A / Del', description: 'Удалить объект' },
   { key: 'Z',       description: 'Отмена' },
   { key: 'X',       description: 'Повтор' },
-  { key: 'D',       description: 'Пред. задача' },
   { key: 'F',       description: 'След. задача' },
   { key: 'G',       description: 'Отправить' },
 ];

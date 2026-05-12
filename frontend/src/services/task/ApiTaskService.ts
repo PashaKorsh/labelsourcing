@@ -42,8 +42,13 @@ export class ApiTaskService implements TaskService {
 
       const existingIdx = existingById.get(dto.id);
       if (existingIdx !== undefined) {
-        // Задача была перевыдана (после истечения) — обновляем expiresAt
-        this.tasks[existingIdx] = { ...this.tasks[existingIdx], expiresAt: dto.expires_at };
+        const existingTask = this.tasks[existingIdx];
+        // Если expiresAt изменился — это новое назначение (реджект/истечение), а не восстановление сессии.
+        // Сбрасываем сохранённую разметку, чтобы пользователь начал с чистого листа.
+        if (existingTask.expiresAt !== dto.expires_at) {
+          this.annotationsMap.delete(dto.id);
+        }
+        this.tasks[existingIdx] = { ...existingTask, expiresAt: dto.expires_at };
         if (!firstTask) firstTask = this.tasks[existingIdx];
       } else {
         this.tasks.push(mapped);

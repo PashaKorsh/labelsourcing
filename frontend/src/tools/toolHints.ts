@@ -18,6 +18,7 @@ const EXTRA_HINTS: Record<string, HotkeyHint[]> = {
   cursor: [
     { key: 'ЛКМ + drag', description: 'Переместить холст' },
     { key: 'Колесо',     description: 'Масштаб' },
+    { key: 'G',          description: 'Отправить' },
   ],
   rectangle: [],
   polygon: [

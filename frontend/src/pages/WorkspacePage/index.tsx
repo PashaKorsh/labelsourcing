@@ -67,7 +67,10 @@ export function WorkspacePage() {
         <ValidationView
           task={task!}
           tags={tags}
+          isSaved={isCurrentTaskSaved}
           onSaved={() => markSaved(task!.id)}
+          onPrev={canGoPrev ? () => navigateTo(taskIndex - 1) : undefined}
+          onNext={canGoNext ? () => navigateTo(taskIndex + 1) : undefined}
         />
       ) : (
         <AnnotationView

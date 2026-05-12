@@ -22,21 +22,24 @@ interface ValidationState {
 interface Props {
   task: AnnotationTask;
   tags: Tag[];
+  isSaved: boolean;
   onSaved: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
 }
 
-export function ValidationView({ task, tags, onSaved }: Props) {
+export function ValidationView({ task, tags, isSaved, onSaved, onPrev, onNext }: Props) {
   const [state, setState] = useState<ValidationState>({
     annotations: [],
     ready: false,
     verdict: null,
     submitting: false,
-    submitted: false,
+    submitted: isSaved,
     imageError: null,
   });
 
   useEffect(() => {
-    setState({ annotations: [], ready: false, verdict: null, submitting: false, submitted: false, imageError: null });
+    setState({ annotations: [], ready: false, verdict: null, submitting: false, submitted: isSaved, imageError: null });
 
     const serialized = (task.metadata?.annotations ?? []) as SerializedShape[];
     let cancelled = false;
@@ -112,6 +115,14 @@ export function ValidationView({ task, tags, onSaved }: Props) {
         </div>
         <div className={styles.buttons}>
           <button
+            className={styles.navButton}
+            onClick={onPrev}
+            disabled={!onPrev}
+            title="Предыдущая задача (D)"
+          >
+            ← Пред
+          </button>
+          <button
             className={styles.rejectButton}
             data-active={state.verdict === false}
             onClick={() => selectVerdict(false)}
@@ -133,9 +144,17 @@ export function ValidationView({ task, tags, onSaved }: Props) {
             className={styles.submitButton}
             onClick={handleSubmit}
             disabled={state.verdict === null || state.submitting || state.submitted}
-            title="Отправить вердикт (Enter)"
+            title="Отправить вердикт (G)"
           >
             {submitLabel}
+          </button>
+          <button
+            className={styles.navButton}
+            onClick={onNext}
+            disabled={!onNext}
+            title="Следующая задача (F)"
+          >
+            След →
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { Annotorious, ImageAnnotator, useAnnotator } from '@annotorious/react';
 import type { ImageAnnotation, DrawingStyle } from '@annotorious/annotorious';
 import type { ImageAnnotator as ImageAnnotatorInstance } from '@annotorious/annotorious';
@@ -17,28 +17,34 @@ function buildTagStyler(tags: Tag[]) {
   };
 }
 
-// Живёт внутри <Annotorious>. Устанавливает аннотации однократно при инициализации
-// anno — так же, как AnnotatorController в AnnotationCanvas. Это гарантирует,
-// что setAnnotations вызывается после того, как Annotorious обработал
-// ResizeObserver изображения и зафиксировал систему координат.
-function ReadOnlyController({ initialAnnotations }: { initialAnnotations: ImageAnnotation[] }) {
+// Живёт внутри <Annotorious>. Устанавливает аннотации однократно, но только после
+// того, как displayStyle применился к img (sizeReady=true). Это устраняет race condition,
+// при котором anno инициализируется до применения правильного масштаба изображения.
+function ReadOnlyController({
+  initialAnnotations,
+  sizeReady,
+}: {
+  initialAnnotations: ImageAnnotation[];
+  sizeReady: boolean;
+}) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
 
   useEffect(() => {
     if (!anno) return;
     anno.setDrawingEnabled(false);
-    if (initialAnnotations.length > 0) {
-      anno.setAnnotations(initialAnnotations);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anno]); // только при инициализации anno; initialAnnotations стабильны благодаря key
+  }, [anno]);
+
+  useEffect(() => {
+    if (!anno || !sizeReady || initialAnnotations.length === 0) return;
+    anno.setAnnotations(initialAnnotations);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anno, sizeReady]); // initialAnnotations стабильны благодаря key на родителе
 
   return null;
 }
 
 export interface ReadOnlyAnnotationCanvasProps {
   imageUrl: string;
-  /** Аннотации, вычисленные до монтирования компонента; устанавливаются однократно. */
   initialAnnotations: ImageAnnotation[];
   tags: Tag[];
 }
@@ -50,35 +56,29 @@ export function ReadOnlyAnnotationCanvas({
 }: ReadOnlyAnnotationCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const panRef = useRef(true); // всегда паним левой кнопкой — режима рисования нет
+  const panRef = useRef(true);
   const { zoom, panX, panY, reset } = useZoomPan(wrapperRef, panRef);
 
   const [originalSize, setOriginalSize] = useState<{ w: number; h: number } | null>(null);
 
+  const measureImage = useCallback((img: HTMLImageElement) => {
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!nw || !nh) return;
+    const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
+    setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
+  }, []);
+
+  // При смене URL сбрасываем размер и сразу проверяем кэшированные изображения
   useEffect(() => {
-    const img = imgRef.current;
-    if (!img) return;
     setOriginalSize(null);
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) measureImage(img);
+  }, [imageUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const measure = () => {
-      const nw = img.naturalWidth;
-      const nh = img.naturalHeight;
-      if (nw === 0 || nh === 0) return;
-      const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
-      setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
-      obs.disconnect();
-    };
-
-    const obs = new ResizeObserver(measure);
-    obs.observe(img);
-    img.addEventListener('load', measure);
-    measure();
-
-    return () => {
-      obs.disconnect();
-      img.removeEventListener('load', measure);
-    };
-  }, [imageUrl]);
+  const handleImageLoad = useCallback((e: SyntheticEvent<HTMLImageElement>) => {
+    measureImage(e.currentTarget);
+  }, [measureImage]);
 
   const displayStyle = originalSize
     ? {
@@ -122,9 +122,13 @@ export function ReadOnlyAnnotationCanvas({
               alt="Annotation target"
               draggable={false}
               crossOrigin="anonymous"
+              onLoad={handleImageLoad}
             />
           </ImageAnnotator>
-          <ReadOnlyController initialAnnotations={initialAnnotations} />
+          <ReadOnlyController
+            initialAnnotations={initialAnnotations}
+            sizeReady={originalSize !== null}
+          />
         </Annotorious>
       </div>
     </div>

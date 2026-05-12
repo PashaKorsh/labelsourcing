@@ -511,12 +511,29 @@ async def reset_user_progress(
         if task is None:
             continue
         if assignment.status == AssignmentStatus.DONE:
+            # Для аннотационных ассайнментов — удаляем связанные validation-задачи,
+            # пока лейбл ещё существует (до каскадного удаления через assignment)
+            if task.type == TaskType.ANNOTATION:
+                label = (await db.execute(
+                    select(Label).where(Label.assignment_id == assignment.id)
+                )).scalar_one_or_none()
+                if label:
+                    val_tasks = (await db.execute(
+                        select(Task)
+                        .where(Task.dataset_id == dataset_id)
+                        .where(Task.type == TaskType.VALIDATION)
+                        .where(Task.task_metadata['annotation_label_id'].astext == f'"{label.id}"')
+                    )).scalars().all()
+                    for vt in val_tasks:
+                        await db.delete(vt)
+
             task.completed_answers = max(0, task.completed_answers - 1)
-            if task.completed_answers < dataset.required_answers:
+            quorum = dataset.validation_quorum if task.type == TaskType.VALIDATION else dataset.required_answers
+            if task.completed_answers < quorum:
                 task.status = TaskStatus.PENDING
         elif assignment.status == AssignmentStatus.IN_PROGRESS:
             task.active_assignments = max(0, task.active_assignments - 1)
-        await db.delete(assignment)
+        await db.delete(assignment)  # cascade удаляет label
 
     access = (await db.execute(
         select(UserDatasetAccess).where(

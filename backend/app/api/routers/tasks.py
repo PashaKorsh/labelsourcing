@@ -155,7 +155,7 @@ async def delete_task(
             select(Task)
             .where(Task.dataset_id == task.dataset_id)
             .where(Task.type == TaskType.VALIDATION)
-            .where(Task.task_metadata['annotation_task_id'].astext == f'"{task_id}"')
+            .where(Task.task_metadata['annotation_task_id'].astext == str(task_id))
         )).scalars().all()
         for vt in val_tasks:
             await db.delete(vt)

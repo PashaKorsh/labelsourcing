@@ -140,6 +140,7 @@ export function AnnotationCanvas({
             activeTag={activeTag}
             tags={tags}
             initialAnnotations={initialAnnotations}
+            sizeReady={originalSize !== null}
             onAnnotationsChange={onAnnotationsChange}
             onHoverChange={handleHoverChange}
             contextMenu={contextMenu}

@@ -96,6 +96,7 @@ export interface AnnotatorControllerProps {
   activeTag: Tag | null;
   tags: Tag[];
   initialAnnotations: ImageAnnotation[];
+  sizeReady: boolean;
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
   /** Колбэк для синхронизации hover-состояния с родительским компонентом */
   onHoverChange: (annotation: ImageAnnotation | null) => void;
@@ -110,6 +111,7 @@ export function AnnotatorController({
   activeTag,
   tags,
   initialAnnotations,
+  sizeReady,
   onAnnotationsChange,
   onHoverChange,
   contextMenu,
@@ -150,12 +152,17 @@ export function AnnotatorController({
     }
   }, [anno, activeTool]);
 
-  // Восстановление сохранённых аннотаций при монтировании (смена таски)
+  // Восстановление сохранённых аннотаций — ждём и anno, и sizeReady,
+  // чтобы displayStyle уже был применён к <img>. rAF даёт ResizeObserver Annotorious
+  // один тик на пересчёт масштаба до передачи аннотаций.
   useEffect(() => {
-    if (!anno || initialAnnotations.length === 0) return;
-    anno.setAnnotations(initialAnnotations);
+    if (!anno || !sizeReady || initialAnnotations.length === 0) return;
+    const raf = requestAnimationFrame(() => {
+      anno.setAnnotations(initialAnnotations);
+    });
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anno]); // только при инициализации anno
+  }, [anno, sizeReady]); // initialAnnotations стабильны благодаря key на родителе
 
   // Привязка активного тега к только что нарисованной аннотации
   useEffect(() => {

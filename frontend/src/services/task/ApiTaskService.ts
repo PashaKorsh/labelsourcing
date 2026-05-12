@@ -112,6 +112,12 @@ export class ApiTaskService implements TaskService {
     if (idx !== -1) this.tasks.splice(idx, 1);
   }
 
+  clearCache(): void {
+    this.tasks.splice(0);
+    this.annotationsMap.clear();
+    this.imageSizeMap.clear();
+  }
+
   async submitValidation(taskId: string, isCorrect: boolean): Promise<void> {
     await apiFetch(API.tasks.saveLabel(taskId), {
       method: 'PUT',

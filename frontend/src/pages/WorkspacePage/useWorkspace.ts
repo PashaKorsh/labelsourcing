@@ -16,7 +16,7 @@ const DEFAULT_TAGS: Tag[] = [
 export function useWorkspace() {
   const datasetId = useDatasetId();
 
-  const [tasks, setTasks] = useState<readonly AnnotationTask[]>(() => taskService.getTasks());
+  const [tasks, setTasks] = useState<readonly AnnotationTask[]>([]);
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
   const [labelingLimit, setLabelingLimit] = useState<number | null>(null);
   const [taskOffset, setTaskOffset] = useState(0);
@@ -30,10 +30,13 @@ export function useWorkspace() {
   useEffect(() => {
     if (!datasetId) return;
 
+    // Сбрасываем кэш перед загрузкой, чтобы не показывать устаревшие завершённые задачи
+    // при возврате на страницу после отправки разметки.
+    taskService.clearCache();
     taskService.loadNextTask(datasetId, 3)
       .then(newTask => {
-        if (newTask) setTasks(taskService.getTasks());
-        else setHasMoreTasks(false);
+        setTasks(taskService.getTasks());
+        if (!newTask) setHasMoreTasks(false);
 
         return datasetService.get(datasetId);
       })

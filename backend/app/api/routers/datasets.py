@@ -522,7 +522,7 @@ async def reset_user_progress(
                         select(Task)
                         .where(Task.dataset_id == dataset_id)
                         .where(Task.type == TaskType.VALIDATION)
-                        .where(Task.task_metadata['annotation_label_id'].astext == f'"{label.id}"')
+                        .where(Task.task_metadata['annotation_label_id'].astext == str(label.id))
                     )).scalars().all()
                     for vt in val_tasks:
                         await db.delete(vt)

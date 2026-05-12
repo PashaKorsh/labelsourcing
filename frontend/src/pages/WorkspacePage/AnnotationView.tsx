@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { AnnotationCanvas } from '../../components/AnnotationCanvas';
 import { ToolSelector } from '../../components/ToolSelector';
@@ -28,6 +28,17 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [activeTagId, setActiveTagId] = useState<string | null>(tags[0]?.id ?? null);
 
+  // Когда теги обновляются (DEFAULT_TAGS → теги от бэкенда с UUID-id), сбрасываем
+  // activeTagId на первый доступный — иначе activeTag становится null и аннотации
+  // создаются без тега и цвета.
+  useEffect(() => {
+    if (!tags.find(t => t.id === activeTagId)) {
+      setActiveTagId(tags[0]?.id ?? null);
+    }
+  }, [tags]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [saveError, setSaveError] = useState(false);
+
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
 
@@ -43,11 +54,14 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
 
   const handleSave = useCallback(async () => {
     if (!task || isExpired) return;
+    setSaveError(false);
     try {
       await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
       onSaved();
     } catch (err) {
-      if (!(err instanceof Error && err.message.startsWith('410'))) throw err;
+      if (err instanceof Error && err.message.startsWith('410')) return;
+      console.error('[AnnotationView] saveAnnotations:', err);
+      setSaveError(true);
     }
   }, [task, isExpired, onSaved]);
 
@@ -79,6 +93,9 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
         <div className={styles.divider} />
         <TagSelector tags={tags} activeTagId={activeTagId} onSelect={setActiveTagId} />
         <div className={styles.sidebarBottom}>
+          {saveError && (
+            <span className={styles.saveError}>Ошибка сохранения</span>
+          )}
           <button
             className={styles.saveButton}
             onClick={handleSave}

@@ -38,4 +38,7 @@ export interface TaskService {
    * Использует тот же эндпоинт PUT /tasks/{id}/labels с данными {is_correct: boolean}.
    */
   submitValidation(taskId: string, isCorrect: boolean): Promise<void>;
+
+  /** Очищает локальный кэш задач и аннотаций (используется при перезаходе на страницу). */
+  clearCache(): void;
 }

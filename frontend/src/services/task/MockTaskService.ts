@@ -64,6 +64,10 @@ export class MockTaskService implements TaskService {
     console.log('[MockTaskService] submitValidation:', _taskId, isCorrect);
   }
 
+  clearCache(): void {
+    // mock — задачи предзагружены статически, сбрасывать нечего
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

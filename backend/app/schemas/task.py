@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, field_serializer
 class TaskCreate(BaseModel):
     dataset_id: uuid.UUID
     url: str
-    type: str = "annotation"
     task_metadata: Optional[Dict[str, Any]] = None
 
 
@@ -33,4 +32,3 @@ class TaskResponse(BaseModel):
 class TaskBatchCreate(BaseModel):
     dataset_id: uuid.UUID
     urls: list[str]
-    type: str = "annotation"

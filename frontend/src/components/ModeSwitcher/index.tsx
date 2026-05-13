@@ -10,8 +10,7 @@ const MODES: { id: AppMode; label: string }[] = [
   { id: 'profile',     label: 'Профиль' },
   { id: 'my_datasets', label: 'Мои датасеты' },
   { id: 'dataset_new', label: 'Новый датасет' },
-  { id: 'annotation',  label: 'Аннотирование' },
-  { id: 'validation',  label: 'Валидация' },
+  { id: 'annotation',  label: 'Воркспейс' },
   { id: 'users',       label: 'Пользователи' },
   { id: 'tags',        label: 'Теги' },
 ];
@@ -23,7 +22,6 @@ function pathToMode(pathname: string): AppMode {
   if (pathname === ROUTES.datasetNew) return 'dataset_new';
   if (pathname === ROUTES.users)      return 'users';
   if (pathname === ROUTES.tags)       return 'tags';
-  if (pathname.startsWith('/dataset') && pathname.endsWith('/validation')) return 'validation';
   if (pathname.startsWith('/dataset')) return 'annotation';
   return 'auth';
 }
@@ -53,8 +51,6 @@ export function ModeSwitcher() {
       case 'tags':        navigate(ROUTES.tags);       break;
       case 'annotation':
         navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId: targetDatasetId })); break;
-      case 'validation':
-        navigate(buildRoute(ROUTES.datasetValidation, { datasetId: targetDatasetId })); break;
     }
   };
 

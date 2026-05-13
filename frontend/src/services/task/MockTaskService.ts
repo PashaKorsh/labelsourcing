@@ -60,6 +60,21 @@ export class MockTaskService implements TaskService {
     if (idx !== -1) this.tasks.splice(idx, 1);
   }
 
+  async submitValidation(_taskId: string, isCorrect: boolean): Promise<void> {
+    console.log('[MockTaskService] submitValidation:', _taskId, isCorrect);
+  }
+
+  clearCache(): void {
+    // mock — задачи предзагружены статически, сбрасывать нечего
+  }
+
+  removeFromCache(taskId: string): void {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
+    this.annotationsMap.delete(taskId);
+    this.imageSizeMap.delete(taskId);
+  }
+
   exportAllAnnotations(): void {
     const output = this.tasks
       .filter(task => (this.annotationsMap.get(task.id)?.length ?? 0) > 0)

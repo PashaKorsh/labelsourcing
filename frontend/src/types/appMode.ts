@@ -5,6 +5,5 @@ export type AppMode =
   | 'my_datasets'
   | 'dataset_new'
   | 'annotation'
-  | 'validation'
   | 'users'
   | 'tags';

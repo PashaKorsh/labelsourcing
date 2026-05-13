@@ -27,6 +27,7 @@ class TaskStatus(str, enum.Enum):
 
 class TaskType(str, enum.Enum):
     ANNOTATION = "annotation"
+    VALIDATION = "validation"
 
 
 class DatasetStatus(str, enum.Enum):
@@ -88,6 +89,8 @@ class Dataset(Base):
     source_type: Mapped[DatasetSourceType] = mapped_column(SAEnum(DatasetSourceType, name="dataset_source_type", values_callable=lambda x: [e.value for e in x]), default=DatasetSourceType.EXTERNAL_URL)
     local_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("local_agents.id", ondelete="SET NULL"), nullable=True)
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    requires_validation: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    validation_quorum: Mapped[int] = mapped_column(Integer, server_default="1")
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     source_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -188,7 +191,6 @@ class UserDatasetAccess(Base):
     labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     labeled_count: Mapped[int] = mapped_column(Integer, server_default="0")
     can_label: Mapped[bool] = mapped_column(Boolean, server_default="true")
-    can_validate: Mapped[bool] = mapped_column(Boolean, server_default="false")
 
     user: Mapped["User"] = relationship(back_populates="dataset_accesses")
     dataset: Mapped["Dataset"] = relationship(back_populates="user_accesses")

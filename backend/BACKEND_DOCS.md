@@ -49,7 +49,7 @@
 |---|---|
 | `AssignmentStatus` | `in_progress`, `done`, `expired`, `rejected` |
 | `TaskStatus` | `pending`, `completed` |
-| `TaskType` | `annotation` |
+| `TaskType` | `annotation`, `validation` |
 | `DatasetStatus` | `active`, `completed` |
 
 ### Таблицы
@@ -81,9 +81,11 @@
 | `description` | TEXT | Описание |
 | `required_answers` | INT (default 3) | Кворум — сколько ответов нужно на задачу |
 | `default_labeling_limit` | INT (default 50) | Лимит задач по умолчанию для нового пользователя |
-| `tasks_count` | INT (default 0) | Денормализованный счётчик задач; обновляется при добавлении/удалении задач |
+| `tasks_count` | INT (default 0) | Денормализованный счётчик задач; учитывает только аннотационные задачи |
 | `status` | VARCHAR | `active` / `completed` |
 | `annotation_labels` | JSONB | Список меток для аннотации: `[{id, label, color, hotkey}]` |
+| `requires_validation` | BOOL (default false) | Включён ли пайплайн валидации |
+| `validation_quorum` | INT (default 1) | Кворум валидаторов — сколько голосов нужно для вынесения вердикта |
 | `created_at` | TIMESTAMP | Дата создания |
 
 #### `tasks`
@@ -92,7 +94,7 @@
 | `id` | UUID PK | Идентификатор |
 | `dataset_id` | UUID FK → datasets | Датасет |
 | `url` | TEXT | Ссылка на контент (изображение, видео и т.д.) |
-| `type` | VARCHAR | Тип задачи (`annotation`) |
+| `type` | VARCHAR | Тип задачи (`annotation` / `validation`) |
 | `completed_answers` | INT (default 0) | Принятых ответов (сравнивается с `required_answers`) |
 | `active_assignments` | INT (default 0) | Активных назначений (задача "в руках") |
 | `status` | VARCHAR | `pending` / `completed` |
@@ -349,13 +351,15 @@ username=user@example.com&password=secret
   "default_labeling_limit": 50,
   "annotation_labels": [
     {"id": "cat", "label": "Кошка", "color": "#ff0000", "hotkey": "1"}
-  ]
+  ],
+  "requires_validation": true,
+  "validation_quorum": 2
 }
 ```
 
 **Алгоритм:**
 1. Создаёт запись `Dataset` с `owner_id = current_user.id`
-2. Сохраняет `annotation_labels` как JSONB
+2. Сохраняет `annotation_labels` и настройки валидации как JSONB/колонки
 3. Возвращает датасет с вычисленными полями (`tasks_count`, `labeled_count` = 0)
 
 ---
@@ -379,7 +383,7 @@ username=user@example.com&password=secret
 **Алгоритм:**
 1. Загружает датасеты с тегами (`tasks_count` берётся из денормализованной колонки)
 2. Загружает `UserDatasetAccess` для текущего пользователя по всем датасетам одним запросом
-3. Вычисляет `user_done` для каждого датасета через `_compute_user_done`
+3. Вычисляет `user_done` и `user_can_validate` для каждого датасета
 
 **Вычисление `user_done`:**
 ```
@@ -394,8 +398,11 @@ user_done = !access.can_label OR labeled_count >= effective_limit
   "title": "...",
   "tasks_count": 100,
   "user_done": false,
+  "user_can_validate": true,
   "user_labeling_limit": 50,
   "user_labeled_count": 10,
+  "requires_validation": true,
+  "validation_quorum": 2,
   "tags": [...],
   ...
 }
@@ -444,14 +451,22 @@ user_done = !access.can_label OR labeled_count >= effective_limit
 
 #### `GET /datasets/{dataset_id}/next`
 
-Получить следующие доступные задачи для разметки. Центральный метод рабочего процесса.
+Получить следующие доступные задачи для разметки или валидации. Центральный метод рабочего процесса.
 
 **Требует:** авторизации
 
 **Query параметры:**
-| Параметр | По умолчанию | Ограничения |
+| Параметр | По умолчанию | Описание |
 |---|---|---|
-| `count` | `1` | от 1 до 10 |
+| `count` | `1` | Количество задач (от 1 до 10) |
+| `mode` | — | `annotation` — только аннотация; `validation` — только валидация; не передан — авто |
+
+**Поведение `mode`:**
+- `mode=annotation` — выдаются **только** аннотационные задачи, даже если у пользователя `can_validate=true`
+- `mode=validation` — выдаются **только** валидационные задачи; если их нет или нет доступа — пустой массив
+- Без `mode` (авто) — validation в приоритете при наличии `can_validate`, annotation как fallback
+
+Фронтенд передаёт `mode` исходя из того, какую кнопку нажал пользователь (`/dataset/:id` → `annotation`, `/dataset/:id/validation` → `validation`).
 
 **Алгоритм (подробно):**
 
@@ -462,27 +477,87 @@ user_done = !access.can_label OR labeled_count >= effective_limit
 
 3. **Upsert записи доступа** — создаёт `UserDatasetAccess` с `labeling_limit = dataset.default_labeling_limit` если не существует (через `ON CONFLICT DO NOTHING`)
 
-4. **Проверка квоты и прав:**
+4. **Попытка выдать задачи валидации** (если `mode` разрешает и `access.can_validate = true` и датасет имеет `requires_validation`):
+   - Выбирает `validation`-задачи с `status = pending`, у которых `completed_answers < validation_quorum`
+   - **Фильтр самовалидации:** исключает задачи, где `task_metadata['annotator_id'] == current_user.id`
+   - Пользователь НЕ имеет активного ассайнмента на задачу
+
+5. **Попытка выдать аннотационные задачи** (если `mode` разрешает и нужное количество ещё не набрано):
+
+   **Проверка квоты:**
    ```
-   effective_limit = min(access.labeling_limit, total_tasks)
-   if not access.can_label OR labeled_count >= effective_limit → return []
+   effective_limit = min(access.labeling_limit, total_annotation_tasks)
+   if not access.can_label OR labeled_count >= effective_limit → пропустить
    ```
 
-5. **Выбор задачи** с блокировкой (`FOR UPDATE SKIP LOCKED`). Условия выбора:
-   - `task.dataset_id == dataset_id`
-   - `task.status == pending`
-   - Количество живых ассайнментов на задачу < `required_answers`
+   **Выбор задачи** с блокировкой (`FOR UPDATE SKIP LOCKED`):
+   - `task.type == annotation`, `task.status == pending`
+   - Количество живых ассайнментов < `required_answers`
    - Пользователь НЕ имеет активного (`done` или живого `in_progress`) ассайнмента
 
 6. **Создание ассайнмента** (expires через 10 минут):
-   - Если у пользователя уже есть истёкший ассайнмент на эту задачу — **обновляет** его (чтобы не нарушить UNIQUE constraint)
+   - Если у пользователя уже есть истёкший ассайнмент — **обновляет** его (чтобы не нарушить UNIQUE constraint)
    - Иначе — создаёт новый, инкрементирует `task.active_assignments`
 
-7. Повторяет шаги 5–6 для каждой из `count` задач (flush между итерациями)
+7. Повторяет для каждой из `count` задач (flush между итерациями)
 
 8. При отсутствии задач — `rollback` и `return []`
 
-**Ответ `200`:** массив `TaskResponse` с полем `expires_at`
+**Ответ `200`:** массив `TaskResponse` с полем `expires_at` и `type` (`annotation` | `validation`)
+
+---
+
+#### `GET /datasets/{dataset_id}/stats`
+
+Статистика датасета по фазам выполнения.
+
+**Требует:** роль `admin` или `moderator`
+
+**Ответ `200`:**
+```json
+{
+  "annotation_tasks_total": 100,
+  "annotation_tasks_pending": 40,
+  "annotation_tasks_completed": 60,
+  "validation_tasks_total": 60,
+  "validation_tasks_pending": 20,
+  "validation_tasks_completed": 40,
+  "phase": "labeling_and_validation"
+}
+```
+
+**Возможные значения `phase`:**
+| Значение | Условие |
+|---|---|
+| `labeling` | Есть аннотационные pending-задачи, нет validation-задач |
+| `labeling_and_validation` | Есть и аннотационные, и валидационные pending-задачи |
+| `validation` | Нет аннотационных pending, есть валидационные pending |
+| `complete` | Нет ни тех, ни других pending |
+
+---
+
+#### `GET /datasets/{dataset_id}/export`
+
+Экспорт сырых аннотаций по всем задачам датасета (без агрегации).
+
+**Требует:** роль `admin` или `moderator`
+
+**Ответ `200`:** массив объектов:
+```json
+[
+  {
+    "task_id": "uuid",
+    "url": "https://...",
+    "labels": [
+      {
+        "assignment_id": "uuid",
+        "user_id": "uuid",
+        "result": { "annotations": [...] }
+      }
+    ]
+  }
+]
+```
 
 ---
 
@@ -644,8 +719,21 @@ user_done = !access.can_label OR labeled_count >= effective_limit
    - **Первый сабмит** (label нет):
      - Создаёт `Label`
      - Если `status == in_progress`: помечает ассайнмент `done`, уменьшает `task.active_assignments`, увеличивает `task.completed_answers`
-     - Если `task.completed_answers >= dataset.required_answers` → `task.status = completed`
-     - Увеличивает `access.labeled_count`
+
+**Ветка аннотации** (`task.type == annotation`):
+- Если `task.completed_answers >= dataset.required_answers` → `task.status = completed`
+- Если `dataset.requires_validation` → создаёт валидационную задачу:
+  - `type = validation`, `url = оригинальная задача url`, `status = pending`
+  - `task_metadata = {annotation_label_id, annotator_id, annotations}` (для десериализации на фронте и фильтра самовалидации)
+  - `dataset.tasks_count` **не** инкрементируется (валидационные задачи не входят в счётчик)
+- Увеличивает `access.labeled_count`
+
+**Ветка валидации** (`task.type == validation`):
+- Загружает все `done` labels для данной валидационной задачи
+- Если собран кворум (`validation_quorum`) → обрабатывает вердикт:
+  - Подсчитывает `is_correct=True` и `is_correct=False` голоса
+  - **Большинство "корректно"** → задача остаётся выполненной
+  - **Большинство "некорректно"** → ищет исходный ассайнмент по `annotation_label_id`, переводит его в `rejected`, уменьшает `task.completed_answers`, переводит аннотационную задачу обратно в `pending`
 
 **Ответ `200`:** объект `LabelResponse`
 
@@ -853,7 +941,40 @@ user_done = !access.can_label OR labeled_count >= effective_limit
 
 ---
 
-### Сценарий 5: Валидация разметки администратором
+### Сценарий 5: Автоматическая валидация (пайплайн)
+
+```
+[Датасет создан с requires_validation=true, validation_quorum=2]
+
+Разметчик А → PUT /tasks/{task_id}/labels
+  body: {data: {annotations: [...]}}
+  → [label создан, assignment.status = done]
+  → [task.completed_answers >= required_answers → task.status = completed]
+  → [создаётся validation Task с metadata={annotation_label_id, annotator_id, annotations}]
+
+Валидатор Б → GET /datasets/{id}/next
+  → [задачи типа validation найдены, annotator_id != Б]
+  → [возвращается ValidationTask с type="validation"]
+
+Валидатор Б → PUT /tasks/{val_task_id}/labels
+  body: {data: {is_correct: false}}
+  → [голос против]
+
+Валидатор В → GET /datasets/{id}/next
+  → [возвращается та же ValidationTask]
+
+Валидатор В → PUT /tasks/{val_task_id}/labels
+  body: {data: {is_correct: false}}
+  → [кворум достигнут: 0 за, 2 против]
+  → [оригинальный assignment → status=rejected]
+  → [annotation task.completed_answers -= 1 → task.status = pending]
+  → [аннотационная задача снова доступна в пуле]
+
+Разметчик А → GET /datasets/{id}/next
+  → [та же задача снова выдаётся (или другому разметчику)]
+```
+
+### Сценарий 6: Валидация разметки администратором (ручная)
 
 ```
 Модератор → PATCH /labels/{label_id}/status
@@ -861,14 +982,14 @@ user_done = !access.can_label OR labeled_count >= effective_limit
   → [assignment.status = rejected]
   → разметка отклонена, задача остаётся в счётчиках
 
-[Примечание: при rejected задача НЕ автоматически возвращается в пул.
+[Примечание: при ручном rejected задача НЕ автоматически возвращается в пул.
  Счётчики task.completed_answers и access.labeled_count не корректируются.
- Это ручная операция — коррекция через [DEV] reset или дополнительную логику.]
+ Это ручная операция — используется для проверки без полного пайплайна.]
 ```
 
 ---
 
-### Сценарий 6: Загрузка датасета и задач (Администратор)
+### Сценарий 7: Загрузка датасета и задач (Администратор)
 
 ```
 Админ → POST /datasets/                     [создаёт датасет с annotation_labels]
@@ -942,4 +1063,27 @@ labeled_count >= effective_limit → пользователь не может б
 При выборе задачи используется SELECT ... FOR UPDATE SKIP LOCKED:
   Две параллельные транзакции не возьмут одну задачу одновременно
   Условие: live_count < required_answers проверяется с блокировкой строки
+```
+
+### Инварианты пайплайна валидации
+
+```
+Валидационная задача создаётся:
+  - Автоматически при первом сабмите аннотации, если dataset.requires_validation = true
+  - task.type = validation, task_metadata содержит {annotation_label_id, annotator_id, annotations}
+
+dataset.tasks_count НЕ учитывает validation-задачи:
+  - Счётчик отражает только аннотационные задачи
+  - Квота пользователя (labeling_limit) применяется только к аннотационным задачам
+
+Самовалидация запрещена:
+  - task_metadata['annotator_id'] сравнивается с current_user.id при выдаче задачи
+  - Разметчик не получит собственную аннотацию для валидации даже с can_validate = true
+
+При отклонении аннотации (majority vote is_correct=False):
+  - Оригинальный assignment → status = rejected
+  - task.completed_answers -= 1
+  - Если task.completed_answers < required_answers → task.status = pending
+  - access.labeled_count НЕ уменьшается (квота засчитана)
+  - Аннотационная задача возвращается в пул для перевыдачи
 ```

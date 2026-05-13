@@ -23,6 +23,8 @@ class DatasetCreate(BaseModel):
     local_agent_id: Optional[uuid.UUID] = None
     # Расширяемые параметры источника (Яндекс.Диск и др.) — см. документацию API
     source_config: Optional[Dict[str, Any]] = Field(default=None, description="Провайдер-специфичные настройки")
+    requires_validation: bool = False
+    validation_quorum: int = 1
 
 
 class DatasetResponse(BaseModel):
@@ -37,6 +39,8 @@ class DatasetResponse(BaseModel):
     local_agent_id: Optional[uuid.UUID] = None
     source_config: Optional[Dict[str, Any]] = None
     tasks_count: int = 0
+    requires_validation: bool = False
+    validation_quorum: int = 1
     user_done: bool = False
     user_labeling_limit: int | None = None
     user_labeled_count: int | None = None
@@ -68,3 +72,5 @@ class DatasetUpdate(BaseModel):
     annotation_labels: Optional[List[AnnotationLabelSchema]] = None
     local_agent_id: Optional[uuid.UUID] = None
     source_config: Optional[Dict[str, Any]] = None
+    requires_validation: Optional[bool] = None
+    validation_quorum: Optional[int] = None

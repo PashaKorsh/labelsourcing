@@ -135,3 +135,96 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.actions {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deleteButton {
+  height: 44px;
+  background: white;
+  color: #c53030;
+  border: 1px solid #feb2b2;
+  border-radius: 16px;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background: #fff5f5;
+  border-color: #fc8181;
+}
+
+.deleteButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.syncHint {
+  align-self: stretch;
+  background: #f0f7ff;
+  border: 1px solid #bee3f8;
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.syncHintTitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a365d;
+}
+
+.syncHintText {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #2c5282;
+  line-height: 1.5;
+}
+
+.inlineCode {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.codeBlock {
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  background: #1a202c;
+  color: #e2e8f0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.sourceBadge {
+  margin: 0;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.localAgentImagesNote {
+  margin: 0;
+  font-size: 14px;
+  color: #4a5568;
+  line-height: 1.55;
+}
+
+.localAgentImagesNote code {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  background: #edf2f7;
+  padding: 2px 6px;
+  border-radius: 6px;
+}

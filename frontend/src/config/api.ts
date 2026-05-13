@@ -19,6 +19,7 @@ export const API = {
     create: () => `${API_BASE}/api/v1/datasets/`,
     detail: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
     update: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
+    delete: (id: string) => `${API_BASE}/api/v1/datasets/${id}`,
     tasks:  (id: string) => `${API_BASE}/api/v1/datasets/${id}/tasks`,
     next:   (id: string, count = 1) => `${API_BASE}/api/v1/datasets/${id}/next?count=${count}`,
   },
@@ -39,6 +40,11 @@ export const API = {
   },
   sources: {
     list: () => `${API_BASE}/api/v1/sources/`,
+  },
+  agents: {
+    list:        () => `${API_BASE}/api/v1/agents/`,
+    pairingCode: () => `${API_BASE}/api/v1/agents/pairing-code`,
+    deactivate:  (id: string) => `${API_BASE}/api/v1/agents/${id}`,
   },
 } as const;
 

@@ -8,7 +8,18 @@ from sqlalchemy.orm import selectinload
 import uuid
 
 from app.database import get_db
-from app.models import Dataset, User, Tag, Task, Assignment, UserDatasetAccess, AssignmentStatus, TaskStatus
+from app.models import (
+    Dataset,
+    User,
+    Tag,
+    Task,
+    Assignment,
+    UserDatasetAccess,
+    AssignmentStatus,
+    TaskStatus,
+    DatasetSourceType,
+    LocalAgent,
+)
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse
@@ -58,6 +69,13 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["admin"]))
 ):
+    if dataset_in.source_type == DatasetSourceType.LOCAL_AGENT:
+        if dataset_in.local_agent_id is None:
+            raise HTTPException(status_code=400, detail="Для локального агента укажите агента")
+        agent = await db.get(LocalAgent, dataset_in.local_agent_id)
+        if not agent or agent.user_id != current_user.id or not agent.is_active:
+            raise HTTPException(status_code=400, detail="Локальный агент недоступен")
+
     labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else None
     new_dataset = Dataset(
         owner_id=current_user.id,
@@ -66,8 +84,17 @@ async def create_dataset(
         required_answers=dataset_in.required_answers,
         default_labeling_limit=dataset_in.default_labeling_limit,
         annotation_labels=labels_data,
+        source_type=dataset_in.source_type,
+        local_agent_id=dataset_in.local_agent_id,
+        source_config=dataset_in.source_config,
     )
     db.add(new_dataset)
+    await db.flush()
+
+    if dataset_in.tag_ids:
+        tags_res = await db.execute(select(Tag).where(Tag.id.in_(dataset_in.tag_ids)))
+        new_dataset.tags = list(tags_res.scalars().all())
+
     await db.commit()
 
     dataset = await _get_dataset_with_counts(db, new_dataset.id)
@@ -422,6 +449,17 @@ async def update_dataset(
     if update_data.annotation_labels is not None:
         dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
 
+    if update_data.local_agent_id is not None:
+        if dataset.source_type != DatasetSourceType.LOCAL_AGENT:
+            raise HTTPException(status_code=400, detail="Агент можно задать только для датасета с источником local_agent")
+        agent = await db.get(LocalAgent, update_data.local_agent_id)
+        if not agent or agent.user_id != admin_user.id or not agent.is_active:
+            raise HTTPException(status_code=400, detail="Локальный агент недоступен")
+        dataset.local_agent_id = update_data.local_agent_id
+
+    if update_data.source_config is not None:
+        dataset.source_config = update_data.source_config
+
     if update_data.tag_ids is not None:
         tags_stmt = select(Tag).where(Tag.id.in_(update_data.tag_ids))
         tags_res = await db.execute(tags_stmt)
@@ -430,3 +468,16 @@ async def update_dataset(
     await db.commit()
 
     return await _get_dataset_with_counts(db, dataset_id)
+
+
+@router.delete("/{dataset_id}", status_code=204)
+async def delete_dataset(
+        dataset_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        _: User = Depends(require_roles(["admin"])),
+):
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+    await db.delete(dataset)
+    await db.commit()

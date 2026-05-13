@@ -20,6 +20,9 @@ interface DatasetDto {
   user_labeling_limit?: number | null;
   user_labeled_count?: number | null;
   annotation_labels?: AnnotationLabelDto[] | null;
+  source_type?: string;
+  local_agent_id?: string | null;
+  source_config?: Record<string, unknown> | null;
 }
 
 interface TaskDto {
@@ -30,6 +33,9 @@ interface TaskDto {
 }
 
 function mapDto(dto: DatasetDto): Dataset {
+  const st = dto.source_type;
+  const sourceType =
+    st === 'local_agent' || st === 'external_url' ? st : 'external_url';
   return {
     id: dto.id,
     title: dto.title ?? undefined,
@@ -45,6 +51,9 @@ function mapDto(dto: DatasetDto): Dataset {
       color: l.color,
       hotkey: l.hotkey,
     })),
+    sourceType,
+    localAgentId: dto.local_agent_id ?? undefined,
+    sourceConfig: dto.source_config ?? null,
   };
 }
 
@@ -92,6 +101,9 @@ export class ApiDatasetService implements DatasetService {
         description: data.description,
         tag_ids: data.tagIds,
         annotation_labels: data.annotationLabels,
+        source_type: data.sourceType,
+        local_agent_id: data.localAgentId,
+        source_config: data.sourceConfig,
       }),
     });
     const dto: DatasetDto = await res.json();
@@ -106,9 +118,15 @@ export class ApiDatasetService implements DatasetService {
         description: data.description,
         tag_ids: data.tagIds,
         annotation_labels: data.annotationLabels,
+        local_agent_id: data.localAgentId,
+        source_config: data.sourceConfig,
       }),
     });
     const dto: DatasetDto = await res.json();
     return mapDto(dto);
+  }
+
+  async delete(id: string): Promise<void> {
+    await apiFetch(API.datasets.delete(id), { method: 'DELETE' });
   }
 }

@@ -65,6 +65,80 @@
   border-color: #999;
 }
 
+/* Source type toggle */
+
+.sourceToggle {
+  display: flex;
+  gap: 4px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 4px;
+}
+
+.sourceOption {
+  flex: 1;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sourceOption:hover:not(:disabled):not(.sourceOptionActive) {
+  background: #ebebeb;
+}
+
+.sourceOptionActive {
+  background: white;
+  color: #1a1a1a;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.sourceOption:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Agent selector */
+
+.select {
+  height: 44px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-family: inherit;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.select:focus {
+  border-color: #999;
+}
+
+.agentHint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.agentCmd {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  background: #f3f3f3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #333;
+}
+
 .saveButton {
   height: 48px;
   background: #1a1a1a;

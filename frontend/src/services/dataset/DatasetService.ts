@@ -15,6 +15,10 @@ export interface DatasetCreateInput {
   description: string;
   tagIds?: string[];
   annotationLabels?: Tag[];
+  sourceType?: 'external_url' | 'local_agent';
+  localAgentId?: string;
+  /** Провайдер-специфичные настройки (расширяемо). */
+  sourceConfig?: Record<string, unknown> | null;
 }
 
 export interface DatasetUpdateInput {
@@ -22,6 +26,8 @@ export interface DatasetUpdateInput {
   description?: string;
   tagIds?: string[];
   annotationLabels?: Tag[];
+  localAgentId?: string;
+  sourceConfig?: Record<string, unknown> | null;
 }
 
 export interface DatasetService {
@@ -31,4 +37,5 @@ export interface DatasetService {
   getTasks(datasetId: string): Promise<AnnotationTask[]>;
   create(data: DatasetCreateInput): Promise<Dataset>;
   update(id: string, data: DatasetUpdateInput): Promise<Dataset>;
+  delete(id: string): Promise<void>;
 }

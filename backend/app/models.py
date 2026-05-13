@@ -34,6 +34,12 @@ class DatasetStatus(str, enum.Enum):
     COMPLETED = "completed"
 
 
+class DatasetSourceType(str, enum.Enum):
+    """Тип хранилища задач. Новые провайдеры — через source_config + миграция enum при необходимости."""
+    EXTERNAL_URL = "external_url"
+    LOCAL_AGENT = "local_agent"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -49,6 +55,7 @@ class User(Base):
     assignments: Mapped[List["Assignment"]] = relationship(back_populates="user")
     tags: Mapped[List["Tag"]] = relationship(secondary="user_tags", back_populates="users")
     dataset_accesses: Mapped[List["UserDatasetAccess"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    local_agents: Mapped[List["LocalAgent"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Role(Base):
@@ -78,14 +85,18 @@ class Dataset(Base):
     required_answers: Mapped[int] = mapped_column(Integer, server_default="3")
     default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status", values_callable=lambda x: [e.value for e in x]), default=DatasetStatus.ACTIVE)
+    source_type: Mapped[DatasetSourceType] = mapped_column(SAEnum(DatasetSourceType, name="dataset_source_type", values_callable=lambda x: [e.value for e in x]), default=DatasetSourceType.EXTERNAL_URL)
+    local_agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("local_agents.id", ondelete="SET NULL"), nullable=True)
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
+    source_config: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     owner: Mapped["User"] = relationship(back_populates="datasets")
     tasks: Mapped[List["Task"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     tags: Mapped[List["Tag"]] = relationship(secondary="dataset_tags", back_populates="datasets")
     user_accesses: Mapped[List["UserDatasetAccess"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
+    local_agent: Mapped[Optional["LocalAgent"]] = relationship(back_populates="datasets")
 
 
 class Task(Base):
@@ -181,3 +192,32 @@ class UserDatasetAccess(Base):
 
     user: Mapped["User"] = relationship(back_populates="dataset_accesses")
     dataset: Mapped["Dataset"] = relationship(back_populates="user_accesses")
+
+
+class LocalAgent(Base):
+    __tablename__ = "local_agents"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    device_token: Mapped[str] = mapped_column(Text, unique=True)
+    base_url: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="local_agents")
+    datasets: Mapped[List["Dataset"]] = relationship(back_populates="local_agent")
+
+
+class PairingCode(Base):
+    __tablename__ = "pairing_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    code: Mapped[str] = mapped_column(Text, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship()

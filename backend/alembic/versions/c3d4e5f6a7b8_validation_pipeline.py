@@ -1,7 +1,7 @@
 """Validation pipeline: task_type enum + dataset validation fields
 
-Revision ID: a1b2c3d4e5f6
-Revises: e5f6a7b8c9d0
+Revision ID: c3d4e5f6a7b8
+Revises: f7a8b9c0d1e2
 Create Date: 2026-05-10
 """
 from typing import Union
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, None] = 'e5f6a7b8c9d0'
+revision: str = 'c3d4e5f6a7b8'
+down_revision: Union[str, None] = 'f7a8b9c0d1e2'
 branch_labels = None
 depends_on = None
 

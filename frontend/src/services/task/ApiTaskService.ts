@@ -8,6 +8,7 @@ interface TaskDto {
   id: string;
   dataset_id: string;
   url: string;
+  full_url?: string | null;
   type?: string;
   task_metadata?: Record<string, unknown>;
   expires_at?: string;
@@ -18,46 +19,38 @@ export class ApiTaskService implements TaskService {
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
-  // Запрашивает задачи у бэкенда и добавляет в кэш только те, которых там нет.
-  // При восстановлении сессии бэк вернёт уже взятые in_progress задачи —
+  // Запрашивает одну задачу у бэкенда и добавляет в кэш, если её там нет.
+  // При восстановлении сессии бэк вернёт уже взятый in_progress ассайнмент —
   // дедупликация предотвращает дубликаты в массиве.
-  // Возвращает первую новую задачу или null, если всё уже в кэше / задач нет.
-  async loadNextTask(datasetId: string, count = 1): Promise<AnnotationTask | null> {
-    const res = await apiFetch(API.datasets.next(datasetId, count));
-    const dtos: TaskDto[] = await res.json();
-    if (!dtos.length) return null;
+  // Возвращает задачу или null, если их больше нет.
+  async loadNextTask(datasetId: string): Promise<AnnotationTask | null> {
+    const res = await apiFetch(API.datasets.next(datasetId));
+    const dto: TaskDto | null = await res.json();
+    if (!dto) return null;
 
-    const existingById = new Map(this.tasks.map((t, i) => [t.id, i]));
-    let firstTask: AnnotationTask | null = null;
+    const mapped: AnnotationTask = {
+      id: dto.id,
+      datasetId: dto.dataset_id,
+      imageUrl: dto.full_url ?? dto.url,
+      type: dto.type as AnnotationTask['type'],
+      metadata: dto.task_metadata,
+      expiresAt: dto.expires_at,
+    };
 
-    for (const dto of dtos) {
-      const mapped: AnnotationTask = {
-        id: dto.id,
-        datasetId: dto.dataset_id,
-        imageUrl: dto.url,
-        type: dto.type as AnnotationTask['type'],
-        metadata: dto.task_metadata,
-        expiresAt: dto.expires_at,
-      };
-
-      const existingIdx = existingById.get(dto.id);
-      if (existingIdx !== undefined) {
-        const existingTask = this.tasks[existingIdx];
-        // Если expiresAt изменился — это новое назначение (реджект/истечение), а не восстановление сессии.
-        // Сбрасываем сохранённую разметку, чтобы пользователь начал с чистого листа.
-        if (existingTask.expiresAt !== dto.expires_at) {
-          this.annotationsMap.delete(dto.id);
-        }
-        this.tasks[existingIdx] = { ...existingTask, expiresAt: dto.expires_at };
-        if (!firstTask) firstTask = this.tasks[existingIdx];
-      } else {
-        this.tasks.push(mapped);
-        existingById.set(dto.id, this.tasks.length - 1);
-        if (!firstTask) firstTask = mapped;
+    const existingIdx = this.tasks.findIndex(t => t.id === dto.id);
+    if (existingIdx !== -1) {
+      const existingTask = this.tasks[existingIdx];
+      // Если expiresAt изменился — это новое назначение (реджект/истечение), а не восстановление сессии.
+      // Сбрасываем сохранённую разметку, чтобы пользователь начал с чистого листа.
+      if (existingTask.expiresAt !== dto.expires_at) {
+        this.annotationsMap.delete(dto.id);
       }
+      this.tasks[existingIdx] = { ...existingTask, expiresAt: dto.expires_at };
+      return this.tasks[existingIdx];
     }
 
-    return firstTask;
+    this.tasks.push(mapped);
+    return mapped;
   }
 
   getTasks(): readonly AnnotationTask[] {

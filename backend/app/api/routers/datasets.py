@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, List, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from urllib.parse import quote
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, exists, cast, String, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -30,6 +31,18 @@ from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdat
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 ASSIGNMENT_EXPIRY_MINUTES = 10
+
+
+def _set_full_url(dataset: Dataset, task: Task) -> None:
+    """Заполняет task.full_url прямой ссылкой на изображение.
+    Для local_agent — публичный URL агента; пользователь скачивает напрямую,
+    бэкенд не проксирует.
+    """
+    if dataset.source_type == DatasetSourceType.LOCAL_AGENT and dataset.local_agent:
+        agent_base = dataset.local_agent.base_url.rstrip("/")
+        task.full_url = f"{agent_base}/datasets/{dataset.id}/files/{quote(task.url, safe='/')}"
+    else:
+        task.full_url = task.url
 
 
 def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
@@ -152,9 +165,6 @@ async def get_datasets(
     return datasets_with_counts
 
 
-MAX_TASKS_PER_REQUEST = 10
-
-
 def _make_live_count_subquery() -> Any:
     """Подзапрос: количество живых (in_progress, не истёкших) ассайнментов на задачу."""
     return (
@@ -216,22 +226,24 @@ async def _assign_task(
     task.expires_at = expires_at
 
 
-@router.get("/{dataset_id}/next", response_model=list[TaskResponse])
+@router.get("/{dataset_id}/next", response_model=TaskResponse | None)
 async def get_next_task(
         dataset_id: uuid.UUID,
-        count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Бронирует и возвращает доступные задачи.
+    """Бронирует и возвращает одну доступную задачу (или null, если задач нет).
     Приоритет: validation-задачи → annotation-задачи.
-    Типы не смешиваются в рамках одного запроса.
     """
-    dataset = await db.get(Dataset, dataset_id)
+    dataset = (await db.execute(
+        select(Dataset)
+        .options(selectinload(Dataset.local_agent))
+        .where(Dataset.id == dataset_id)
+    )).scalar_one_or_none()
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
-    # Восстановление сессии: живые ассайнменты любого типа
+    # Восстановление сессии: первый живой ассайнмент любого типа
     existing_stmt = (
         select(Task, Assignment.expires_at)
         .join(Assignment, Task.id == Assignment.task_id)
@@ -240,12 +252,14 @@ async def get_next_task(
         .where(Assignment.status == AssignmentStatus.IN_PROGRESS)
         .where(Assignment.expires_at > func.now())
         .order_by(Task.created_at)
+        .limit(1)
     )
-    existing_rows = (await db.execute(existing_stmt)).all()
-    if existing_rows:
-        for task, exp in existing_rows:
-            task.expires_at = exp
-        return [task for task, _ in existing_rows]
+    existing_row = (await db.execute(existing_stmt)).first()
+    if existing_row:
+        task, exp = existing_row
+        task.expires_at = exp
+        _set_full_url(dataset, task)
+        return task
 
     # Upsert access-записи
     upsert_stmt = (
@@ -270,7 +284,7 @@ async def get_next_task(
     expires_at = datetime.utcnow() + timedelta(minutes=ASSIGNMENT_EXPIRY_MINUTES)
     live_count_sq = _make_live_count_subquery()
     user_busy_sq = _make_user_busy_subquery(current_user.id)
-    result_tasks: list[Task] = []
+    picked: Task | None = None
 
     # Validation-задачи в приоритете
     if dataset.requires_validation:
@@ -289,18 +303,10 @@ async def get_next_task(
             .limit(1)
             .with_for_update(skip_locked=True)
         )
-
-        for _ in range(count):
-            if result_tasks:
-                await db.flush()
-            task = (await db.execute(val_task_stmt)).scalar_one_or_none()
-            if not task:
-                break
-            await _assign_task(db, task, current_user.id, expires_at)
-            result_tasks.append(task)
+        picked = (await db.execute(val_task_stmt)).scalar_one_or_none()
 
     # Annotation-задачи — только если валидации не нашлось
-    if not result_tasks and access.can_label:
+    if picked is None and access.can_label:
         effective_limit = min(access.labeling_limit, dataset.tasks_count)
         if access.labeled_count < effective_limit:
             ann_task_stmt = (
@@ -314,24 +320,17 @@ async def get_next_task(
                 .limit(1)
                 .with_for_update(skip_locked=True)
             )
+            picked = (await db.execute(ann_task_stmt)).scalar_one_or_none()
 
-            for _ in range(count):
-                if result_tasks:
-                    await db.flush()
-                task = (await db.execute(ann_task_stmt)).scalar_one_or_none()
-                if not task:
-                    break
-                await _assign_task(db, task, current_user.id, expires_at)
-                result_tasks.append(task)
-
-    if not result_tasks:
+    if picked is None:
         await db.rollback()
-        return []
+        return None
 
+    await _assign_task(db, picked, current_user.id, expires_at)
     await db.commit()
-    for task in result_tasks:
-        await db.refresh(task)
-    return result_tasks
+    await db.refresh(picked)
+    _set_full_url(dataset, picked)
+    return picked
 
 
 @router.get("/{dataset_id}/stats")

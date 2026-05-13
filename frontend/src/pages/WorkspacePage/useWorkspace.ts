@@ -42,7 +42,7 @@ export function useWorkspace() {
     setTaskOffset(0);
     taskService.clearCache();
 
-    taskService.loadNextTask(datasetId, 3)
+    taskService.loadNextTask(datasetId)
       .then(newTask => {
         setTasks(taskService.getTasks());
         if (!newTask) setHasMoreTasks(false);
@@ -79,28 +79,20 @@ export function useWorkspace() {
 
     if (remaining.length > 0) {
       setTasks(remaining);
-      // Фоновая догрузка, если буфер почти пуст
-      if (remaining.length < 2 && hasMoreTasks) {
-        taskService.loadNextTask(datasetId ?? '', 1)
-          .then(newTask => {
-            if (!newTask) setHasMoreTasks(false);
-            else setTasks(taskService.getTasks());
-          })
-          .catch(err => console.error('[WorkspacePage] prefetch:', err));
-      }
-    } else {
-      const newTask = await taskService.loadNextTask(datasetId ?? '', 1).catch(err => {
-        console.error('[WorkspacePage] loadNextTask:', err);
-        return null;
-      });
-      if (newTask) {
-        setTasks(taskService.getTasks());
-      } else {
-        setTasks([]);
-        setHasMoreTasks(false);
-      }
+      return;
     }
-  }, [task, isSaved, datasetId, hasMoreTasks]);
+
+    const newTask = await taskService.loadNextTask(datasetId ?? '').catch(err => {
+      console.error('[WorkspacePage] loadNextTask:', err);
+      return null;
+    });
+    if (newTask) {
+      setTasks(taskService.getTasks());
+    } else {
+      setTasks([]);
+      setHasMoreTasks(false);
+    }
+  }, [task, isSaved, datasetId]);
 
   const canGoNext = isSaved || isExpired;
   const taskNumber = taskOffset + sessionCompleted + 1;

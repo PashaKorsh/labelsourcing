@@ -28,7 +28,7 @@ export class MockTaskService implements TaskService {
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
   // Все задачи предзагружены — loadNextTask возвращает null.
-  async loadNextTask(_datasetId: string, _count?: number): Promise<AnnotationTask | null> {
+  async loadNextTask(_datasetId: string): Promise<AnnotationTask | null> {
     return null;
   }
 

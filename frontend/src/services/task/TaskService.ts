@@ -3,12 +3,12 @@ import type { AnnotationTask } from '../../types/task';
 
 export interface TaskService {
   /**
-   * Запрашивает до `count` задач из датасета и добавляет их в getTasks().
-   * Возвращает первую новую задачу или null, если задач больше нет.
+   * Запрашивает одну задачу из датасета и добавляет её в getTasks().
+   * Возвращает задачу или null, если их больше нет.
    * Мок — no-op (задачи предзагружены).
-   * API — GET /api/v1/datasets/{id}/next?count=N
+   * API — GET /api/v1/datasets/{id}/next
    */
-  loadNextTask(datasetId: string, count?: number): Promise<AnnotationTask | null>;
+  loadNextTask(datasetId: string): Promise<AnnotationTask | null>;
 
   /** Возвращает кэшированный список задач. */
   getTasks(): readonly AnnotationTask[];

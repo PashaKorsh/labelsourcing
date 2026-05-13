@@ -21,17 +21,15 @@ LabelSourcing Local Agent
 """
 
 import argparse
-import hashlib
-import hmac
 import json
 import sys
-import time
 import uuid
 from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 CONFIG_FILE = Path.home() / ".labelsourcing-agent.json"
@@ -144,40 +142,24 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 def cmd_serve(args: argparse.Namespace) -> None:
     cfg = require_agent_credentials()
-    token = cfg["device_token"]
 
     app = FastAPI(docs_url=None, redoc_url=None)
 
-    def _verify(request: Request) -> None:
-        sig = request.headers.get("X-Signature", "")
-        ts_raw = request.headers.get("X-Timestamp", "0")
-        req_id = request.headers.get("X-Request-Id", "")
-
-        try:
-            ts = int(ts_raw)
-        except ValueError:
-            raise HTTPException(status_code=401, detail="Bad timestamp")
-
-        if abs(time.time() - ts) > 30:
-            raise HTTPException(status_code=401, detail="Request expired")
-
-        expected = hmac.new(
-            key=token.encode(),
-            msg=f"{req_id}:{ts}".encode(),
-            digestmod=hashlib.sha256,
-        ).hexdigest()
-
-        if not hmac.compare_digest(sig, expected):
-            raise HTTPException(status_code=401, detail="Invalid signature")
+    # Файлы публично отдаются по ссылке: бэкенд только формирует URL, а браузер
+    # пользователя качает картинку напрямую с агента. Поэтому нужен открытый CORS.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET"],
+        allow_headers=["*"],
+    )
 
     @app.get("/health")
     async def health():
         return {"status": "ok"}
 
     @app.get("/datasets/{dataset_id}/files/{file_path:path}")
-    async def serve_dataset_file(dataset_id: str, file_path: str, request: Request):
-        _verify(request)
-
+    async def serve_dataset_file(dataset_id: str, file_path: str):
         roots = load_config().get("dataset_roots") or {}
         root_raw = roots.get(dataset_id)
         if not root_raw:

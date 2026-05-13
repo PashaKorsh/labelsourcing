@@ -1,20 +1,13 @@
-import hashlib
-import hmac
-import time
 import uuid
-from urllib.parse import quote
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
-import httpx
+from sqlalchemy import select
 
 from app.database import get_db
 from app.models import (
     Task, User, Assignment, Label, Dataset, UserDatasetAccess,
-    AssignmentStatus, TaskStatus, TaskType, DatasetSourceType,
+    AssignmentStatus, TaskStatus, TaskType,
 )
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
@@ -275,53 +268,3 @@ async def submit_label(
     return label
 
 
-@router.get("/{task_id}/image")
-async def proxy_task_image(
-    task_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Проксирует картинку с локального агента владельца датасета."""
-    task = await db.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Задача не найдена")
-
-    stmt = (
-        select(Dataset)
-        .options(selectinload(Dataset.local_agent))
-        .where(Dataset.id == task.dataset_id)
-    )
-    dataset = (await db.execute(stmt)).scalar_one_or_none()
-
-    if dataset.source_type != DatasetSourceType.LOCAL_AGENT or not dataset.local_agent:
-        raise HTTPException(status_code=400, detail="Задача не привязана к локальному агенту")
-
-    agent = dataset.local_agent
-    if not agent.is_active:
-        raise HTTPException(status_code=503, detail="Агент отключён")
-
-    timestamp = int(time.time())
-    signature = hmac.new(
-        key=agent.device_token.encode(),
-        msg=f"{task_id}:{timestamp}".encode(),
-        digestmod=hashlib.sha256,
-    ).hexdigest()
-
-    url = f"{agent.base_url}/datasets/{dataset.id}/files/{quote(task.url, safe='/')}"
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(url, headers={
-                "X-Request-Id": str(task_id),
-                "X-Timestamp": str(timestamp),
-                "X-Signature": signature,
-            })
-    except httpx.RequestError:
-        raise HTTPException(status_code=502, detail="Агент недоступен")
-
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="Агент вернул ошибку")
-
-    return Response(
-        content=resp.content,
-        media_type=resp.headers.get("content-type", "image/jpeg"),
-    )

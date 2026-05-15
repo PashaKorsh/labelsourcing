@@ -15,15 +15,21 @@ router = APIRouter(prefix="/tags", tags=["Tags"])
 
 @router.get("/", response_model=list[TagResponse])
 async def get_tags(
-    limit: int = 100,
-    offset: int = 0,
-    # Поиск по названию тега (будет реализован позже)
-    search: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+        limit: int = 100,
+        offset: int = 0,
+        search: Optional[str] = None,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
 ):
-    """Получить список всех доступных тегов"""
-    result = await db.execute(select(Tag).limit(limit).offset(offset))
+    """Получить список всех доступных тегов с пагинацией и поиском"""
+    stmt = select(Tag)
+
+    if search:
+        stmt = stmt.where(Tag.name.ilike(f"%{search}%"))
+
+    stmt = stmt.limit(limit).offset(offset)
+
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 

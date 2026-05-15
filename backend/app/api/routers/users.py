@@ -32,16 +32,21 @@ async def get_my_profile(
 async def get_all_users(
         limit: int = 100,
         offset: int = 0,
-        # Поиск по email/имени пользователя (будет реализован позже)
         search: Optional[str] = None,
         db: AsyncSession = Depends(get_db),
         admin_user: User = Depends(require_roles(["admin"]))
 ):
-    """Список всех пользователей для Панели управления (только Админ)"""
+    """Список всех пользователей для Панели управления (с поиском)"""
     stmt = select(User).options(
         selectinload(User.roles),
         selectinload(User.tags)
-    ).limit(limit).offset(offset)
+    )
+
+    if search:
+        stmt = stmt.where(User.email.ilike(f"%{search}%"))
+
+    stmt = stmt.limit(limit).offset(offset)
+
     result = await db.execute(stmt)
     return result.scalars().all()
 

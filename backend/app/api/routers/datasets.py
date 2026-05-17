@@ -30,9 +30,9 @@ def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bo
 
 
 async def _get_dataset_with_counts(
-    db: AsyncSession,
-    dataset_id: uuid.UUID,
-    user_id: uuid.UUID | None = None,
+        db: AsyncSession,
+        dataset_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
 ) -> Dataset | None:
     stmt = select(Dataset).where(Dataset.id == dataset_id).options(selectinload(Dataset.tags))
     dataset = (await db.execute(stmt)).scalar_one_or_none()
@@ -81,47 +81,38 @@ async def create_dataset(
 
 @router.get("/", response_model=list[DatasetResponse])
 async def get_datasets(
-        limit: int = 100,
+        limit: int = 20,
         offset: int = 0,
         search: Optional[str] = None,
-        status: Optional[str] = None,
-        owner_id: Optional[uuid.UUID] = None,
-        owner_search: Optional[str] = None,
-        tag_ids: Optional[List[uuid.UUID]] = None,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
     stmt = (
-        select(Dataset)
-        .options(selectinload(Dataset.tags))
-        .limit(limit)
-        .offset(offset)
+        select(
+            Dataset,
+            func.count(Task.id.distinct()).label("tasks_count"),
+            func.count(Label.id.distinct()).label("labeled_count")
+        )
+        .outerjoin(Task, Dataset.id == Task.dataset_id)
+        .outerjoin(Assignment, Task.id == Assignment.task_id)
+        .outerjoin(Label, Assignment.id == Label.assignment_id)
     )
 
-    if owner_id:
-        stmt = stmt.where(Dataset.owner_id == owner_id)
+    if search:
+        stmt = stmt.where(Dataset.description.ilike(f"%{search}%"))
+
+    stmt = stmt.group_by(Dataset.id)
+    stmt = stmt.options(selectinload(Dataset.tags))
+    stmt = stmt.limit(limit).offset(offset)
 
     result = await db.execute(stmt)
 
     datasets_with_counts = []
-    for dataset in result.scalars().all():
-        dataset.user_done = False
+    for row in result.all():
+        dataset = row[0]
+        dataset.tasks_count = row[1]
+        dataset.labeled_count = row[2]
         datasets_with_counts.append(dataset)
-
-    if datasets_with_counts:
-        dataset_ids = [d.id for d in datasets_with_counts]
-        access_result = await db.execute(
-            select(UserDatasetAccess).where(
-                UserDatasetAccess.user_id == current_user.id,
-                UserDatasetAccess.dataset_id.in_(dataset_ids),
-            )
-        )
-        access_map: dict[uuid.UUID, UserDatasetAccess] = {
-            a.dataset_id: a for a in access_result.scalars()
-        }
-        for dataset in datasets_with_counts:
-            access = access_map.get(dataset.id)
-            dataset.user_done = _compute_user_done(access, dataset.tasks_count)
 
     return datasets_with_counts
 
@@ -150,8 +141,8 @@ def _make_user_busy_subquery(user_id: uuid.UUID) -> Any:
         .where(
             (Assignment.status == AssignmentStatus.DONE) |
             (
-                (Assignment.status == AssignmentStatus.IN_PROGRESS) &
-                (Assignment.expires_at > func.now())
+                    (Assignment.status == AssignmentStatus.IN_PROGRESS) &
+                    (Assignment.expires_at > func.now())
             )
         )
         .correlate(Task)
@@ -159,10 +150,10 @@ def _make_user_busy_subquery(user_id: uuid.UUID) -> Any:
 
 
 async def _assign_task(
-    db: AsyncSession,
-    task: Task,
-    user_id: uuid.UUID,
-    expires_at: datetime,
+        db: AsyncSession,
+        task: Task,
+        user_id: uuid.UUID,
+        expires_at: datetime,
 ) -> None:
     """Создаёт или обновляет ассайнмент на задачу."""
     existing = (await db.execute(
@@ -255,27 +246,26 @@ async def get_next_task(
             .where(Task.status == TaskStatus.PENDING)
             .where(live_count_sq < dataset.validation_quorum)
             .where(~user_busy_sq)
-            # Запрет самовалидации: нельзя оценивать собственную разметку
             .where(
                 cast(Task.task_metadata['annotator_id'], String) != f'"{current_user.id}"'
             )
             .order_by(Task.created_at)
-            .limit(1)
-            .with_for_update(skip_locked=True)
+            .limit(count)
+            .with_for_update(of=Task, skip_locked=True)
         )
 
-        for _ in range(count):
-            if result_tasks:
-                await db.flush()
-            task = (await db.execute(val_task_stmt)).scalar_one_or_none()
-            if not task:
-                break
+        validation_tasks = (await db.execute(val_task_stmt)).scalars().all()
+
+        for task in validation_tasks:
             await _assign_task(db, task, current_user.id, expires_at)
             result_tasks.append(task)
 
+    remaining_count = count - len(result_tasks)
+
     # Annotation-задачи — только если валидации не нашлось
-    if not result_tasks and access.can_label:
+    if remaining_count > 0 and access.can_label:
         effective_limit = min(access.labeling_limit, dataset.tasks_count)
+
         if access.labeled_count < effective_limit:
             ann_task_stmt = (
                 select(Task)
@@ -285,16 +275,13 @@ async def get_next_task(
                 .where(live_count_sq < dataset.required_answers)
                 .where(~user_busy_sq)
                 .order_by(Task.created_at)
-                .limit(1)
-                .with_for_update(skip_locked=True)
+                .limit(remaining_count)  # Добираем остаток
+                .with_for_update(of=Task, skip_locked=True)  # Изолируем блокировку
             )
 
-            for _ in range(count):
-                if result_tasks:
-                    await db.flush()
-                task = (await db.execute(ann_task_stmt)).scalar_one_or_none()
-                if not task:
-                    break
+            annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
+
+            for task in annotation_tasks:
                 await _assign_task(db, task, current_user.id, expires_at)
                 result_tasks.append(task)
 
@@ -409,18 +396,18 @@ async def get_dataset_tasks(
         dataset_id: uuid.UUID,
         limit: int = 100,
         offset: int = 0,
+        status: Optional[str] = None,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
-    """Список всех задач датасета — только для администраторов"""
-    query = (
-        select(Task)
-        .where(Task.dataset_id == dataset_id)
-        .where(Task.type == TaskType.ANNOTATION)
-        .limit(limit)
-        .offset(offset)
-    )
-    result = await db.execute(query)
+    stmt = select(Task).where(Task.dataset_id == dataset_id)
+
+    if status:
+        stmt = stmt.where(Task.status == status)
+
+    stmt = stmt.limit(limit).offset(offset)
+
+    result = await db.execute(stmt)
     return result.scalars().all()
 
 

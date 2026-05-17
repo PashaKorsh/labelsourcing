@@ -48,7 +48,12 @@ async def _process_validation_verdict(
     if not annotation_assignment:
         return
 
-    annotation_task = await db.get(Task, annotation_assignment.task_id)
+    stmt_task = (
+        select(Task)
+        .where(Task.id == annotation_assignment.task_id)
+        .with_for_update()  # Ждем снятия блокировки, если кто-то другой тоже меняет счетчик
+    )
+    annotation_task = (await db.execute(stmt_task)).scalar_one_or_none()
     if not annotation_task:
         return
 
@@ -166,10 +171,10 @@ async def delete_task(
 
 @router.put("/{task_id}/labels", response_model=LabelResponse)
 async def submit_label(
-    task_id: uuid.UUID,
-    label_in: LabelSubmit,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+        task_id: uuid.UUID,
+        label_in: LabelSubmit,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
 ):
     """Сохранить или перезаписать разметку / вердикт валидации для активного ассайнмента."""
     stmt = select(Assignment).where(
@@ -185,11 +190,17 @@ async def submit_label(
             detail="Нет активного задания для этой задачи. Сначала получите задачу через /next."
         )
 
+    # 1. БЛОКИРУЕМ ЗАДАЧУ (TASK) ПЕРЕД ЛЮБЫМИ ИЗМЕНЕНИЯМИ СЧЕТЧИКОВ
+    # Если кто-то другой сейчас тоже сдает эту задачу, наш запрос подождет здесь
+    task_stmt = select(Task).where(Task.id == task_id).with_for_update()
+    task = (await db.execute(task_stmt)).scalar_one_or_none()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+
     # Ленивая проверка истечения
     if assignment.status == AssignmentStatus.IN_PROGRESS and assignment.expires_at < datetime.utcnow():
-        task_obj = await db.get(Task, task_id)
-        if task_obj:
-            task_obj.active_assignments = max(0, task_obj.active_assignments - 1)
+        task.active_assignments = max(0, task.active_assignments - 1)
         assignment.status = AssignmentStatus.EXPIRED
         await db.commit()
         raise HTTPException(status_code=410, detail="Время на выполнение задания истекло. Получите новую задачу.")
@@ -208,7 +219,6 @@ async def submit_label(
     if assignment.status == AssignmentStatus.IN_PROGRESS:
         assignment.status = AssignmentStatus.DONE
 
-        task = await db.get(Task, task_id)
         dataset = await db.get(Dataset, task.dataset_id)
 
         task.active_assignments = max(0, task.active_assignments - 1)
@@ -220,7 +230,6 @@ async def submit_label(
             task.status = TaskStatus.COMPLETED
 
             if task.type == TaskType.VALIDATION:
-                # Нужен flush, чтобы label.id был доступен до вызова _process_validation_verdict
                 await db.flush()
                 await _process_validation_verdict(db, task, dataset)
 
@@ -228,15 +237,15 @@ async def submit_label(
             access_stmt = select(UserDatasetAccess).where(
                 UserDatasetAccess.user_id == current_user.id,
                 UserDatasetAccess.dataset_id == task.dataset_id,
-            )
+            ).with_for_update()
+
             access = (await db.execute(access_stmt)).scalar_one_or_none()
             if access is not None:
                 access.labeled_count += 1
 
-            # Создаём validation-задачи только когда собрано required_answers аннотаций.
-            # Для каждой аннотации — отдельная задача, чтобы валидатор оценивал их по одной.
-            if dataset.requires_validation and task.completed_answers >= dataset.required_answers:
-                await db.flush()  # нужен, чтобы label.id был доступен
+            # Блок создания валидационных задач
+            if dataset.requires_validation and task.completed_answers == dataset.required_answers:
+                await db.flush()
 
                 all_labels_stmt = (
                     select(Label, Assignment)

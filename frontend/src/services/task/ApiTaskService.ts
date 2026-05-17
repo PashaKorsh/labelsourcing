@@ -86,6 +86,9 @@ export class ApiTaskService implements TaskService {
     }
 
     const size = imageSize ?? this.imageSizeMap.get(taskId);
+    if (!size && annotations.length > 0) {
+      throw new Error('[ApiTaskService] Размер изображения неизвестен — нельзя нормализовать координаты');
+    }
     const serialized = serializeTaskAnnotations(
       taskId,
       annotations,

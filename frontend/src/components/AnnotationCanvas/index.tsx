@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Annotorious, ImageAnnotator } from '@annotorious/react';
 import type { ImageAnnotation, DrawingStyle } from '@annotorious/annotorious';
 import type { Tag } from '../../types/annotation';
@@ -41,38 +41,31 @@ export function AnnotationCanvas({
   onNext,
 }: AnnotationCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const leftButtonPanRef = useRef(activeTool === 'cursor');
   useEffect(() => { leftButtonPanRef.current = activeTool === 'cursor'; }, [activeTool]);
   const { zoom, panX, panY, reset } = useZoomPan(wrapperRef, leftButtonPanRef);
 
-  // Исходный размер изображения при zoom=1 (с учётом CSS-ограничений max-width/height).
-  // Фиксируется при загрузке, используется для вычисления displayStyle.
   const [originalSize, setOriginalSize] = useState<{ w: number; h: number } | null>(null);
 
-  const measureImage = useCallback((img: HTMLImageElement) => {
-    const nw = img.naturalWidth;
-    const nh = img.naturalHeight;
-    if (!nw || !nh) return;
-    // Вычисляем CSS-ограниченный размер (max-width: 80vw; max-height: 80vh) программно
-    const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
-    setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
-    onImageSizeChange?.({ w: nw, h: nh });
-  }, [onImageSizeChange]);
-
-  // При смене URL сбрасываем размер и сразу проверяем кэшированные изображения
-  // (для них img.complete == true ещё до onLoad)
+  // Измеряем натуральный размер через отдельный Image-объект — независимо от того,
+  // как Annotorious обращается с <img> внутри ImageAnnotator (клонирует, оборачивает и т.д.).
+  // Браузер отдаёт уже закэшированный ресурс, поэтому дублирующего запроса на сеть нет.
   useEffect(() => {
     setOriginalSize(null);
-    const img = imgRef.current;
-    if (img?.complete && img.naturalWidth > 0) measureImage(img);
-  }, [imageUrl]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // onLoad React-пропп обрабатывается внутри event system React'а —
-  // гарантирует синхронный ре-рендер без задержек автобатчинга
-  const handleImageLoad = useCallback((e: SyntheticEvent<HTMLImageElement>) => {
-    measureImage(e.currentTarget);
-  }, [measureImage]);
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      const nw = probe.naturalWidth;
+      const nh = probe.naturalHeight;
+      if (!nw || !nh) return;
+      const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
+      setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
+      onImageSizeChange?.({ w: nw, h: nh });
+    };
+    probe.src = imageUrl;
+    return () => { cancelled = true; };
+  }, [imageUrl, onImageSizeChange]);
 
   // Явные размеры передаются на <img>, чтобы Annotorious увидел изменение
   // через свой ResizeObserver и пересчитал SVG-оверлей корректно.
@@ -123,14 +116,12 @@ export function AnnotationCanvas({
         <Annotorious>
           <ImageAnnotator style={tagStyler} containerClassName={styles.annotoriousContainer}>
             <img
-              ref={imgRef}
               src={imageUrl}
               className={styles.image}
               style={displayStyle}
               alt="Annotation target"
               draggable={false}
               crossOrigin="anonymous"
-              onLoad={handleImageLoad}
             />
           </ImageAnnotator>
           <AnnotatorController

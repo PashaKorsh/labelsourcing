@@ -5,13 +5,6 @@ import { taskService, datasetService } from '../../services';
 import { useDatasetId } from '../../hooks/useRouteParams';
 import { useIsExpired } from '../../hooks/useIsExpired';
 
-const DEFAULT_TAGS: Tag[] = [
-  { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
-  { id: 'vehicle', label: 'Транспорт', color: '#3b82f6', hotkey: '2' },
-  { id: 'animal', label: 'Животное', color: '#22c55e', hotkey: '3' },
-  { id: 'object', label: 'Объект', color: '#f59e0b', hotkey: '4' },
-];
-
 export function useWorkspace() {
   const datasetId = useDatasetId();
 
@@ -21,7 +14,7 @@ export function useWorkspace() {
   const [taskOffset, setTaskOffset] = useState(0);
   const [sessionCompleted, setSessionCompleted] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
-  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   const task = tasks[0] ?? null;
   const isExpired = useIsExpired(task?.expiresAt);

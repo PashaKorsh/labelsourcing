@@ -21,6 +21,8 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 ASSIGNMENT_EXPIRY_MINUTES = 10
 
+DEFAULT_ANNOTATION_LABELS = [{"id": "object", "label": "Object", "color": "#f59e0b"}]
+
 
 def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
     if access is None:
@@ -61,7 +63,7 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["admin"]))
 ):
-    labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else None
+    labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
     new_dataset = Dataset(
         owner_id=current_user.id,
         title=dataset_in.title,

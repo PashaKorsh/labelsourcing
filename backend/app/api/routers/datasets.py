@@ -90,11 +90,12 @@ async def get_datasets(
     stmt = (
         select(
             Dataset,
-            func.count(Task.id).label("tasks_count"),
+            func.count(Task.id.distinct()).label("tasks_count"),
             func.count(Label.id.distinct()).label("labeled_count")
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
-        .outerjoin(Label, Task.id == Label.task_id)
+        .outerjoin(Assignment, Task.id == Assignment.task_id)
+        .outerjoin(Label, Assignment.id == Label.assignment_id)
     )
 
     if search:

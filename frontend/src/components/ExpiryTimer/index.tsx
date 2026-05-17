@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
+import { toUTC } from '../../utils/time';
 import styles from './ExpiryTimer.module.css';
-
-function toUTC(isoString: string): string {
-  return isoString.endsWith('Z') || isoString.includes('+') ? isoString : isoString + 'Z';
-}
 
 function formatTimeLeft(seconds: number): string {
   const m = Math.floor(seconds / 60);

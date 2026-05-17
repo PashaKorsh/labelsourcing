@@ -24,9 +24,8 @@ async def get_tags(
     """Получить список всех доступных тегов с пагинацией и поиском"""
     stmt = select(Tag)
 
-    # Если передали строку поиска, фильтруем по имени
     if search:
-        stmt = stmt.where(Tag.name.ilike(f"%{search}%"))
+        stmt = stmt.order_by(Tag.id).where(Tag.name.ilike(f"%{search}%"))
 
     stmt = stmt.limit(limit).offset(offset)
 

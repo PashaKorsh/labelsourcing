@@ -6,7 +6,6 @@ export const ROUTES = {
   datasetNew:        '/dataset/new',
   datasetEdit:       '/dataset/:datasetId/edit',
   datasetAnnotation: '/dataset/:datasetId',
-  datasetValidation: '/dataset/:datasetId/validation',
   users:             '/users',
   tags:              '/tags',
 } as const;

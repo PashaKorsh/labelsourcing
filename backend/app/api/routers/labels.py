@@ -25,7 +25,7 @@ async def update_label_status(
         admin_user: User = Depends(require_roles(["admin", "moderator"]))
 ):
     """Изменить статус ассайнмента через его label — для валидации (Админ/Модератор)"""
-    stmt = select(Label).where(Label.id == label_id)
+    stmt = select(Label).where(Label.id == label_id).with_for_update()
     result = await db.execute(stmt)
     label = result.scalar_one_or_none()
 

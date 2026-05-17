@@ -40,11 +40,13 @@ export function DatasetCard({ dataset }: Props) {
               <RoleBadge key={tag.id} role={tag} />
             ))}
           </div>
-          {isDone ? (
-            <span className={styles.doneBadge}>✓ Выполнено</span>
-          ) : (
-            <PlayButton onClick={handlePlay} />
-          )}
+          <div className={styles.actions}>
+            {isDone ? (
+              <span className={styles.doneBadge}>✓ Выполнено</span>
+            ) : (
+              <PlayButton onClick={handlePlay} />
+            )}
+          </div>
         </div>
       </div>
     </div>

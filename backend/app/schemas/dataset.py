@@ -17,6 +17,8 @@ class DatasetCreate(BaseModel):
     required_answers: int = 3
     default_labeling_limit: int = 50
     annotation_labels: Optional[List[AnnotationLabelSchema]] = None
+    requires_validation: bool = False
+    validation_quorum: int = 1
 
 
 class DatasetResponse(BaseModel):
@@ -28,6 +30,8 @@ class DatasetResponse(BaseModel):
     default_labeling_limit: int = 50
     status: str = "active"
     tasks_count: int = 0
+    requires_validation: bool = False
+    validation_quorum: int = 1
     user_done: bool = False
     user_labeling_limit: int | None = None
     user_labeled_count: int | None = None
@@ -50,3 +54,5 @@ class DatasetUpdate(BaseModel):
     status: Optional[str] = None
     tag_ids: Optional[list[uuid.UUID]] = None
     annotation_labels: Optional[List[AnnotationLabelSchema]] = None
+    requires_validation: Optional[bool] = None
+    validation_quorum: Optional[int] = None

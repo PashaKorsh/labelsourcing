@@ -25,7 +25,7 @@ async def get_tags(
     stmt = select(Tag)
 
     if search:
-        stmt = stmt.where(Tag.name.ilike(f"%{search}%"))
+        stmt = stmt.order_by(Tag.id).where(Tag.name.ilike(f"%{search}%"))
 
     stmt = stmt.limit(limit).offset(offset)
 

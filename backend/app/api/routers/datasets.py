@@ -245,27 +245,26 @@ async def get_next_task(
             .where(Task.status == TaskStatus.PENDING)
             .where(live_count_sq < dataset.validation_quorum)
             .where(~user_busy_sq)
-            # Запрет самовалидации: нельзя оценивать собственную разметку
             .where(
                 cast(Task.task_metadata['annotator_id'], String) != f'"{current_user.id}"'
             )
             .order_by(Task.created_at)
-            .limit(1)
-            .with_for_update(skip_locked=True)
+            .limit(count)
+            .with_for_update(of=Task, skip_locked=True)
         )
 
-        for _ in range(count):
-            if result_tasks:
-                await db.flush()
-            task = (await db.execute(val_task_stmt)).scalar_one_or_none()
-            if not task:
-                break
+        validation_tasks = (await db.execute(val_task_stmt)).scalars().all()
+
+        for task in validation_tasks:
             await _assign_task(db, task, current_user.id, expires_at)
             result_tasks.append(task)
 
+    remaining_count = count - len(result_tasks)
+
     # Annotation-задачи — только если валидации не нашлось
-    if not result_tasks and access.can_label:
+    if remaining_count > 0 and access.can_label:
         effective_limit = min(access.labeling_limit, dataset.tasks_count)
+
         if access.labeled_count < effective_limit:
             ann_task_stmt = (
                 select(Task)
@@ -275,16 +274,13 @@ async def get_next_task(
                 .where(live_count_sq < dataset.required_answers)
                 .where(~user_busy_sq)
                 .order_by(Task.created_at)
-                .limit(1)
-                .with_for_update(skip_locked=True)
+                .limit(remaining_count)  # Добираем остаток
+                .with_for_update(of=Task, skip_locked=True)  # Изолируем блокировку
             )
 
-            for _ in range(count):
-                if result_tasks:
-                    await db.flush()
-                task = (await db.execute(ann_task_stmt)).scalar_one_or_none()
-                if not task:
-                    break
+            annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
+
+            for task in annotation_tasks:
                 await _assign_task(db, task, current_user.id, expires_at)
                 result_tasks.append(task)
 

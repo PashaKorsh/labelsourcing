@@ -12,6 +12,18 @@ services:
       interval: 5s
       timeout: 5s
 
+  migrate:
+    build: ./backend
+    command: alembic upgrade head
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+
   backend:
     build: ./backend
     expose:
@@ -23,6 +35,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   nginx:
     build:

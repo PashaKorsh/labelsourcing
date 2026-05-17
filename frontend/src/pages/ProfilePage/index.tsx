@@ -21,27 +21,16 @@ export function ProfilePage() {
               )}
               <h1 className={styles.name}>{user.name ?? user.email}</h1>
               <p className={styles.email}>{user.email}</p>
-              {user.tags.map(tag => (
-                <RoleBadge key={tag.id} role={tag} />
-              ))}
+              {user.tags.length > 0 && (
+                <div className={styles.tags}>
+                  {user.tags.map(tag => (
+                    <RoleBadge key={tag.id} role={tag} />
+                  ))}
+                </div>
+              )}
               <button type="button" className={styles.logoutButton} onClick={logout}>
                 Выйти
               </button>
-            </div>
-
-            <div className={styles.stats}>
-              <div className={styles.statCard}>
-                <span className={styles.statValue}>42</span>
-                <span className={styles.statLabel}>Размечено</span>
-              </div>
-              <div className={styles.statCard}>
-                <span className={styles.statValue}>18</span>
-                <span className={styles.statLabel}>Валидировано</span>
-              </div>
-              <div className={styles.statCard}>
-                <span className={styles.statValue}>94%</span>
-                <span className={styles.statLabel}>Точность</span>
-              </div>
             </div>
           </>
         )}

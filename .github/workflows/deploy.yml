@@ -8,6 +8,7 @@ on:
       - 'backend/**'
       - 'docker-compose.prod.yml'
       - 'nginx/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
     inputs:
       job:

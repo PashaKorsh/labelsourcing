@@ -69,7 +69,7 @@ jobs:
           chmod 600 ssh_key
           ~/yc/bin/yc config set service-account-key sa-key.json
           ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
-          ~/yc/bin/yc compute instance start ${{ secrets.YC_INSTANCE_ID }}
+          ~/yc/bin/yc compute instance start ${{ secrets.YC_INSTANCE_ID }} || true
 
           for i in {1..12}; do
             if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i ssh_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo ready"; then

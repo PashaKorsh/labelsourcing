@@ -79,6 +79,17 @@ jobs:
             sleep 5
           done
 
+      - name: Wait for SSH to be ready
+        run: |
+          for i in {1..12}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i ${{ secrets.SSH_PRIVATE_KEY }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo ready"; then
+              echo "SSH is ready"
+              break
+            fi
+            echo "Waiting for SSH... ($i/12)"
+            sleep 5
+          done
+
       - name: Copy docker-compose and configs to server
         uses: appleboy/scp-action@v0.1.7
         with:

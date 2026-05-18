@@ -9,8 +9,9 @@ services:
       - ./pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U test -d testdb"]
-      interval: 5s
-      timeout: 5s
+      interval: 1s
+      timeout: 1s
+      retries: 1000000
 
   migrate:
     build: ./backend

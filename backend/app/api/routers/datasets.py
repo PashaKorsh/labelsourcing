@@ -244,7 +244,7 @@ async def get_next_task(
             .where(Task.dataset_id == dataset_id)
             .where(Task.type == TaskType.VALIDATION)
             .where(Task.status == TaskStatus.PENDING)
-            .where(live_count_sq < dataset.validation_quorum)
+            .where((live_count_sq + Task.completed_answers) < dataset.validation_quorum)
             .where(~user_busy_sq)
             .where(
                 cast(Task.task_metadata['annotator_id'], String) != f'"{current_user.id}"'
@@ -272,7 +272,7 @@ async def get_next_task(
                 .where(Task.dataset_id == dataset_id)
                 .where(Task.type == TaskType.ANNOTATION)
                 .where(Task.status == TaskStatus.PENDING)
-                .where(live_count_sq < dataset.required_answers)
+                .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
                 .where(~user_busy_sq)
                 .order_by(Task.created_at)
                 .limit(remaining_count)  # Добираем остаток

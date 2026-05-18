@@ -5,7 +5,7 @@ from sqlalchemy import select
 import uuid
 
 from app.database import get_db
-from app.models import Label, Assignment, User
+from app.models import Label, Assignment, User, AssignmentStatus, Task, TaskStatus
 from app.api.dependencies import require_roles
 
 router = APIRouter(prefix="/labels", tags=["Labels"])
@@ -35,6 +35,13 @@ async def update_label_status(
     new_status = status_in.status
     if new_status not in ALLOWED_ASSIGNMENT_STATUSES:
         raise HTTPException(status_code=422, detail=f"Недопустимый статус: {new_status}")
+
+    if new_status == AssignmentStatus.REJECTED:
+        task = await db.get(Task, Assignment.task_id)
+        task.completed_answers = max(0, task.completed_answers - 1)
+
+        if task.status == TaskStatus.COMPLETED:
+            task.status = TaskStatus.PENDING
 
     assignment = await db.get(Assignment, label.assignment_id)
     assignment.status = new_status

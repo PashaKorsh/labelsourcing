@@ -63,28 +63,16 @@ jobs:
 
       - name: Start VM and wait for SSH
         run: |
-          # Install Yandex Cloud CLI and start VM
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i ~/yc -n
-          echo "$HOME/yc/bin" >> $GITHUB_PATH
           echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > sa-key.json
+          echo '${{ secrets.SSH_PRIVATE_KEY }}' > ssh_key
+          chmod 600 ssh_key
           ~/yc/bin/yc config set service-account-key sa-key.json
           ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
           ~/yc/bin/yc compute instance start ${{ secrets.YC_INSTANCE_ID }}
 
-          # Wait for VM to be running
           for i in {1..12}; do
-            STATUS=$($HOME/yc/bin/yc compute instance get ${{ secrets.YC_INSTANCE_ID }} --format=json | jq -r .status)
-            if [ "$STATUS" = "RUNNING" ]; then
-              echo "VM is running"
-              break
-            fi
-            echo "Waiting for VM to start... ($i/12)"
-            sleep 5
-          done
-
-          # Wait for SSH to be ready
-          for i in {1..12}; do
-            if echo '${{ secrets.SSH_PRIVATE_KEY }}' | ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /dev/stdin ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo ready"; then
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i ssh_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo ready"; then
               echo "SSH is ready"
               break
             fi

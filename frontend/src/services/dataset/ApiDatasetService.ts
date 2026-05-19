@@ -106,6 +106,11 @@ export class ApiDatasetService implements DatasetService {
     return mapDto(dto);
   }
 
+  async exportLabels(id: string): Promise<unknown[]> {
+    const res = await apiFetch(API.datasets.export(id));
+    return res.json();
+  }
+
   async update(id: string, data: DatasetUpdateInput): Promise<Dataset> {
     const body = {
       ...data.extra,

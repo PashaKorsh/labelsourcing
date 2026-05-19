@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
@@ -10,12 +10,23 @@ import { useAuth } from '../../context/auth';
 import type { Dataset } from '../../types/dataset';
 import styles from './MyDatasetsPage.module.css';
 
+function triggerJsonDownload(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function MyDatasetsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [exportingIds, setExportingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -28,6 +39,24 @@ export function MyDatasetsPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [user, search]);
+
+  const handleExport = useCallback(async (dataset: Dataset) => {
+    if (exportingIds.has(dataset.id)) return;
+    setExportingIds(prev => new Set(prev).add(dataset.id));
+    try {
+      const data = await datasetService.exportLabels(dataset.id);
+      const name = dataset.title ?? dataset.description ?? dataset.id;
+      triggerJsonDownload(data, `${name}.json`);
+    } catch (err) {
+      console.error('[MyDatasetsPage] export:', err);
+    } finally {
+      setExportingIds(prev => {
+        const next = new Set(prev);
+        next.delete(dataset.id);
+        return next;
+      });
+    }
+  }, [exportingIds]);
 
   return (
     <main className={styles.page}>
@@ -55,6 +84,15 @@ export function MyDatasetsPage() {
                     </div>
                   )}
                 </div>
+                <button
+                  type="button"
+                  className={styles.exportButton}
+                  onClick={() => handleExport(dataset)}
+                  disabled={exportingIds.has(dataset.id)}
+                  title="Выгрузить разметку"
+                >
+                  {exportingIds.has(dataset.id) ? '…' : '↓ JSON'}
+                </button>
                 <button
                   type="button"
                   className={styles.editButton}

@@ -137,4 +137,8 @@ export class MockDatasetService implements DatasetService {
     }
     return updated;
   }
+
+  async exportLabels(_id: string): Promise<unknown[]> {
+    return [];
+  }
 }

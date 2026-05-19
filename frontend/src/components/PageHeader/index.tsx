@@ -2,15 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../config/routes';
 import { useAuth } from '../../context/auth';
+import { NAV_ITEMS, hasRole } from '../../config/permissions';
 import styles from './PageHeader.module.css';
 import profileLogo from '/src/assets/profile-image-stock-white-theme.png';
-
-const NAV_ITEMS = [
-  { label: 'Датасеты',     path: ROUTES.home },
-  { label: 'Мои датасеты', path: ROUTES.myDatasets },
-  { label: 'Пользователи', path: ROUTES.users },
-  { label: 'Теги',         path: ROUTES.tags },
-] as const;
 
 export function PageHeader() {
   const navigate = useNavigate();
@@ -24,16 +18,17 @@ export function PageHeader() {
       setAvatarSrc(profileLogo);
       return;
     }
-    // Показываем заглушку пока грузится реальный аватар
     const img = new Image();
     img.onload = () => setAvatarSrc(user.avatarUrl!);
     img.onerror = () => setAvatarSrc(profileLogo);
     img.src = user.avatarUrl;
   }, [user?.avatarUrl]);
 
+  const visibleItems = NAV_ITEMS.filter(item => hasRole(user?.roles ?? [], item.roles));
+
   return (
     <nav className={styles.nav}>
-      {NAV_ITEMS.map(({ label, path }) => (
+      {visibleItems.map(({ label, path }) => (
         <button
           key={path}
           type="button"

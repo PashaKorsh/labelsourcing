@@ -100,6 +100,10 @@ async def get_datasets(
         .outerjoin(Label, Assignment.id == Label.assignment_id)
     )
 
+    user_role_names = [role.name for role in current_user.roles]
+    if 'admin' not in user_role_names:
+        stmt = stmt.where(Dataset.owner_id == current_user.id)
+
     if search:
         stmt = stmt.where(Dataset.description.ilike(f"%{search}%"))
 
@@ -301,7 +305,7 @@ async def get_next_task(
 async def get_dataset_stats(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        admin_user: User = Depends(require_roles(["admin"]))
 ):
     """Статистика обработки датасета: количество задач по типам/статусам и текущая фаза."""
     dataset = await db.get(Dataset, dataset_id)
@@ -400,7 +404,7 @@ async def get_dataset_tasks(
         offset: int = 0,
         status: Optional[str] = None,
         db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        admin_user: User = Depends(require_roles(["admin"]))
 ):
     stmt = (
         select(Task)

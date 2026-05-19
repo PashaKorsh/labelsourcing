@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 
 from app.database import get_db
 from app.core.config import settings
-from app.models import User
+from app.models import User, Role
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
@@ -45,7 +45,7 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    stmt = select(User).where(User.id == user_id)
+    stmt = select(User).options(selectinload(User.roles)).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 

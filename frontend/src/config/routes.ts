@@ -2,7 +2,7 @@ export const ROUTES = {
   login:             '/login',
   home:              '/datasets',
   profile:           '/profile',
-  myDatasets:        '/my_datasets',
+  myDatasets:        '/datasets/manage',
   datasetNew:        '/dataset/new',
   datasetEdit:       '/dataset/:datasetId/edit',
   datasetAnnotation: '/dataset/:datasetId',

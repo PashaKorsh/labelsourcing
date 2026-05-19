@@ -61,7 +61,6 @@ export class ApiDatasetService implements DatasetService {
     const qs = new URLSearchParams();
     if (params?.search)  qs.set('search', params.search);
     if (params?.status)  qs.set('status', params.status);
-    if (params?.ownerId) qs.set('owner_id', params.ownerId);
     if (params?.limit  !== undefined) qs.set('limit',  String(params.limit));
     if (params?.offset !== undefined) qs.set('offset', String(params.offset));
     const qsStr = qs.toString();
@@ -69,10 +68,6 @@ export class ApiDatasetService implements DatasetService {
     const res = await apiFetch(url);
     const dtos: DatasetDto[] = await res.json();
     return dtos.map(mapDto);
-  }
-
-  async listMine(ownerId: string, search?: string): Promise<Dataset[]> {
-    return this.list({ ownerId, search });
   }
 
   async get(id: string): Promise<Dataset> {

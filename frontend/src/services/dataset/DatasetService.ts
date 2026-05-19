@@ -5,7 +5,6 @@ import type { Tag } from '../../types/annotation';
 export interface DatasetListParams {
   search?: string;
   status?: 'new' | 'started' | 'done';
-  ownerId?: string;
   limit?: number;
   offset?: number;
 }
@@ -31,7 +30,6 @@ export interface DatasetUpdateInput {
 
 export interface DatasetService {
   list(params?: DatasetListParams): Promise<Dataset[]>;
-  listMine(ownerId: string, search?: string): Promise<Dataset[]>;
   get(id: string): Promise<Dataset>;
   getTasks(datasetId: string): Promise<AnnotationTask[]>;
   create(data: DatasetCreateInput): Promise<Dataset>;

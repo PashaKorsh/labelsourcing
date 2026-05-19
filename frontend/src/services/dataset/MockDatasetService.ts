@@ -86,15 +86,6 @@ export class MockDatasetService implements DatasetService {
     return result;
   }
 
-  async listMine(_ownerId: string, search?: string): Promise<Dataset[]> {
-    let result = [...this.mineDatasets];
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(d => (d.title ?? d.description).toLowerCase().includes(q));
-    }
-    return result;
-  }
-
   async get(id: string): Promise<Dataset> {
     const ds = [...this.datasets, ...this.mineDatasets].find(d => d.id === id);
     if (!ds) throw new Error(`Dataset ${id} not found`);

@@ -32,7 +32,7 @@ export function MyDatasetsPage() {
     if (!user) return;
     setLoading(true);
     const timer = setTimeout(() => {
-      datasetService.listMine(user.id, search || undefined)
+      datasetService.list({ search: search || undefined })
         .then(setDatasets)
         .catch(err => console.error('[MyDatasetsPage]', err))
         .finally(() => setLoading(false));

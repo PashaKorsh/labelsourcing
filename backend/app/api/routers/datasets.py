@@ -402,7 +402,11 @@ async def get_dataset_tasks(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    stmt = select(Task).where(Task.dataset_id == dataset_id)
+    stmt = (
+        select(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.ANNOTATION)
+    )
 
     if status:
         stmt = stmt.where(Task.status == status)

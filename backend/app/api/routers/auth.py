@@ -2,6 +2,7 @@ import json
 import uuid
 import base64
 from urllib.parse import urlencode
+from datetime import timedelta
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -14,6 +15,7 @@ from app.database import get_db
 from app.models import User
 from app.core.config import settings
 from app.core.security import verify_password, create_access_token, get_password_hash
+from app.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -162,3 +164,17 @@ async def yandex_callback(
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     return response
+
+
+@router.post("/refresh")
+async def refresh_token(
+        current_user: User = Depends(get_current_user)
+):
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    new_access_token = create_access_token(
+        data={"sub": current_user.email},
+        expires_delta=access_token_expires
+    )
+
+    return {"access_token": new_access_token, "token_type": "bearer"}

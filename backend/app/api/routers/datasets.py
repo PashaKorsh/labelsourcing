@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, exists, cast, String, delete
+from sqlalchemy import select, func, exists, cast, String, delete, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 import uuid
@@ -10,7 +10,7 @@ import uuid
 from app.database import get_db
 from app.models import (
     Dataset, User, Tag, Task, Assignment, Label, UserDatasetAccess,
-    AssignmentStatus, TaskStatus, TaskType,
+    AssignmentStatus, TaskStatus, TaskType, DatasetStatus
 )
 from app.api.dependencies import get_current_user, require_roles
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
@@ -20,6 +20,21 @@ from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdat
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 ASSIGNMENT_EXPIRY_MINUTES = 10
+
+
+def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
+    is_admin = any(role.name == "admin" for role in current_user.roles)
+    if is_admin:
+        return
+
+    if dataset.tags:
+        user_tag_ids = {t.id for t in current_user.tags}
+        dataset_tag_ids = {t.id for t in dataset.tags}
+        if not dataset_tag_ids.intersection(user_tag_ids):
+            raise HTTPException(
+                status_code=403,
+                detail="Нет доступа: у вас нет необходимых тегов для этого датасета"
+            )
 
 
 def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
@@ -79,6 +94,18 @@ async def create_dataset(
     return dataset
 
 
+def _get_user_status(dataset: Dataset, access: UserDatasetAccess | None, tasks_count: int) -> str:
+    if dataset.status == DatasetStatus.COMPLETED:
+        return "COMPLETED"
+    if access is not None:
+        effective_limit = min(access.labeling_limit, tasks_count)
+        if not access.can_label or access.labeled_count >= effective_limit:
+            return "USER_DONE"
+        if access.labeled_count > 0:
+            return "IN_PROGRESS"
+    return "NOT_STARTED"
+
+
 @router.get("/", response_model=list[DatasetResponse])
 async def get_datasets(
         limit: int = 20,
@@ -91,17 +118,34 @@ async def get_datasets(
         select(
             Dataset,
             func.count(Task.id.distinct()).label("tasks_count"),
-            func.count(Label.id.distinct()).label("labeled_count")
+            func.count(Label.id.distinct()).label("labeled_count"),
+            UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
         .outerjoin(Assignment, Task.id == Assignment.task_id)
         .outerjoin(Label, Assignment.id == Label.assignment_id)
+        .outerjoin(
+            UserDatasetAccess,
+            (UserDatasetAccess.dataset_id == Dataset.id) &
+            (UserDatasetAccess.user_id == current_user.id)
+        )
     )
-
+    is_admin = any(role.name == "admin" for role in current_user.roles)
+    if not is_admin:
+        user_tag_ids = [t.id for t in current_user.tags]
+        if user_tag_ids:
+            stmt = stmt.where(
+                or_(
+                    ~Dataset.tags.any(),
+                    Dataset.tags.any(Tag.id.in_(user_tag_ids))
+                )
+            )
+        else:
+            stmt = stmt.where(~Dataset.tags.any())
     if search:
-        stmt = stmt.where(Dataset.description.ilike(f"%{search}%"))
+        stmt = stmt.where(Dataset.title.ilike(f"%{search}%"))
 
-    stmt = stmt.group_by(Dataset.id)
+    stmt = stmt.group_by(Dataset.id, UserDatasetAccess.user_id, UserDatasetAccess.dataset_id)
     stmt = stmt.options(selectinload(Dataset.tags))
     stmt = stmt.limit(limit).offset(offset)
 
@@ -112,6 +156,9 @@ async def get_datasets(
         dataset = row[0]
         dataset.tasks_count = row[1]
         dataset.labeled_count = row[2]
+        user_access = row[3]
+        dataset.user_status = _get_user_status(dataset, user_access, dataset.tasks_count)
+
         datasets_with_counts.append(dataset)
 
     return datasets_with_counts
@@ -192,9 +239,13 @@ async def get_next_task(
     Приоритет: validation-задачи → annotation-задачи.
     Типы не смешиваются в рамках одного запроса.
     """
-    dataset = await db.get(Dataset, dataset_id)
+    stmt = select(Dataset).where(Dataset.id == dataset_id).options(selectinload(Dataset.tags))
+    dataset = (await db.execute(stmt)).scalar_one_or_none()
+
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    _check_dataset_access(dataset, current_user)
 
     # Восстановление сессии: живые ассайнменты любого типа
     existing_stmt = (
@@ -470,6 +521,7 @@ async def get_dataset_detail(
     dataset = await _get_dataset_with_counts(db, dataset_id, user_id=current_user.id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    _check_dataset_access(dataset, current_user)
     return dataset
 
 

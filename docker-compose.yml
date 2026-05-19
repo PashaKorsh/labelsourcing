@@ -43,6 +43,7 @@ services:
       context: ./frontend
       args:
         - VITE_API_MODE=${VITE_API_MODE:-real}
+        - VITE_ENABLE_RAW_SETTINGS=${VITE_ENABLE_RAW_SETTINGS:-false}
     ports:
       - "80:80"
     volumes:

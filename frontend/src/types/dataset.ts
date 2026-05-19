@@ -13,4 +13,8 @@ export interface Dataset {
   userLabelingLimit?: number;
   userLabeledCount?: number;
   annotationLabels?: Tag[];
+  requiredAnswers?: number;
+  validationQuorum?: number;
+  requiresValidation?: boolean;
+  defaultLabelingLimit?: number;
 }

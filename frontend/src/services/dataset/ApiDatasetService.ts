@@ -20,6 +20,10 @@ interface DatasetDto {
   user_labeling_limit?: number | null;
   user_labeled_count?: number | null;
   annotation_labels?: AnnotationLabelDto[] | null;
+  required_answers?: number | null;
+  validation_quorum?: number | null;
+  requires_validation?: boolean | null;
+  default_labeling_limit?: number | null;
 }
 
 interface TaskDto {
@@ -45,6 +49,10 @@ function mapDto(dto: DatasetDto): Dataset {
       color: l.color,
       hotkey: l.hotkey,
     })),
+    requiredAnswers: dto.required_answers ?? undefined,
+    validationQuorum: dto.validation_quorum ?? undefined,
+    requiresValidation: dto.requires_validation ?? undefined,
+    defaultLabelingLimit: dto.default_labeling_limit ?? undefined,
   };
 }
 
@@ -99,14 +107,20 @@ export class ApiDatasetService implements DatasetService {
   }
 
   async update(id: string, data: DatasetUpdateInput): Promise<Dataset> {
+    const body = {
+      ...data.extra,
+      title: data.title,
+      description: data.description,
+      tag_ids: data.tagIds,
+      annotation_labels: data.annotationLabels,
+      required_answers: data.requiredAnswers,
+      validation_quorum: data.validationQuorum,
+      requires_validation: data.requiresValidation,
+      default_labeling_limit: data.defaultLabelingLimit,
+    };
     const res = await apiFetch(API.datasets.update(id), {
       method: 'PATCH',
-      body: JSON.stringify({
-        title: data.title,
-        description: data.description,
-        tag_ids: data.tagIds,
-        annotation_labels: data.annotationLabels,
-      }),
+      body: JSON.stringify(body),
     });
     const dto: DatasetDto = await res.json();
     return mapDto(dto);

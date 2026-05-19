@@ -135,3 +135,18 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}

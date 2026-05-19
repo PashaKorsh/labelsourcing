@@ -22,6 +22,11 @@ export interface DatasetUpdateInput {
   description?: string;
   tagIds?: string[];
   annotationLabels?: Tag[];
+  requiredAnswers?: number;
+  validationQuorum?: number;
+  requiresValidation?: boolean;
+  defaultLabelingLimit?: number;
+  extra?: Record<string, unknown>;
 }
 
 export interface DatasetService {

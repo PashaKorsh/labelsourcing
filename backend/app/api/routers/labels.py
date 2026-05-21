@@ -37,7 +37,8 @@ async def update_label_status(
         raise HTTPException(status_code=422, detail=f"Недопустимый статус: {new_status}")
 
     if new_status == AssignmentStatus.REJECTED:
-        task = await db.get(Task, Assignment.task_id)
+        assignment = await db.get(Assignment, label.assignment_id)
+        task = await db.get(Task, assignment.task_id)
         task.completed_answers = max(0, task.completed_answers - 1)
 
         if task.status == TaskStatus.COMPLETED:

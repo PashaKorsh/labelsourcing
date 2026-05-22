@@ -15,13 +15,44 @@ from app.database import get_db
 from app.models import User
 from app.core.config import settings
 from app.core.security import verify_password, create_access_token, get_password_hash
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_user_from_refresh_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 YANDEX_AUTH_URL = "https://oauth.yandex.ru/authorize"
 YANDEX_TOKEN_URL = "https://oauth.yandex.ru/token"
 YANDEX_USER_INFO_URL = "https://login.yandex.ru/info"
+ACCESS_COOKIE_MAX_AGE = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60
+
+
+def _set_auth_cookies(response: Response, user_id: int):
+    """Вспомогательная функция для генерации токенов и записи их в Cookies"""
+    access_token = create_access_token(
+        data={"sub": str(user_id), "type": "access"},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh_token = create_access_token(
+        data={"sub": str(user_id), "type": "refresh"},
+        expires_delta=timedelta(seconds=REFRESH_COOKIE_MAX_AGE)
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=ACCESS_COOKIE_MAX_AGE,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=REFRESH_COOKIE_MAX_AGE,
+    )
 
 
 def _encode_state(data: dict) -> str:
@@ -34,6 +65,7 @@ def _decode_state(state: str) -> dict:
 
 @router.post("/login")
 async def login_for_access_token(
+        response: Response,
         form_data: OAuth2PasswordRequestForm = Depends(),
         db: AsyncSession = Depends(get_db)
 ):
@@ -48,27 +80,22 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
-    return {"access_token": access_token, "token_type": "bearer"}
+    _set_auth_cookies(response, user.id)
+    return {"ok": True, "message": "Successfully logged in"}
 
 
 @router.post("/logout")
 async def logout(response: Response):
-    """Выход из системы — удаляет cookie с токеном"""
     response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
+    response.delete_cookie(key="refresh_token", httponly=True, secure=True, samesite="lax")
     return {"ok": True}
 
 
 @router.get("/yandex/login")
 async def yandex_login(
-    success_url: str = Query(default="/"),
-    error_url: str = Query(default="/login"),
+        success_url: str = Query(default="/"),
+        error_url: str = Query(default="/login"),
 ):
-    """
-    Редиректит пользователя на Яндекс OAuth.
-    success_url и error_url — абсолютные URL, на которые Яндекс вернёт пользователя
-    после авторизации (успех/ошибка). Передаются через state OAuth.
-    """
     state = _encode_state({"success_url": success_url, "error_url": error_url})
     params = urlencode({
         "response_type": "code",
@@ -82,14 +109,10 @@ async def yandex_login(
 
 @router.get("/yandex/callback")
 async def yandex_callback(
-    code: str = Query(...),
-    state: str = Query(...),
-    db: AsyncSession = Depends(get_db),
+        code: str = Query(...),
+        state: str = Query(...),
+        db: AsyncSession = Depends(get_db),
 ):
-    """
-    Callback от Яндекса. Обменивает code на токен, получает email пользователя,
-    создаёт его в БД если нового, выпускает JWT и редиректит на success_url.
-    """
     try:
         state_data = _decode_state(state)
         success_url: str = state_data["success_url"]
@@ -99,7 +122,6 @@ async def yandex_callback(
 
     try:
         async with httpx.AsyncClient() as client:
-            # Обмен code на access_token Яндекса
             token_resp = await client.post(YANDEX_TOKEN_URL, data={
                 "grant_type": "authorization_code",
                 "code": code,
@@ -109,7 +131,6 @@ async def yandex_callback(
             token_resp.raise_for_status()
             yandex_token = token_resp.json()["access_token"]
 
-            # Получение данных пользователя
             user_resp = await client.get(
                 YANDEX_USER_INFO_URL,
                 headers={"Authorization": f"OAuth {yandex_token}"},
@@ -124,7 +145,6 @@ async def yandex_callback(
     if not email:
         return RedirectResponse(error_url)
 
-    # Извлекаем имя и аватар из ответа Яндекса
     yandex_name = user_info.get("real_name") or user_info.get("display_name")
     avatar_id = user_info.get("default_avatar_id")
     is_avatar_empty = user_info.get("is_avatar_empty", True)
@@ -153,28 +173,16 @@ async def yandex_callback(
     await db.commit()
     await db.refresh(user)
 
-    access_token = create_access_token(data={"sub": str(user.id)})
     response = RedirectResponse(success_url)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    _set_auth_cookies(response, user.id)
     return response
 
 
 @router.post("/refresh")
 async def refresh_token(
-        current_user: User = Depends(get_current_user)
+        response: Response,
+        current_user: User = Depends(get_user_from_refresh_token)
 ):
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    _set_auth_cookies(response, current_user.id)
 
-    new_access_token = create_access_token(
-        data={"sub": current_user.email},
-        expires_delta=access_token_expires
-    )
-
-    return {"access_token": new_access_token, "token_type": "bearer"}
+    return {"ok": True, "message": "Tokens refreshed successfully"}

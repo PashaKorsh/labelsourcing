@@ -23,14 +23,14 @@ YANDEX_AUTH_URL = "https://oauth.yandex.ru/authorize"
 YANDEX_TOKEN_URL = "https://oauth.yandex.ru/token"
 YANDEX_USER_INFO_URL = "https://login.yandex.ru/info"
 ACCESS_COOKIE_MAX_AGE = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60
+REFRESH_COOKIE_MAX_AGE = ACCESS_COOKIE_MAX_AGE + 2 * 24 * 60 * 60
 
 
-def _set_auth_cookies(response: Response, user_id: int):
+def _set_auth_cookies(response: Response, user_id: uuid):
     """Вспомогательная функция для генерации токенов и записи их в Cookies"""
     access_token = create_access_token(
         data={"sub": str(user_id), "type": "access"},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta=timedelta(seconds=ACCESS_COOKIE_MAX_AGE)
     )
     refresh_token = create_access_token(
         data={"sub": str(user_id), "type": "refresh"},

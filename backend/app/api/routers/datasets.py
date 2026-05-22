@@ -30,7 +30,7 @@ def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
     if dataset.tags:
         user_tag_ids = {t.id for t in current_user.tags}
         dataset_tag_ids = {t.id for t in dataset.tags}
-        if not dataset_tag_ids.intersection(user_tag_ids):
+        if not dataset_tag_ids.issubset(user_tag_ids):
             raise HTTPException(
                 status_code=403,
                 detail="Нет доступа: у вас нет необходимых тегов для этого датасета"
@@ -137,7 +137,7 @@ async def get_datasets(
             stmt = stmt.where(
                 or_(
                     ~Dataset.tags.any(),
-                    Dataset.tags.any(Tag.id.in_(user_tag_ids))
+                    ~Dataset.tags.any(~Tag.id.in_(user_tag_ids))
                 )
             )
         else:

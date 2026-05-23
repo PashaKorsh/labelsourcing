@@ -10,15 +10,16 @@ type Props = {
 };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  USER_DONE:  { label: '✓ Выполнено',   className: styles.doneBadge },
-  COMPLETED:  { label: '✓ Завершён',    className: styles.doneBadge },
-  IN_PROGRESS: { label: '● В процессе', className: styles.inProgressBadge },
+  USER_DONE:           { label: '✓ Выполнено',          className: styles.doneBadge },
+  COMPLETED:           { label: '✓ Завершён',            className: styles.doneBadge },
+  IN_PROGRESS:         { label: '● В процессе',          className: styles.inProgressBadge },
+  WAITING_VALIDATION:  { label: '⏳ Ждёт проверки',      className: styles.waitingBadge },
 };
 
 export function DatasetCard({ dataset }: Props) {
   const navigate = useNavigate();
   const { userStatus } = dataset;
-  const isFinished = userStatus === 'USER_DONE' || userStatus === 'COMPLETED';
+  const isFinished = userStatus === 'USER_DONE' || userStatus === 'COMPLETED' || userStatus === 'WAITING_VALIDATION';
   const badge = STATUS_BADGE[userStatus];
 
   const handlePlay = () => {

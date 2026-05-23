@@ -101,14 +101,17 @@ def _get_user_status(
         access: UserDatasetAccess | None,
         tasks_count: int,
         has_pending_validation: bool = False,
+        has_pending_own_validation: bool = False,
 ) -> str:
     if dataset.status == DatasetStatus.COMPLETED:
         return "COMPLETED"
     if access is not None:
         effective_limit = min(access.labeling_limit, tasks_count)
         if not access.can_label or access.labeled_count >= effective_limit:
-            if dataset.requires_validation and has_pending_validation:
+            if dataset.requires_validation and has_pending_validation and access.labeled_count < access.labeling_limit:
                 return "IN_PROGRESS"
+            if dataset.requires_validation and has_pending_own_validation:
+                return "WAITING_VALIDATION"
             return "USER_DONE"
         if access.labeled_count > 0:
             return "IN_PROGRESS"
@@ -125,8 +128,9 @@ async def get_datasets(
 ):
     ValTask = aliased(Task)
     ValAssignment = aliased(Assignment)
+    OwnValTask = aliased(Task)
 
-    # Подзапрос: есть ли PENDING validation-задачи, которые текущий пользователь ещё не сделал
+    # Подзапрос: PENDING validation-задачи, которые текущий пользователь ещё не сделал
     pending_val_for_user_sq = (
         select(func.count())
         .where(ValTask.dataset_id == Dataset.id)
@@ -145,11 +149,23 @@ async def get_datasets(
         .scalar_subquery()
     )
 
+    # Подзапрос: PENDING validation-задачи по аннотациям самого пользователя (его работа ждёт проверки)
+    own_pending_val_sq = (
+        select(func.count())
+        .where(OwnValTask.dataset_id == Dataset.id)
+        .where(OwnValTask.type == TaskType.VALIDATION)
+        .where(OwnValTask.status == TaskStatus.PENDING)
+        .where(cast(OwnValTask.task_metadata['annotator_id'], String) == f'"{current_user.id}"')
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
     stmt = (
         select(
             Dataset,
             func.count(Label.id.distinct()).label("labeled_count"),
             pending_val_for_user_sq.label("pending_val_count"),
+            own_pending_val_sq.label("own_pending_val_count"),
             UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
@@ -189,8 +205,13 @@ async def get_datasets(
         dataset = row[0]
         dataset.labeled_count = row[1]
         pending_val_count = row[2]
-        user_access = row[3]
-        dataset.user_status = _get_user_status(dataset, user_access, dataset.tasks_count, pending_val_count > 0)
+        own_pending_val_count = row[3]
+        user_access = row[4]
+        dataset.user_status = _get_user_status(
+            dataset, user_access, dataset.tasks_count,
+            has_pending_validation=pending_val_count > 0,
+            has_pending_own_validation=own_pending_val_count > 0,
+        )
 
         datasets_with_counts.append(dataset)
 

@@ -321,8 +321,8 @@ async def get_next_task(
     user_busy_sq = _make_user_busy_subquery(current_user.id)
     result_tasks: list[Task] = []
 
-    # Validation-задачи в приоритете
-    if dataset.requires_validation:
+    # Validation-задачи в приоритете (только если пользователь не исчерпал лимит)
+    if dataset.requires_validation and access.labeled_count < access.labeling_limit:
         val_task_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)

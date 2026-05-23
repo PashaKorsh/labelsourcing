@@ -233,16 +233,17 @@ async def submit_label(
                 await db.flush()
                 await _process_validation_verdict(db, task, dataset)
 
+        # Засчитываем выполненную задачу в лимит (и аннотация, и валидация)
+        access_stmt = select(UserDatasetAccess).where(
+            UserDatasetAccess.user_id == current_user.id,
+            UserDatasetAccess.dataset_id == task.dataset_id,
+        ).with_for_update()
+
+        access = (await db.execute(access_stmt)).scalar_one_or_none()
+        if access is not None:
+            access.labeled_count += 1
+
         if task.type == TaskType.ANNOTATION:
-            access_stmt = select(UserDatasetAccess).where(
-                UserDatasetAccess.user_id == current_user.id,
-                UserDatasetAccess.dataset_id == task.dataset_id,
-            ).with_for_update()
-
-            access = (await db.execute(access_stmt)).scalar_one_or_none()
-            if access is not None:
-                access.labeled_count += 1
-
             # Блок создания валидационных задач
             if dataset.requires_validation and task.completed_answers == dataset.required_answers:
                 await db.flush()

@@ -16,7 +16,7 @@ interface DatasetDto {
   description: string | null;
   tags: { id: string; name: string; color: string | null }[];
   tasks_count?: number;
-  user_done?: boolean;
+  user_status?: string;
   user_labeling_limit?: number | null;
   user_labeled_count?: number | null;
   annotation_labels?: AnnotationLabelDto[] | null;
@@ -42,7 +42,7 @@ function mapDto(dto: DatasetDto): Dataset {
     taskCount: dto.tasks_count,
     userLabelingLimit: dto.user_labeling_limit ?? undefined,
     userLabeledCount: dto.user_labeled_count ?? undefined,
-    userDone: dto.user_done ?? false,
+    userStatus: (dto.user_status ?? 'NOT_STARTED') as Dataset['userStatus'],
     annotationLabels: dto.annotation_labels?.map(l => ({
       id: l.id,
       label: l.label,

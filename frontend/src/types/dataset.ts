@@ -1,14 +1,15 @@
 import type { AppTag } from './appTag';
 import type { Tag } from './annotation';
 
+export type UserDatasetStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'USER_DONE' | 'COMPLETED';
+
 export interface Dataset {
   id: string;
   title?: string;
   description: string;
   tags: AppTag[];
   imageUrl?: string;
-  completed?: boolean;
-  userDone?: boolean;
+  userStatus: UserDatasetStatus;
   taskCount?: number;
   userLabelingLimit?: number;
   userLabeledCount?: number;

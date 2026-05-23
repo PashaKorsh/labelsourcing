@@ -9,12 +9,20 @@ type Props = {
   dataset: Dataset;
 };
 
+const STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  USER_DONE:  { label: '✓ Выполнено',   className: styles.doneBadge },
+  COMPLETED:  { label: '✓ Завершён',    className: styles.doneBadge },
+  IN_PROGRESS: { label: '● В процессе', className: styles.inProgressBadge },
+};
+
 export function DatasetCard({ dataset }: Props) {
   const navigate = useNavigate();
-  const isDone = dataset.userDone ?? false;
+  const { userStatus } = dataset;
+  const isFinished = userStatus === 'USER_DONE' || userStatus === 'COMPLETED';
+  const badge = STATUS_BADGE[userStatus];
 
   const handlePlay = () => {
-    if (isDone) return;
+    if (isFinished) return;
     navigate(buildRoute(ROUTES.datasetAnnotation, { datasetId: dataset.id }));
   };
 
@@ -24,11 +32,11 @@ export function DatasetCard({ dataset }: Props) {
         <img
           src={dataset.imageUrl}
           alt=""
-          className={`${styles.image} ${dataset.completed ? styles.dimmed : ''}`}
+          className={`${styles.image} ${isFinished ? styles.dimmed : ''}`}
         />
       )}
 
-      <div className={`${styles.content} ${dataset.completed ? styles.dimmed : ''}`}>
+      <div className={`${styles.content} ${isFinished ? styles.dimmed : ''}`}>
         <div className={styles.textGroup}>
           <h2 className={styles.title}>{dataset.title ?? dataset.description}</h2>
           {dataset.title && <p className={styles.description}>{dataset.description}</p>}
@@ -41,11 +49,8 @@ export function DatasetCard({ dataset }: Props) {
             ))}
           </div>
           <div className={styles.actions}>
-            {isDone ? (
-              <span className={styles.doneBadge}>✓ Выполнено</span>
-            ) : (
-              <PlayButton onClick={handlePlay} />
-            )}
+            {badge && <span className={badge.className}>{badge.label}</span>}
+            {!isFinished && <PlayButton onClick={handlePlay} />}
           </div>
         </div>
       </div>

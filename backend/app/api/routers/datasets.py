@@ -119,7 +119,6 @@ async def get_datasets(
     stmt = (
         select(
             Dataset,
-            func.count(Task.id.distinct()).label("tasks_count"),
             func.count(Label.id.distinct()).label("labeled_count"),
             UserDatasetAccess
         )
@@ -158,9 +157,8 @@ async def get_datasets(
     datasets_with_counts = []
     for row in result.all():
         dataset = row[0]
-        dataset.tasks_count = row[1]
-        dataset.labeled_count = row[2]
-        user_access = row[3]
+        dataset.labeled_count = row[1]
+        user_access = row[2]
         dataset.user_status = _get_user_status(dataset, user_access, dataset.tasks_count)
 
         datasets_with_counts.append(dataset)

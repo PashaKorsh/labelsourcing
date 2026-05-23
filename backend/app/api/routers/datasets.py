@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, exists, cast, String, delete, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, aliased
 import uuid
 
 from app.database import get_db
@@ -96,12 +96,19 @@ async def create_dataset(
     return dataset
 
 
-def _get_user_status(dataset: Dataset, access: UserDatasetAccess | None, tasks_count: int) -> str:
+def _get_user_status(
+        dataset: Dataset,
+        access: UserDatasetAccess | None,
+        tasks_count: int,
+        has_pending_validation: bool = False,
+) -> str:
     if dataset.status == DatasetStatus.COMPLETED:
         return "COMPLETED"
     if access is not None:
         effective_limit = min(access.labeling_limit, tasks_count)
         if not access.can_label or access.labeled_count >= effective_limit:
+            if dataset.requires_validation and has_pending_validation:
+                return "IN_PROGRESS"
             return "USER_DONE"
         if access.labeled_count > 0:
             return "IN_PROGRESS"
@@ -116,10 +123,33 @@ async def get_datasets(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    ValTask = aliased(Task)
+    ValAssignment = aliased(Assignment)
+
+    # Подзапрос: есть ли PENDING validation-задачи, которые текущий пользователь ещё не сделал
+    pending_val_for_user_sq = (
+        select(func.count())
+        .where(ValTask.dataset_id == Dataset.id)
+        .where(ValTask.type == TaskType.VALIDATION)
+        .where(ValTask.status == TaskStatus.PENDING)
+        .where(
+            ~exists(
+                select(ValAssignment.id)
+                .where(ValAssignment.task_id == ValTask.id)
+                .where(ValAssignment.user_id == current_user.id)
+                .where(ValAssignment.status == AssignmentStatus.DONE)
+                .correlate(ValTask)
+            )
+        )
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
     stmt = (
         select(
             Dataset,
             func.count(Label.id.distinct()).label("labeled_count"),
+            pending_val_for_user_sq.label("pending_val_count"),
             UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
@@ -158,8 +188,9 @@ async def get_datasets(
     for row in result.all():
         dataset = row[0]
         dataset.labeled_count = row[1]
-        user_access = row[2]
-        dataset.user_status = _get_user_status(dataset, user_access, dataset.tasks_count)
+        pending_val_count = row[2]
+        user_access = row[3]
+        dataset.user_status = _get_user_status(dataset, user_access, dataset.tasks_count, pending_val_count > 0)
 
         datasets_with_counts.append(dataset)
 
@@ -615,6 +646,10 @@ async def update_dataset(
         dataset.status = update_data.status
     if update_data.annotation_labels is not None:
         dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
+    enabling_validation = (
+        update_data.requires_validation is True and not dataset.requires_validation
+    )
+
     if update_data.requires_validation is not None:
         dataset.requires_validation = update_data.requires_validation
     if update_data.validation_quorum is not None:
@@ -624,6 +659,51 @@ async def update_dataset(
         tags_stmt = select(Tag).where(Tag.id.in_(update_data.tag_ids))
         tags_res = await db.execute(tags_stmt)
         dataset.tags = list(tags_res.scalars().all())
+
+    # Если валидация включается впервые — создаём validation-задачи
+    # для всех уже завершённых annotation-задач, у которых их ещё нет
+    if enabling_validation:
+        quorum = update_data.validation_quorum if update_data.validation_quorum is not None else dataset.validation_quorum
+        completed_ann_stmt = (
+            select(Task)
+            .where(Task.dataset_id == dataset_id)
+            .where(Task.type == TaskType.ANNOTATION)
+            .where(Task.status == TaskStatus.COMPLETED)
+        )
+        completed_tasks = (await db.execute(completed_ann_stmt)).scalars().all()
+
+        for ann_task in completed_tasks:
+            existing_val = (await db.execute(
+                select(Task.id)
+                .where(Task.dataset_id == dataset_id)
+                .where(Task.type == TaskType.VALIDATION)
+                .where(Task.task_metadata['annotation_task_id'].astext == str(ann_task.id))
+                .limit(1)
+            )).scalar_one_or_none()
+            if existing_val is not None:
+                continue
+
+            all_labels_stmt = (
+                select(Label, Assignment)
+                .join(Assignment, Label.assignment_id == Assignment.id)
+                .where(Assignment.task_id == ann_task.id)
+                .where(Assignment.status == AssignmentStatus.DONE)
+            )
+            all_rows = (await db.execute(all_labels_stmt)).all()
+
+            for done_label, done_assignment in all_rows:
+                ann_data = done_label.result.get('result', [])
+                db.add(Task(
+                    dataset_id=dataset_id,
+                    url=ann_task.url,
+                    type=TaskType.VALIDATION,
+                    task_metadata={
+                        'annotation_task_id': str(ann_task.id),
+                        'annotation_label_id': str(done_label.id),
+                        'annotator_id': str(done_assignment.user_id),
+                        'annotations': ann_data,
+                    },
+                ))
 
     await db.commit()
 

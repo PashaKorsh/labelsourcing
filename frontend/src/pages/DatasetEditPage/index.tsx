@@ -5,6 +5,7 @@ import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { AppTagSelector } from '../../components/AppTagSelector';
 import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
 import { RawSettingsEditor } from '../../components/RawSettingsEditor';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import { ROUTES } from '../../config/routes';
 import { datasetService, taskService } from '../../services';
 import type { AppTag } from '../../types/appTag';
@@ -36,6 +37,7 @@ export function DatasetEditPage() {
   const [defaultLabelingLimit, setDefaultLabelingLimit] = useState<number | ''>('');
   const [extra, setExtra] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!datasetId) return;
@@ -65,6 +67,16 @@ export function DatasetEditPage() {
 
   const removeRow = (index: number) =>
     setTaskRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : [{ url: '' }]);
+
+  const handleDelete = async () => {
+    if (!datasetId) return;
+    try {
+      await datasetService.delete(datasetId);
+      navigate(ROUTES.myDatasets);
+    } catch (err) {
+      console.error('[DatasetEditPage] delete', err);
+    }
+  };
 
   const handleSave = async () => {
     if (!datasetId || !description.trim()) return;
@@ -245,15 +257,35 @@ export function DatasetEditPage() {
           </div>
         )}
 
-        <button
-          type="button"
-          className={styles.saveButton}
-          onClick={handleSave}
-          disabled={submitting || !description.trim()}
-        >
-          {submitting ? 'Сохранение…' : 'Сохранить'}
-        </button>
+        <div className={styles.bottomActions}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={handleSave}
+            disabled={submitting || !description.trim()}
+          >
+            {submitting ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <button
+            type="button"
+            className={styles.deleteButton}
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={submitting}
+          >
+            Удалить датасет
+          </button>
+        </div>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          message="Удалить датасет безвозвратно? Вместе с ним удалится вся созданная разметка."
+          confirmLabel="Удалить"
+          cancelLabel="Отмена"
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </main>
   );
 }

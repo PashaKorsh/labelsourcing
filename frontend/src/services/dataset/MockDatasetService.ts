@@ -136,6 +136,11 @@ export class MockDatasetService implements DatasetService {
     return updated;
   }
 
+  async delete(id: string): Promise<void> {
+    this.datasets = this.datasets.filter(d => d.id !== id);
+    this.mineDatasets = this.mineDatasets.filter(d => d.id !== id);
+  }
+
   async exportLabels(_id: string): Promise<unknown[]> {
     return [];
   }

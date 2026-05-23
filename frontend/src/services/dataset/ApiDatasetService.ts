@@ -101,6 +101,10 @@ export class ApiDatasetService implements DatasetService {
     return mapDto(dto);
   }
 
+  async delete(id: string): Promise<void> {
+    await apiFetch(API.datasets.delete(id), { method: 'DELETE' });
+  }
+
   async exportLabels(id: string): Promise<unknown[]> {
     const res = await apiFetch(API.datasets.export(id));
     return res.json();

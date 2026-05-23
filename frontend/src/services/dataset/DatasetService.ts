@@ -34,5 +34,6 @@ export interface DatasetService {
   getTasks(datasetId: string): Promise<AnnotationTask[]>;
   create(data: DatasetCreateInput): Promise<Dataset>;
   update(id: string, data: DatasetUpdateInput): Promise<Dataset>;
+  delete(id: string): Promise<void>;
   exportLabels(id: string): Promise<unknown[]>;
 }

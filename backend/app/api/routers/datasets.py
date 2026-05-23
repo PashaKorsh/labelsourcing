@@ -549,6 +549,19 @@ async def upsert_user_access(
     return access
 
 
+@router.delete("/{dataset_id}", status_code=204)
+async def delete_dataset(
+        dataset_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        _: User = Depends(require_roles(["admin"]))
+):
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+    await db.delete(dataset)
+    await db.commit()
+
+
 @router.get("/{dataset_id}", response_model=DatasetResponse)
 async def get_dataset_detail(
         dataset_id: uuid.UUID,

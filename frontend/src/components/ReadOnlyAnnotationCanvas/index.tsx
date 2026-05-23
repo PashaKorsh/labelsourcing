@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Annotorious, ImageAnnotator, useAnnotator } from '@annotorious/react';
 import type { ImageAnnotation, DrawingStyle } from '@annotorious/annotorious';
 import type { ImageAnnotator as ImageAnnotatorInstance } from '@annotorious/annotorious';
@@ -63,30 +63,26 @@ export function ReadOnlyAnnotationCanvas({
   tags,
 }: ReadOnlyAnnotationCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
   const panRef = useRef(true);
   const { zoom, panX, panY, reset } = useZoomPan(wrapperRef, panRef);
 
   const [originalSize, setOriginalSize] = useState<{ w: number; h: number } | null>(null);
 
-  const measureImage = useCallback((img: HTMLImageElement) => {
-    const nw = img.naturalWidth;
-    const nh = img.naturalHeight;
-    if (!nw || !nh) return;
-    const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
-    setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
-  }, []);
-
-  // При смене URL сбрасываем размер и сразу проверяем кэшированные изображения
   useEffect(() => {
     setOriginalSize(null);
-    const img = imgRef.current;
-    if (img?.complete && img.naturalWidth > 0) measureImage(img);
-  }, [imageUrl]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleImageLoad = useCallback((e: SyntheticEvent<HTMLImageElement>) => {
-    measureImage(e.currentTarget);
-  }, [measureImage]);
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      const nw = probe.naturalWidth;
+      const nh = probe.naturalHeight;
+      if (!nw || !nh) return;
+      const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
+      setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
+    };
+    probe.src = imageUrl;
+    return () => { cancelled = true; };
+  }, [imageUrl]);
 
   const displayStyle = originalSize
     ? {
@@ -123,14 +119,12 @@ export function ReadOnlyAnnotationCanvas({
             containerClassName={styles.annotoriousContainer}
           >
             <img
-              ref={imgRef}
               src={imageUrl}
               className={styles.image}
               style={displayStyle}
               alt="Annotation target"
               draggable={false}
               crossOrigin="anonymous"
-              onLoad={handleImageLoad}
             />
           </ImageAnnotator>
           <ReadOnlyController

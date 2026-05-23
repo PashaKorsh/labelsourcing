@@ -56,12 +56,36 @@
   gap: 4px;
 }
 
+.exportButton {
+  padding: 8px 14px;
+  background: none;
+  border: 1px solid #d0d0d0;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  color: #555;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.exportButton:hover:not(:disabled) {
+  border-color: #888;
+  color: #111;
+}
+
+.exportButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .editButton {
   padding: 8px 16px;
   background: #f5f5f5;
   border: none;
   border-radius: 12px;
   font-size: 14px;
+  font-family: inherit;
   cursor: pointer;
   transition: background 0.15s;
 }

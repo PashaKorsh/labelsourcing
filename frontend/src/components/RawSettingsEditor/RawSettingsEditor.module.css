@@ -1,0 +1,43 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 14px;
+  color: #6f6f6f;
+}
+
+.hint {
+  font-size: 13px;
+  color: #999;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.textarea {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-family: 'Courier New', Courier, monospace;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+
+.textarea:focus {
+  border-color: #999;
+}
+
+.hasError {
+  border-color: #e05555;
+}
+
+.error {
+  font-size: 13px;
+  color: #e05555;
+  margin: 0;
+}

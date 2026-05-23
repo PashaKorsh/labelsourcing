@@ -83,7 +83,8 @@ export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) 
     s: () => selectVerdict(true),
     a: () => selectVerdict(false),
     g: handleSubmit,
-  }), [selectVerdict, handleSubmit]);
+    ...(onNext ? { f: onNext } : {}),
+  }), [selectVerdict, handleSubmit, onNext]);
   useHotkeys(hotkeys);
 
   const submitLabel = state.submitted ? 'Отправлено' : (state.submitting ? 'Отправка…' : 'Отправить');
@@ -111,6 +112,7 @@ export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) 
           <span>S — корректно</span>
           <span>A — некорректно</span>
           <span>G — отправить</span>
+          {onNext && <span>F — следующая</span>}
         </div>
         <div className={styles.buttons}>
           <button

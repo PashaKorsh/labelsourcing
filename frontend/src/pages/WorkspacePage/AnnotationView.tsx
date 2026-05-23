@@ -5,6 +5,7 @@ import { ToolSelector } from '../../components/ToolSelector';
 import { TagSelector } from '../../components/TagSelector';
 import { HintsBar } from '../../components/HintsBar';
 import { CompletedScreen } from '../../components/CompletedScreen';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService } from '../../services';
 import { useHotkeys } from '../../hooks/useHotkeys';
@@ -27,9 +28,8 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
   const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
   const [activeTagId, setActiveTagId] = useState<string | null>(tags[0]?.id ?? null);
 
-  // Когда теги обновляются (DEFAULT_TAGS → теги от бэкенда с UUID-id), сбрасываем
-  // activeTagId на первый доступный — иначе activeTag становится null и аннотации
-  // создаются без тега и цвета.
+  // При обновлении списка тегов (первая загрузка от бэкенда) сбрасываем activeTagId
+  // на первый доступный — иначе activeTag становится null и аннотации без тега/цвета.
   useEffect(() => {
     if (!tags.find(t => t.id === activeTagId)) {
       setActiveTagId(tags[0]?.id ?? null);
@@ -37,6 +37,7 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
   }, [tags]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [saveError, setSaveError] = useState(false);
+  const [showEmptyConfirm, setShowEmptyConfirm] = useState(false);
 
   const annotationsRef = useRef<ImageAnnotation[]>([]);
   const imageSizeRef = useRef<{ w: number; h: number } | undefined>(undefined);
@@ -51,8 +52,9 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
     imageSizeRef.current = size;
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const doSave = useCallback(async () => {
     if (!task || isExpired) return;
+    setShowEmptyConfirm(false);
     setSaveError(false);
     try {
       await taskService.saveAnnotations(task.id, annotationsRef.current, imageSizeRef.current);
@@ -63,6 +65,15 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
       setSaveError(true);
     }
   }, [task, isExpired, onSaved]);
+
+  const handleSave = useCallback(() => {
+    if (!task || isExpired) return;
+    if (annotationsRef.current.length === 0) {
+      setShowEmptyConfirm(true);
+      return;
+    }
+    doSave();
+  }, [task, isExpired, doSave]);
 
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};
@@ -126,6 +137,15 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
           }
         </div>
         <HintsBar activeTool={activeTool} />
+        {showEmptyConfirm && (
+          <ConfirmModal
+            message="Вы не добавили ни одной аннотации. Отправить пустую разметку?"
+            confirmLabel="Отправить"
+            cancelLabel="Отмена"
+            onConfirm={doSave}
+            onCancel={() => setShowEmptyConfirm(false)}
+          />
+        )}
       </main>
     </div>
   );

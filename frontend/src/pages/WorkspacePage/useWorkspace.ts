@@ -5,12 +5,7 @@ import { taskService, datasetService } from '../../services';
 import { useDatasetId } from '../../hooks/useRouteParams';
 import { useIsExpired } from '../../hooks/useIsExpired';
 
-const DEFAULT_TAGS: Tag[] = [
-  { id: 'person', label: 'Человек', color: '#ef4444', hotkey: '1' },
-  { id: 'vehicle', label: 'Транспорт', color: '#3b82f6', hotkey: '2' },
-  { id: 'animal', label: 'Животное', color: '#22c55e', hotkey: '3' },
-  { id: 'object', label: 'Объект', color: '#f59e0b', hotkey: '4' },
-];
+const TASK_BATCH_SIZE = 3;
 
 export function useWorkspace() {
   const datasetId = useDatasetId();
@@ -21,7 +16,7 @@ export function useWorkspace() {
   const [taskOffset, setTaskOffset] = useState(0);
   const [sessionCompleted, setSessionCompleted] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
-  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
+  const [tags, setTags] = useState<Tag[]>([]);
 
   const task = tasks[0] ?? null;
   const isExpired = useIsExpired(task?.expiresAt);
@@ -42,7 +37,7 @@ export function useWorkspace() {
     setTaskOffset(0);
     taskService.clearCache();
 
-    taskService.loadNextTask(datasetId, 3)
+    taskService.loadNextTask(datasetId, TASK_BATCH_SIZE)
       .then(newTask => {
         setTasks(taskService.getTasks());
         if (!newTask) setHasMoreTasks(false);
@@ -79,9 +74,9 @@ export function useWorkspace() {
 
     if (remaining.length > 0) {
       setTasks(remaining);
-      // Фоновая догрузка, если буфер почти пуст
-      if (remaining.length < 2 && hasMoreTasks) {
-        taskService.loadNextTask(datasetId ?? '', 1)
+      // Фоновая догрузка, если в буфере осталась последняя задача
+      if (remaining.length < 1 && hasMoreTasks) {
+        taskService.loadNextTask(datasetId ?? '', TASK_BATCH_SIZE)
           .then(newTask => {
             if (!newTask) setHasMoreTasks(false);
             else setTasks(taskService.getTasks());
@@ -89,7 +84,7 @@ export function useWorkspace() {
           .catch(err => console.error('[WorkspacePage] prefetch:', err));
       }
     } else {
-      const newTask = await taskService.loadNextTask(datasetId ?? '', 1).catch(err => {
+      const newTask = await taskService.loadNextTask(datasetId ?? '', TASK_BATCH_SIZE).catch(err => {
         console.error('[WorkspacePage] loadNextTask:', err);
         return null;
       });

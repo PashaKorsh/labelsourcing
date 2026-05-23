@@ -27,8 +27,8 @@ services:
 
   backend:
     build: ./backend
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     env_file:
       - ./backend/.env
     volumes:
@@ -44,6 +44,7 @@ services:
       context: ./frontend
       args:
         - VITE_API_MODE=${VITE_API_MODE:-real}
+        - VITE_ENABLE_RAW_SETTINGS=${VITE_ENABLE_RAW_SETTINGS:-false}
     ports:
       - "80:80"
     volumes:

@@ -84,6 +84,7 @@ class Dataset(Base):
     validation_quorum: Mapped[int] = mapped_column(Integer, server_default="1")
     annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    settings: Mapped[dict] = mapped_column(JSONB, server_default='{}', default=dict)
 
     owner: Mapped["User"] = relationship(back_populates="datasets")
     tasks: Mapped[List["Task"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
@@ -179,7 +180,7 @@ class UserDatasetAccess(Base):
 
     labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     labeled_count: Mapped[int] = mapped_column(Integer, server_default="0")
-    can_label: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    can_label: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
 
     user: Mapped["User"] = relationship(back_populates="dataset_accesses")
     dataset: Mapped["Dataset"] = relationship(back_populates="user_accesses")

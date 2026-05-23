@@ -12,6 +12,7 @@ const MOCK_LIST: Dataset[] = [
     description: 'Небольшое описание набора 1.\nМаксимум две строки (?)...',
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-1/400/240',
     tags: [TAG_MEDIC],
+    userStatus: 'NOT_STARTED',
   },
   {
     id: '1',
@@ -19,6 +20,7 @@ const MOCK_LIST: Dataset[] = [
     description: 'Небольшое описание набора 2.',
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-2/400/240',
     tags: [TAG_MEDIC],
+    userStatus: 'IN_PROGRESS',
   },
   {
     id: '2',
@@ -26,6 +28,7 @@ const MOCK_LIST: Dataset[] = [
     description: 'Небольшое описание набора 3.',
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-3/400/240',
     tags: [TAG_USER],
+    userStatus: 'NOT_STARTED',
   },
   {
     id: '3',
@@ -33,7 +36,7 @@ const MOCK_LIST: Dataset[] = [
     description: 'Небольшое описание набора 4.',
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-4/400/240',
     tags: [TAG_MEDIC],
-    completed: true,
+    userStatus: 'USER_DONE',
   },
 ];
 
@@ -45,6 +48,7 @@ const MOCK_MINE: Dataset[] = [
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-1/400/240',
     tags: [],
     taskCount: 248,
+    userStatus: 'NOT_STARTED',
   },
   {
     id: '11',
@@ -53,6 +57,7 @@ const MOCK_MINE: Dataset[] = [
     imageUrl: 'https://picsum.photos/seed/labelsourcing-dog-1/400/240',
     tags: [],
     taskCount: 134,
+    userStatus: 'NOT_STARTED',
   },
   {
     id: '12',
@@ -61,6 +66,7 @@ const MOCK_MINE: Dataset[] = [
     imageUrl: 'https://picsum.photos/seed/labelsourcing-nature-1/400/240',
     tags: [],
     taskCount: 76,
+    userStatus: 'NOT_STARTED',
   },
 ];
 
@@ -86,15 +92,6 @@ export class MockDatasetService implements DatasetService {
     return result;
   }
 
-  async listMine(_ownerId: string, search?: string): Promise<Dataset[]> {
-    let result = [...this.mineDatasets];
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(d => (d.title ?? d.description).toLowerCase().includes(q));
-    }
-    return result;
-  }
-
   async get(id: string): Promise<Dataset> {
     const ds = [...this.datasets, ...this.mineDatasets].find(d => d.id === id);
     if (!ds) throw new Error(`Dataset ${id} not found`);
@@ -111,6 +108,7 @@ export class MockDatasetService implements DatasetService {
       title: data.title,
       description: data.description,
       tags: [],
+      userStatus: 'NOT_STARTED',
       annotationLabels: data.annotationLabels,
     };
     this.mineDatasets.push(dataset);
@@ -136,5 +134,14 @@ export class MockDatasetService implements DatasetService {
       if (listIdx !== -1) this.datasets[listIdx] = updated;
     }
     return updated;
+  }
+
+  async delete(id: string): Promise<void> {
+    this.datasets = this.datasets.filter(d => d.id !== id);
+    this.mineDatasets = this.mineDatasets.filter(d => d.id !== id);
+  }
+
+  async exportLabels(_id: string): Promise<unknown[]> {
+    return [];
   }
 }

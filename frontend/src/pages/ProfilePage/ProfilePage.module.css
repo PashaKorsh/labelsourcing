@@ -43,32 +43,11 @@
   margin: 0;
 }
 
-.stats {
+.tags {
   display: flex;
-  gap: 8px;
-  align-self: stretch;
-}
-
-.statCard {
-  flex: 1;
-  background: white;
-  border-radius: 24px;
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
-}
-
-.statValue {
-  font-size: 36px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.statLabel {
-  font-size: 13px;
-  color: #6f6f6f;
+  justify-content: center;
 }
 
 .logoutButton {

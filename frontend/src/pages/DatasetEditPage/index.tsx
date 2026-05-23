@@ -4,12 +4,16 @@ import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { AppTagSelector } from '../../components/AppTagSelector';
 import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
+import { RawSettingsEditor } from '../../components/RawSettingsEditor';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import { ROUTES } from '../../config/routes';
 import { datasetService, taskService } from '../../services';
 import type { AppTag } from '../../types/appTag';
 import type { Tag } from '../../types/annotation';
 import type { Dataset } from '../../types/dataset';
 import styles from './DatasetEditPage.module.css';
+
+const SHOW_RAW_SETTINGS = import.meta.env.VITE_ENABLE_RAW_SETTINGS === 'true';
 
 interface TaskRow {
   id?: string;
@@ -27,7 +31,13 @@ export function DatasetEditPage() {
   const [taskRows, setTaskRows] = useState<TaskRow[]>([{ url: '' }]);
   const [originalTaskIds, setOriginalTaskIds] = useState<string[]>([]);
   const [annotationLabels, setAnnotationLabels] = useState<Tag[]>([]);
+  const [requiredAnswers, setRequiredAnswers] = useState<number | ''>('');
+  const [validationQuorum, setValidationQuorum] = useState<number | ''>('');
+  const [requiresValidation, setRequiresValidation] = useState(false);
+  const [defaultLabelingLimit, setDefaultLabelingLimit] = useState<number | ''>('');
+  const [extra, setExtra] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!datasetId) return;
@@ -43,6 +53,10 @@ export function DatasetEditPage() {
       setTaskRows(rows.length > 0 ? rows : [{ url: '' }]);
       setOriginalTaskIds(tasks.map(t => t.id));
       setAnnotationLabels(ds.annotationLabels ?? []);
+      setRequiredAnswers(ds.requiredAnswers ?? '');
+      setValidationQuorum(ds.validationQuorum ?? '');
+      setRequiresValidation(ds.requiresValidation ?? false);
+      setDefaultLabelingLimit(ds.defaultLabelingLimit ?? '');
     }).catch(console.error);
   }, [datasetId]);
 
@@ -54,6 +68,16 @@ export function DatasetEditPage() {
   const removeRow = (index: number) =>
     setTaskRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : [{ url: '' }]);
 
+  const handleDelete = async () => {
+    if (!datasetId) return;
+    try {
+      await datasetService.delete(datasetId);
+      navigate(ROUTES.myDatasets);
+    } catch (err) {
+      console.error('[DatasetEditPage] delete', err);
+    }
+  };
+
   const handleSave = async () => {
     if (!datasetId || !description.trim()) return;
     setSubmitting(true);
@@ -63,6 +87,11 @@ export function DatasetEditPage() {
         description: description.trim(),
         tagIds: selectedTags.map(t => t.id),
         annotationLabels,
+        requiredAnswers: requiredAnswers === '' ? undefined : requiredAnswers,
+        validationQuorum: validationQuorum === '' ? undefined : validationQuorum,
+        requiresValidation,
+        defaultLabelingLimit: defaultLabelingLimit === '' ? undefined : defaultLabelingLimit,
+        extra,
       });
 
       const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
@@ -147,6 +176,53 @@ export function DatasetEditPage() {
         </div>
 
         <div className={styles.card}>
+          <h2 className={styles.cardTitle}>Параметры разметки</h2>
+          <div className={styles.settingsGrid}>
+            <div className={styles.field}>
+              <label className={styles.label}>Ответов на задание</label>
+              <input
+                type="number"
+                min={1}
+                className={styles.input}
+                placeholder="1"
+                value={requiredAnswers}
+                onChange={e => setRequiredAnswers(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Валидаций на ответ</label>
+              <input
+                type="number"
+                min={1}
+                className={styles.input}
+                placeholder="1"
+                value={validationQuorum}
+                onChange={e => setValidationQuorum(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Лимит заданий на пользователя</label>
+              <input
+                type="number"
+                min={1}
+                className={styles.input}
+                placeholder="Без ограничений"
+                value={defaultLabelingLimit}
+                onChange={e => setDefaultLabelingLimit(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <label className={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              checked={requiresValidation}
+              onChange={e => setRequiresValidation(e.target.checked)}
+            />
+            Требуется валидация
+          </label>
+        </div>
+
+        <div className={styles.card}>
           <h2 className={styles.cardTitle}>Изображения</h2>
           <div className={styles.field}>
             {taskRows.map((row, i) => (
@@ -174,15 +250,42 @@ export function DatasetEditPage() {
           </div>
         </div>
 
-        <button
-          type="button"
-          className={styles.saveButton}
-          onClick={handleSave}
-          disabled={submitting || !description.trim()}
-        >
-          {submitting ? 'Сохранение…' : 'Сохранить'}
-        </button>
+        {SHOW_RAW_SETTINGS && (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>Дополнительные настройки</h2>
+            <RawSettingsEditor onChange={setExtra} />
+          </div>
+        )}
+
+        <div className={styles.bottomActions}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={handleSave}
+            disabled={submitting || !description.trim()}
+          >
+            {submitting ? 'Сохранение…' : 'Сохранить'}
+          </button>
+          <button
+            type="button"
+            className={styles.deleteButton}
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={submitting}
+          >
+            Удалить датасет
+          </button>
+        </div>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          message="Удалить датасет безвозвратно? Вместе с ним удалится вся созданная разметка."
+          confirmLabel="Удалить"
+          cancelLabel="Отмена"
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </main>
   );
 }

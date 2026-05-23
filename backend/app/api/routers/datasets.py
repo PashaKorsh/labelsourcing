@@ -368,7 +368,7 @@ async def get_next_task(
     remaining_count = count - len(result_tasks)
 
     # Annotation-задачи — только если валидации не нашлось
-    if remaining_count > 0 and access.can_label:
+    if len(result_tasks) == 0 and access.can_label:
         effective_limit = min(access.labeling_limit, dataset.tasks_count)
 
         if access.labeled_count < effective_limit:
@@ -380,8 +380,8 @@ async def get_next_task(
                 .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
                 .where(~user_busy_sq)
                 .order_by(Task.created_at)
-                .limit(remaining_count)  # Добираем остаток
-                .with_for_update(of=Task, skip_locked=True)  # Изолируем блокировку
+                .limit(remaining_count)
+                .with_for_update(of=Task, skip_locked=True)
             )
 
             annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()

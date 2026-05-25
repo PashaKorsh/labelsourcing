@@ -19,7 +19,7 @@ class DatasetCreate(BaseModel):
     annotation_labels: List[AnnotationLabelSchema] = Field(
         default=[AnnotationLabelSchema(id="obj", label="Объект", color="#FF0000")]
     )
-    tags: Optional[List[TagResponse]] = None
+    tag_ids: Optional[List[uuid.UUID]] = None
     requires_validation: bool = False
     validation_quorum: int = 1
     settings: dict = Field(default_factory=dict)

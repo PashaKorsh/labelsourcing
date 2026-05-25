@@ -89,6 +89,12 @@ async def create_dataset(
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
     )
+
+    if dataset_in.tag_ids:
+        tags_stmt = select(Tag).where(Tag.id.in_(dataset_in.tag_ids))
+        tags_res = await db.execute(tags_stmt)
+        new_dataset.tags = list(tags_res.scalars().all())
+
     db.add(new_dataset)
     await db.commit()
 

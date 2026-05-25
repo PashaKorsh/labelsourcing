@@ -75,7 +75,7 @@ export function useWorkspace() {
     if (remaining.length > 0) {
       setTasks(remaining);
       // Фоновая догрузка, если в буфере осталась последняя задача
-      if (remaining.length < 1 && hasMoreTasks) {
+      if (remaining.length === 1 && hasMoreTasks) {
         taskService.loadNextTask(datasetId ?? '', TASK_BATCH_SIZE)
           .then(newTask => {
             if (!newTask) setHasMoreTasks(false);

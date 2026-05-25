@@ -71,7 +71,7 @@ async def _process_validation_verdict(
     access_stmt = select(UserDatasetAccess).where(
         UserDatasetAccess.user_id == annotation_assignment.user_id,
         UserDatasetAccess.dataset_id == annotation_task.dataset_id,
-    )
+    ).with_for_update()
     access = (await db.execute(access_stmt)).scalar_one_or_none()
     if access is not None:
         access.labeled_count = max(0, access.labeled_count - 1)

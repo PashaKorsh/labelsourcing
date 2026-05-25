@@ -131,11 +131,13 @@ async def get_datasets(
     OwnValTask = aliased(Task)
 
     # Подзапрос: PENDING validation-задачи, которые текущий пользователь ещё не сделал
+    # и которые он вообще может выполнить (т.е. аннотировал не он сам).
     pending_val_for_user_sq = (
         select(func.count())
         .where(ValTask.dataset_id == Dataset.id)
         .where(ValTask.type == TaskType.VALIDATION)
         .where(ValTask.status == TaskStatus.PENDING)
+        .where(cast(ValTask.task_metadata['annotator_id'], String) != f'"{current_user.id}"')
         .where(
             ~exists(
                 select(ValAssignment.id)

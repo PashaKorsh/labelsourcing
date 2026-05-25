@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess, AssignmentStatus, TaskStatus, TaskType
 from app.api.dependencies import get_current_user, require_roles
+from app.api.helpers import _ensure_validation_tasks
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
 from app.schemas.label import LabelSubmit, LabelResponse
 
@@ -244,31 +245,9 @@ async def submit_label(
             access.labeled_count += 1
 
         if task.type == TaskType.ANNOTATION:
-            # Блок создания валидационных задач
-            if dataset.requires_validation and task.completed_answers == dataset.required_answers:
+            if dataset.requires_validation and task.completed_answers >= dataset.required_answers:
                 await db.flush()
-
-                all_labels_stmt = (
-                    select(Label, Assignment)
-                    .join(Assignment, Label.assignment_id == Assignment.id)
-                    .where(Assignment.task_id == task.id)
-                    .where(Assignment.status == AssignmentStatus.DONE)
-                )
-                all_rows = (await db.execute(all_labels_stmt)).all()
-
-                for done_label, done_assignment in all_rows:
-                    ann_data = done_label.result.get('result', [])
-                    db.add(Task(
-                        dataset_id=dataset.id,
-                        url=task.url,
-                        type=TaskType.VALIDATION,
-                        task_metadata={
-                            'annotation_task_id': str(task.id),
-                            'annotation_label_id': str(done_label.id),
-                            'annotator_id': str(done_assignment.user_id),
-                            'annotations': ann_data,
-                        },
-                    ))
+                await _ensure_validation_tasks(db, task, dataset)
 
     await db.commit()
     await db.refresh(label)

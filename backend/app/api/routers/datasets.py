@@ -13,6 +13,7 @@ from app.models import (
     AssignmentStatus, TaskStatus, TaskType, DatasetStatus
 )
 from app.api.dependencies import get_current_user, require_roles
+from app.api.helpers import _ensure_validation_tasks
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse
 from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
@@ -676,6 +677,14 @@ async def update_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
+    enabling_validation = (
+        update_data.requires_validation is True and not dataset.requires_validation
+    )
+    decreasing_required_answers = (
+        update_data.required_answers is not None and
+        update_data.required_answers < dataset.required_answers
+    )
+
     if update_data.title is not None:
         dataset.title = update_data.title
     if update_data.description is not None:
@@ -688,10 +697,6 @@ async def update_dataset(
         dataset.status = update_data.status
     if update_data.annotation_labels is not None:
         dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
-    enabling_validation = (
-        update_data.requires_validation is True and not dataset.requires_validation
-    )
-
     if update_data.requires_validation is not None:
         dataset.requires_validation = update_data.requires_validation
     if update_data.validation_quorum is not None:
@@ -702,10 +707,26 @@ async def update_dataset(
         tags_res = await db.execute(tags_stmt)
         dataset.tags = list(tags_res.scalars().all())
 
-    # Если валидация включается впервые — создаём validation-задачи
-    # для всех уже завершённых annotation-задач, у которых их ещё нет
+    # При снижении required_answers: задачи с completed_answers >= нового порога
+    # застревают в PENDING и никогда не получают validation-задач.
+    # Завершаем их и создаём validation-задачи (если валидация включена).
+    if decreasing_required_answers:
+        stuck_stmt = (
+            select(Task)
+            .where(Task.dataset_id == dataset_id)
+            .where(Task.type == TaskType.ANNOTATION)
+            .where(Task.status == TaskStatus.PENDING)
+            .where(Task.completed_answers >= dataset.required_answers)
+        )
+        stuck_tasks = (await db.execute(stuck_stmt)).scalars().all()
+        for ann_task in stuck_tasks:
+            ann_task.status = TaskStatus.COMPLETED
+            if dataset.requires_validation:
+                await _ensure_validation_tasks(db, ann_task, dataset)
+
+    # При первом включении валидации: создаём validation-задачи
+    # для уже завершённых annotation-задач, у которых их ещё нет.
     if enabling_validation:
-        quorum = update_data.validation_quorum if update_data.validation_quorum is not None else dataset.validation_quorum
         completed_ann_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -713,39 +734,8 @@ async def update_dataset(
             .where(Task.status == TaskStatus.COMPLETED)
         )
         completed_tasks = (await db.execute(completed_ann_stmt)).scalars().all()
-
         for ann_task in completed_tasks:
-            existing_val = (await db.execute(
-                select(Task.id)
-                .where(Task.dataset_id == dataset_id)
-                .where(Task.type == TaskType.VALIDATION)
-                .where(Task.task_metadata['annotation_task_id'].astext == str(ann_task.id))
-                .limit(1)
-            )).scalar_one_or_none()
-            if existing_val is not None:
-                continue
-
-            all_labels_stmt = (
-                select(Label, Assignment)
-                .join(Assignment, Label.assignment_id == Assignment.id)
-                .where(Assignment.task_id == ann_task.id)
-                .where(Assignment.status == AssignmentStatus.DONE)
-            )
-            all_rows = (await db.execute(all_labels_stmt)).all()
-
-            for done_label, done_assignment in all_rows:
-                ann_data = done_label.result.get('result', [])
-                db.add(Task(
-                    dataset_id=dataset_id,
-                    url=ann_task.url,
-                    type=TaskType.VALIDATION,
-                    task_metadata={
-                        'annotation_task_id': str(ann_task.id),
-                        'annotation_label_id': str(done_label.id),
-                        'annotator_id': str(done_assignment.user_id),
-                        'annotations': ann_data,
-                    },
-                ))
+            await _ensure_validation_tasks(db, ann_task, dataset)
 
     await db.commit()
 

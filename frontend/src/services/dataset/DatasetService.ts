@@ -24,8 +24,8 @@ export interface DatasetUpdateInput {
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;
-  defaultLabelingLimit?: number;
-  extra?: Record<string, unknown>;
+  defaultTasksLimit?: number;
+  settings?: Record<string, unknown> | null;
 }
 
 export interface DatasetService {

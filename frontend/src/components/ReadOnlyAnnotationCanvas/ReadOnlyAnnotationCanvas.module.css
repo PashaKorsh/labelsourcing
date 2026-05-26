@@ -1,4 +1,4 @@
-/* Идентична AnnotationCanvas.module.css, но без стилей контекстного меню */
+/* Идентична AnnotationCanvas.module.css, но с упрощённым контекстным меню (только просмотр тега) */
 
 .wrapper {
   position: relative;
@@ -77,4 +77,37 @@
 .zoomReset:hover {
   background: #383838;
   color: #fff;
+}
+
+/* ── Context menu (read-only tag display) ────────── */
+
+.contextMenu {
+  position: fixed;
+  z-index: 9999;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  min-width: 120px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.contextMenuTagRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  color: #ccc;
+}
+
+.contextMenuTagDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.contextMenuTagLabel {
+  flex: 1;
 }

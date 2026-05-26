@@ -13,6 +13,7 @@ from app.models import (
     AssignmentStatus, TaskStatus, TaskType, DatasetStatus
 )
 from app.api.dependencies import get_current_user, require_roles
+from app.api.helpers import _ensure_validation_tasks
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse
 from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
@@ -42,8 +43,8 @@ def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
 def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
     if access is None:
         return False
-    effective_limit = min(access.labeling_limit, tasks_count)
-    return not access.can_label or access.labeled_count >= effective_limit
+    effective_limit = min(access.tasks_limit, tasks_count)
+    return not access.can_label or access.tasks_done >= effective_limit
 
 
 async def _get_dataset_with_counts(
@@ -66,8 +67,8 @@ async def _get_dataset_with_counts(
         )).scalar_one_or_none()
         dataset.user_done = _compute_user_done(access, dataset.tasks_count)
         if access is not None:
-            dataset.user_labeling_limit = min(access.labeling_limit, dataset.tasks_count)
-            dataset.user_labeled_count = access.labeled_count
+            dataset.user_tasks_limit = access.tasks_limit
+            dataset.user_tasks_done = access.tasks_done
 
     return dataset
 
@@ -84,11 +85,17 @@ async def create_dataset(
         title=dataset_in.title,
         description=dataset_in.description,
         required_answers=dataset_in.required_answers,
-        default_labeling_limit=dataset_in.default_labeling_limit,
+        default_tasks_limit=dataset_in.default_tasks_limit,
         annotation_labels=labels_data,
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
     )
+
+    if dataset_in.tag_ids:
+        tags_stmt = select(Tag).where(Tag.id.in_(dataset_in.tag_ids))
+        tags_res = await db.execute(tags_stmt)
+        new_dataset.tags = list(tags_res.scalars().all())
+
     db.add(new_dataset)
     await db.commit()
 
@@ -101,16 +108,19 @@ def _get_user_status(
         access: UserDatasetAccess | None,
         tasks_count: int,
         has_pending_validation: bool = False,
+        has_pending_own_validation: bool = False,
 ) -> str:
     if dataset.status == DatasetStatus.COMPLETED:
         return "COMPLETED"
     if access is not None:
-        effective_limit = min(access.labeling_limit, tasks_count)
-        if not access.can_label or access.labeled_count >= effective_limit:
-            if dataset.requires_validation and has_pending_validation:
+        effective_limit = min(access.tasks_limit, tasks_count)
+        if not access.can_label or access.tasks_done >= effective_limit:
+            if dataset.requires_validation and has_pending_validation and access.tasks_done < access.tasks_limit:
                 return "IN_PROGRESS"
+            if dataset.requires_validation and has_pending_own_validation:
+                return "WAITING_VALIDATION"
             return "USER_DONE"
-        if access.labeled_count > 0:
+        if access.tasks_done > 0:
             return "IN_PROGRESS"
     return "NOT_STARTED"
 
@@ -125,13 +135,16 @@ async def get_datasets(
 ):
     ValTask = aliased(Task)
     ValAssignment = aliased(Assignment)
+    OwnValTask = aliased(Task)
 
-    # Подзапрос: есть ли PENDING validation-задачи, которые текущий пользователь ещё не сделал
+    # Подзапрос: PENDING validation-задачи, которые текущий пользователь ещё не сделал
+    # и которые он вообще может выполнить (т.е. аннотировал не он сам).
     pending_val_for_user_sq = (
         select(func.count())
         .where(ValTask.dataset_id == Dataset.id)
         .where(ValTask.type == TaskType.VALIDATION)
         .where(ValTask.status == TaskStatus.PENDING)
+        .where(cast(ValTask.task_metadata['annotator_id'], String) != f'"{current_user.id}"')
         .where(
             ~exists(
                 select(ValAssignment.id)
@@ -145,11 +158,23 @@ async def get_datasets(
         .scalar_subquery()
     )
 
+    # Подзапрос: PENDING validation-задачи по аннотациям самого пользователя (его работа ждёт проверки)
+    own_pending_val_sq = (
+        select(func.count())
+        .where(OwnValTask.dataset_id == Dataset.id)
+        .where(OwnValTask.type == TaskType.VALIDATION)
+        .where(OwnValTask.status == TaskStatus.PENDING)
+        .where(cast(OwnValTask.task_metadata['annotator_id'], String) == f'"{current_user.id}"')
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
     stmt = (
         select(
             Dataset,
             func.count(Label.id.distinct()).label("labeled_count"),
             pending_val_for_user_sq.label("pending_val_count"),
+            own_pending_val_sq.label("own_pending_val_count"),
             UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
@@ -189,8 +214,13 @@ async def get_datasets(
         dataset = row[0]
         dataset.labeled_count = row[1]
         pending_val_count = row[2]
-        user_access = row[3]
-        dataset.user_status = _get_user_status(dataset, user_access, dataset.tasks_count, pending_val_count > 0)
+        own_pending_val_count = row[3]
+        user_access = row[4]
+        dataset.user_status = _get_user_status(
+            dataset, user_access, dataset.tasks_count,
+            has_pending_validation=pending_val_count > 0,
+            has_pending_own_validation=own_pending_val_count > 0,
+        )
 
         datasets_with_counts.append(dataset)
 
@@ -302,7 +332,7 @@ async def get_next_task(
         .values(
             user_id=current_user.id,
             dataset_id=dataset_id,
-            labeling_limit=dataset.default_labeling_limit,
+            tasks_limit=dataset.default_tasks_limit,
         )
         .on_conflict_do_nothing(index_elements=["user_id", "dataset_id"])
     )
@@ -321,8 +351,8 @@ async def get_next_task(
     user_busy_sq = _make_user_busy_subquery(current_user.id)
     result_tasks: list[Task] = []
 
-    # Validation-задачи в приоритете
-    if dataset.requires_validation:
+    # Validation-задачи в приоритете (только если пользователь не исчерпал лимит)
+    if dataset.requires_validation and access.tasks_done < access.tasks_limit:
         val_task_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -347,10 +377,10 @@ async def get_next_task(
     remaining_count = count - len(result_tasks)
 
     # Annotation-задачи — только если валидации не нашлось
-    if remaining_count > 0 and access.can_label:
-        effective_limit = min(access.labeling_limit, dataset.tasks_count)
+    if len(result_tasks) == 0 and access.can_label:
+        effective_limit = min(access.tasks_limit, dataset.tasks_count)
 
-        if access.labeled_count < effective_limit:
+        if access.tasks_done < effective_limit:
             ann_task_stmt = (
                 select(Task)
                 .where(Task.dataset_id == dataset_id)
@@ -359,8 +389,8 @@ async def get_next_task(
                 .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
                 .where(~user_busy_sq)
                 .order_by(Task.created_at)
-                .limit(remaining_count)  # Добираем остаток
-                .with_for_update(of=Task, skip_locked=True)  # Изолируем блокировку
+                .limit(remaining_count)
+                .with_for_update(of=Task, skip_locked=True)
             )
 
             annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
@@ -534,13 +564,13 @@ async def upsert_user_access(
         access = UserDatasetAccess(
             user_id=user_id,
             dataset_id=dataset_id,
-            labeling_limit=update_in.labeling_limit if update_in.labeling_limit is not None else dataset.default_labeling_limit,
+            tasks_limit=update_in.tasks_limit if update_in.tasks_limit is not None else dataset.default_tasks_limit,
             can_label=update_in.can_label if update_in.can_label is not None else True,
         )
         db.add(access)
     else:
-        if update_in.labeling_limit is not None:
-            access.labeling_limit = update_in.labeling_limit
+        if update_in.tasks_limit is not None:
+            access.tasks_limit = update_in.tasks_limit
         if update_in.can_label is not None:
             access.can_label = update_in.can_label
 
@@ -647,36 +677,58 @@ async def update_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
+    enabling_validation = (
+        update_data.requires_validation is True and not dataset.requires_validation
+    )
+    decreasing_required_answers = (
+        update_data.required_answers is not None and
+        update_data.required_answers < dataset.required_answers
+    )
+
     if update_data.title is not None:
         dataset.title = update_data.title
     if update_data.description is not None:
         dataset.description = update_data.description
     if update_data.required_answers is not None:
         dataset.required_answers = update_data.required_answers
-    if update_data.default_labeling_limit is not None:
-        dataset.default_labeling_limit = update_data.default_labeling_limit
+    if update_data.default_tasks_limit is not None:
+        dataset.default_tasks_limit = update_data.default_tasks_limit
     if update_data.status is not None:
         dataset.status = update_data.status
     if update_data.annotation_labels is not None:
         dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
-    enabling_validation = (
-        update_data.requires_validation is True and not dataset.requires_validation
-    )
-
     if update_data.requires_validation is not None:
         dataset.requires_validation = update_data.requires_validation
     if update_data.validation_quorum is not None:
         dataset.validation_quorum = update_data.validation_quorum
+    if update_data.settings is not None:
+        dataset.settings = update_data.settings
 
     if update_data.tag_ids is not None:
         tags_stmt = select(Tag).where(Tag.id.in_(update_data.tag_ids))
         tags_res = await db.execute(tags_stmt)
         dataset.tags = list(tags_res.scalars().all())
 
-    # Если валидация включается впервые — создаём validation-задачи
-    # для всех уже завершённых annotation-задач, у которых их ещё нет
+    # При снижении required_answers: задачи с completed_answers >= нового порога
+    # застревают в PENDING и никогда не получают validation-задач.
+    # Завершаем их и создаём validation-задачи (если валидация включена).
+    if decreasing_required_answers:
+        stuck_stmt = (
+            select(Task)
+            .where(Task.dataset_id == dataset_id)
+            .where(Task.type == TaskType.ANNOTATION)
+            .where(Task.status == TaskStatus.PENDING)
+            .where(Task.completed_answers >= dataset.required_answers)
+        )
+        stuck_tasks = (await db.execute(stuck_stmt)).scalars().all()
+        for ann_task in stuck_tasks:
+            ann_task.status = TaskStatus.COMPLETED
+            if dataset.requires_validation:
+                await _ensure_validation_tasks(db, ann_task, dataset)
+
+    # При первом включении валидации: создаём validation-задачи
+    # для уже завершённых annotation-задач, у которых их ещё нет.
     if enabling_validation:
-        quorum = update_data.validation_quorum if update_data.validation_quorum is not None else dataset.validation_quorum
         completed_ann_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -684,39 +736,8 @@ async def update_dataset(
             .where(Task.status == TaskStatus.COMPLETED)
         )
         completed_tasks = (await db.execute(completed_ann_stmt)).scalars().all()
-
         for ann_task in completed_tasks:
-            existing_val = (await db.execute(
-                select(Task.id)
-                .where(Task.dataset_id == dataset_id)
-                .where(Task.type == TaskType.VALIDATION)
-                .where(Task.task_metadata['annotation_task_id'].astext == str(ann_task.id))
-                .limit(1)
-            )).scalar_one_or_none()
-            if existing_val is not None:
-                continue
-
-            all_labels_stmt = (
-                select(Label, Assignment)
-                .join(Assignment, Label.assignment_id == Assignment.id)
-                .where(Assignment.task_id == ann_task.id)
-                .where(Assignment.status == AssignmentStatus.DONE)
-            )
-            all_rows = (await db.execute(all_labels_stmt)).all()
-
-            for done_label, done_assignment in all_rows:
-                ann_data = done_label.result.get('result', [])
-                db.add(Task(
-                    dataset_id=dataset_id,
-                    url=ann_task.url,
-                    type=TaskType.VALIDATION,
-                    task_metadata={
-                        'annotation_task_id': str(ann_task.id),
-                        'annotation_label_id': str(done_label.id),
-                        'annotator_id': str(done_assignment.user_id),
-                        'annotations': ann_data,
-                    },
-                ))
+            await _ensure_validation_tasks(db, ann_task, dataset)
 
     await db.commit()
 

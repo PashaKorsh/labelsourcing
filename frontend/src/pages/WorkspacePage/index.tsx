@@ -10,7 +10,8 @@ export function WorkspacePage() {
     task,
     taskNumber,
     hasMoreTasks,
-    labelingLimit,
+    tasksLimit,
+    allowedTools,
     tags,
     isExpired,
     canGoNext,
@@ -35,7 +36,7 @@ export function WorkspacePage() {
                 {(task.metadata?.name as string | undefined) ?? `Задача ${taskNumber}`}
                 {isValidationTask && <span className={styles.validationBadge}>Валидация</span>}
                 <span className={styles.taskIndex}>
-                  {taskNumber}{labelingLimit != null ? ` / ${labelingLimit}` : ''}
+                  {taskNumber}{tasksLimit != null ? ` / ${tasksLimit}` : ''}
                 </span>
               </>
             ) : 'Готово'}
@@ -65,6 +66,7 @@ export function WorkspacePage() {
           task={task}
           hasMoreTasks={hasMoreTasks}
           tags={tags}
+          allowedTools={allowedTools}
           isExpired={isExpired}
           isSaved={isSaved}
           onSaved={markSaved}

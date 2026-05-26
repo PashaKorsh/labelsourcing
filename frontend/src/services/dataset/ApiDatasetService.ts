@@ -17,13 +17,14 @@ interface DatasetDto {
   tags: { id: string; name: string; color: string | null }[];
   tasks_count?: number;
   user_status?: string;
-  user_labeling_limit?: number | null;
-  user_labeled_count?: number | null;
+  user_tasks_limit?: number | null;
+  user_tasks_done?: number | null;
   annotation_labels?: AnnotationLabelDto[] | null;
   required_answers?: number | null;
   validation_quorum?: number | null;
   requires_validation?: boolean | null;
-  default_labeling_limit?: number | null;
+  default_tasks_limit?: number | null;
+  settings?: Record<string, unknown> | null;
 }
 
 interface TaskDto {
@@ -40,8 +41,8 @@ function mapDto(dto: DatasetDto): Dataset {
     description: dto.description ?? '',
     tags: dto.tags.map(t => ({ id: t.id, name: t.name, color: t.color ?? '#d9d9d9' })),
     taskCount: dto.tasks_count,
-    userLabelingLimit: dto.user_labeling_limit ?? undefined,
-    userLabeledCount: dto.user_labeled_count ?? undefined,
+    userTasksLimit: dto.user_tasks_limit ?? undefined,
+    userTasksDone: dto.user_tasks_done ?? undefined,
     userStatus: (dto.user_status ?? 'NOT_STARTED') as Dataset['userStatus'],
     annotationLabels: dto.annotation_labels?.map(l => ({
       id: l.id,
@@ -52,7 +53,8 @@ function mapDto(dto: DatasetDto): Dataset {
     requiredAnswers: dto.required_answers ?? undefined,
     validationQuorum: dto.validation_quorum ?? undefined,
     requiresValidation: dto.requires_validation ?? undefined,
-    defaultLabelingLimit: dto.default_labeling_limit ?? undefined,
+    defaultTasksLimit: dto.default_tasks_limit ?? undefined,
+    settings: dto.settings ?? undefined,
   };
 }
 
@@ -111,8 +113,7 @@ export class ApiDatasetService implements DatasetService {
   }
 
   async update(id: string, data: DatasetUpdateInput): Promise<Dataset> {
-    const body = {
-      ...data.extra,
+    const body: Record<string, unknown> = {
       title: data.title,
       description: data.description,
       tag_ids: data.tagIds,
@@ -120,8 +121,12 @@ export class ApiDatasetService implements DatasetService {
       required_answers: data.requiredAnswers,
       validation_quorum: data.validationQuorum,
       requires_validation: data.requiresValidation,
-      default_labeling_limit: data.defaultLabelingLimit,
+      default_tasks_limit: data.defaultTasksLimit,
     };
+    // settings передаём явно: null → {} (сброс), объект → обновление, undefined → не трогаем
+    if (data.settings !== undefined) {
+      body.settings = data.settings ?? {};
+    }
     const res = await apiFetch(API.datasets.update(id), {
       method: 'PATCH',
       body: JSON.stringify(body),

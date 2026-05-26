@@ -18,14 +18,33 @@ interface Props {
   task: AnnotationTask | null;
   hasMoreTasks: boolean;
   tags: Tag[];
+  allowedTools?: string[];
   isExpired: boolean;
   isSaved: boolean;
   onSaved: () => void;
   onNext?: () => void;
 }
 
-export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, onSaved, onNext }: Props) {
-  const [activeTool, setActiveTool] = useState(IMAGE_DRAWING_TOOLS[0].id);
+export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpired, isSaved, onSaved, onNext }: Props) {
+  // cursor всегда доступен (режим пана), фильтруем только инструменты разметки
+  const visibleTools = useMemo(
+    () => allowedTools && allowedTools.length > 0
+      ? IMAGE_DRAWING_TOOLS.filter(t => t.id === 'cursor' || allowedTools.includes(t.id))
+      : IMAGE_DRAWING_TOOLS,
+    [allowedTools],
+  );
+
+  const [activeTool, setActiveTool] = useState(
+    () => visibleTools.find(t => t.id !== 'cursor')?.id ?? visibleTools[0].id,
+  );
+
+  // Если после загрузки настроек активный инструмент оказался скрыт — переключаемся
+  useEffect(() => {
+    if (!visibleTools.find(t => t.id === activeTool)) {
+      setActiveTool(visibleTools.find(t => t.id !== 'cursor')?.id ?? visibleTools[0].id);
+    }
+  }, [visibleTools]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [activeTagId, setActiveTagId] = useState<string | null>(tags[0]?.id ?? null);
 
   // При обновлении списка тегов (первая загрузка от бэкенда) сбрасываем activeTagId
@@ -77,7 +96,7 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
 
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};
-    for (const tool of IMAGE_DRAWING_TOOLS) {
+    for (const tool of visibleTools) {
       if (tool.hotkey) map[tool.hotkey] = () => setActiveTool(tool.id);
     }
     for (const tag of tags) {
@@ -85,7 +104,7 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
     }
     map['g'] = handleSave;
     return map;
-  }, [tags, handleSave]);
+  }, [visibleTools, tags, handleSave]);
   useHotkeys(hotkeys);
 
   const saveLabel = isSaved
@@ -99,7 +118,7 @@ export function AnnotationView({ task, hasMoreTasks, tags, isExpired, isSaved, o
   return (
     <div className={styles.body}>
       <aside className={styles.sidebar}>
-        <ToolSelector tools={IMAGE_DRAWING_TOOLS} activeTool={activeTool} onSelect={setActiveTool} />
+        <ToolSelector tools={visibleTools} activeTool={activeTool} onSelect={setActiveTool} />
         <div className={styles.divider} />
         <TagSelector tags={tags} activeTagId={activeTagId} onSelect={setActiveTagId} />
         <div className={styles.sidebarBottom}>

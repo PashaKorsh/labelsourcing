@@ -21,3 +21,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Скрываем ручку поворота прямоугольников в Annotorious */
+.a9s-rotation-handle,
+.a9s-rotation-handle-line-bg,
+.a9s-rotation-handle-line-fg {
+  display: none !important;
+}

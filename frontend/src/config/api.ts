@@ -6,6 +6,7 @@ export const API = {
   auth: {
     login:          () => `${API_BASE}/api/v1/auth/login`,
     logout:         () => `${API_BASE}/api/v1/auth/logout`,
+    refresh:        () => `${API_BASE}/api/v1/auth/refresh`,
     yandexLogin:    () => `${API_BASE}/api/v1/auth/yandex/login`,
     yandexCallback: () => `${API_BASE}/api/v1/auth/yandex/callback`,
   },
@@ -46,9 +47,26 @@ export const API = {
   },
 } as const;
 
+// Один активный запрос на обновление токена. Все параллельные 401 ждут его результата.
+let pendingRefresh: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  if (!pendingRefresh) {
+    pendingRefresh = fetch(API.auth.refresh(), {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then(res => res.ok)
+      .catch(() => false)
+      .finally(() => { pendingRefresh = null; });
+  }
+  return pendingRefresh;
+}
+
 // Обёртка fetch с автоматической подстановкой cookie и обработкой 401.
+// При 401 пытается обновить токены через refresh, затем повторяет запрос.
 export async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
-  const res = await fetch(url, {
+  const doFetch = () => fetch(url, {
     ...options,
     credentials: 'include',
     headers: {
@@ -56,6 +74,16 @@ export async function apiFetch(url: string, options?: RequestInit): Promise<Resp
       ...options?.headers,
     },
   });
+
+  let res = await doFetch();
+
+  if (res.status === 401 && !url.includes('/auth/refresh')) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      res = await doFetch();
+    }
+  }
+
   if (res.status === 401) {
     // Уведомляем AuthProvider — он почистит localStorage и редиректнет на /login
     window.dispatchEvent(new CustomEvent('auth:unauthorized'));

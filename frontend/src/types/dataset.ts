@@ -1,7 +1,7 @@
 import type { AppTag } from './appTag';
 import type { Tag } from './annotation';
 
-export type UserDatasetStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'USER_DONE' | 'COMPLETED';
+export type UserDatasetStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'USER_DONE' | 'COMPLETED' | 'WAITING_VALIDATION';
 
 export interface Dataset {
   id: string;
@@ -11,11 +11,12 @@ export interface Dataset {
   imageUrl?: string;
   userStatus: UserDatasetStatus;
   taskCount?: number;
-  userLabelingLimit?: number;
-  userLabeledCount?: number;
+  userTasksLimit?: number;
+  userTasksDone?: number;
   annotationLabels?: Tag[];
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;
-  defaultLabelingLimit?: number;
+  defaultTasksLimit?: number;
+  settings?: Record<string, unknown>;
 }

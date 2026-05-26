@@ -7,6 +7,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess, AssignmentStatus, TaskStatus, TaskType
 from app.api.dependencies import get_current_user, require_roles
+from app.api.helpers import _ensure_validation_tasks
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
 from app.schemas.label import LabelSubmit, LabelResponse
 
@@ -70,10 +71,10 @@ async def _process_validation_verdict(
     access_stmt = select(UserDatasetAccess).where(
         UserDatasetAccess.user_id == annotation_assignment.user_id,
         UserDatasetAccess.dataset_id == annotation_task.dataset_id,
-    )
+    ).with_for_update()
     access = (await db.execute(access_stmt)).scalar_one_or_none()
     if access is not None:
-        access.labeled_count = max(0, access.labeled_count - 1)
+        access.tasks_done = max(0, access.tasks_done - 1)
 
 
 @router.post("/", response_model=TaskResponse)
@@ -133,7 +134,7 @@ async def delete_task(
     if task.type == TaskType.VALIDATION:
         raise HTTPException(status_code=400, detail="Validation-задачи управляются автоматически и не могут быть удалены напрямую.")
 
-    # Корректируем labeled_count у всех, кто выполнил эту аннотационную задачу
+    # Корректируем tasks_done у всех, кто выполнил эту аннотационную задачу
     if task.type == TaskType.ANNOTATION:
         done_assignments = (await db.execute(
             select(Assignment).where(
@@ -149,7 +150,7 @@ async def delete_task(
                 )
             )).scalar_one_or_none()
             if access:
-                access.labeled_count = max(0, access.labeled_count - 1)
+                access.tasks_done = max(0, access.tasks_done - 1)
 
         dataset = await db.get(Dataset, task.dataset_id)
         if dataset:
@@ -212,14 +213,28 @@ async def submit_label(
     if existing_label is not None:
         raise HTTPException(status_code=409, detail="Разметка уже отправлена и не может быть изменена.")
 
+    dataset = await db.get(Dataset, task.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    # Проверка разрешённых инструментов (только для аннотационных задач)
+    if task.type == TaskType.ANNOTATION:
+        allowed_tools: list | None = (dataset.settings or {}).get('allowed_tools')
+        if allowed_tools:
+            for shape in label_in.data.get('result', []):
+                tool = shape.get('shape')
+                if tool and tool not in allowed_tools:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Инструмент '{tool}' не разрешён для этого датасета. Разрешены: {', '.join(str(t) for t in allowed_tools)}",
+                    )
+
     # Первый (и единственный) сабмит
     label = Label(assignment_id=assignment.id, result=label_in.data)
     db.add(label)
 
     if assignment.status == AssignmentStatus.IN_PROGRESS:
         assignment.status = AssignmentStatus.DONE
-
-        dataset = await db.get(Dataset, task.dataset_id)
 
         task.active_assignments = max(0, task.active_assignments - 1)
         task.completed_answers += 1
@@ -233,41 +248,20 @@ async def submit_label(
                 await db.flush()
                 await _process_validation_verdict(db, task, dataset)
 
+        # Засчитываем выполненную задачу в лимит (и аннотация, и валидация)
+        access_stmt = select(UserDatasetAccess).where(
+            UserDatasetAccess.user_id == current_user.id,
+            UserDatasetAccess.dataset_id == task.dataset_id,
+        ).with_for_update()
+
+        access = (await db.execute(access_stmt)).scalar_one_or_none()
+        if access is not None:
+            access.tasks_done += 1
+
         if task.type == TaskType.ANNOTATION:
-            access_stmt = select(UserDatasetAccess).where(
-                UserDatasetAccess.user_id == current_user.id,
-                UserDatasetAccess.dataset_id == task.dataset_id,
-            ).with_for_update()
-
-            access = (await db.execute(access_stmt)).scalar_one_or_none()
-            if access is not None:
-                access.labeled_count += 1
-
-            # Блок создания валидационных задач
-            if dataset.requires_validation and task.completed_answers == dataset.required_answers:
+            if dataset.requires_validation and task.completed_answers >= dataset.required_answers:
                 await db.flush()
-
-                all_labels_stmt = (
-                    select(Label, Assignment)
-                    .join(Assignment, Label.assignment_id == Assignment.id)
-                    .where(Assignment.task_id == task.id)
-                    .where(Assignment.status == AssignmentStatus.DONE)
-                )
-                all_rows = (await db.execute(all_labels_stmt)).all()
-
-                for done_label, done_assignment in all_rows:
-                    ann_data = done_label.result.get('result', [])
-                    db.add(Task(
-                        dataset_id=dataset.id,
-                        url=task.url,
-                        type=TaskType.VALIDATION,
-                        task_metadata={
-                            'annotation_task_id': str(task.id),
-                            'annotation_label_id': str(done_label.id),
-                            'annotator_id': str(done_assignment.user_id),
-                            'annotations': ann_data,
-                        },
-                    ))
+                await _ensure_validation_tasks(db, task, dataset)
 
     await db.commit()
     await db.refresh(label)

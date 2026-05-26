@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { SearchBar } from '../../components/SearchBar';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
@@ -11,16 +11,31 @@ export function DatasetsListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  const fetchDatasets = useCallback((isInitial: boolean, currentSearch: string) => {
+    if (isInitial) setLoading(true);
+    datasetService.list({ search: currentSearch || undefined })
+      .then(setDatasets)
+      .catch(err => console.error('[DatasetsListPage]', err))
+      .finally(() => { if (isInitial) setLoading(false); });
+  }, []);
+
   useEffect(() => {
     setLoading(true);
-    const timer = setTimeout(() => {
-      datasetService.list({ search: search || undefined })
-        .then(setDatasets)
-        .catch(err => console.error('[DatasetsListPage]', err))
-        .finally(() => setLoading(false));
-    }, 300);
+    const timer = setTimeout(() => fetchDatasets(true, search), 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, fetchDatasets]);
+
+  // Обновляем статусы при возврате на вкладку — валидация могла завершиться пока пользователь
+  // был в другом месте, и его датасет перешёл из WAITING_VALIDATION обратно в IN_PROGRESS.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDatasets(false, search);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [search, fetchDatasets]);
 
   return (
     <main className="min-h-screen bg-[#f5f5f5] py-[36px]">

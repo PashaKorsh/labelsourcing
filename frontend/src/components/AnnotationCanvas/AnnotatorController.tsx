@@ -96,12 +96,12 @@ export interface AnnotatorControllerProps {
   activeTag: Tag | null;
   tags: Tag[];
   initialAnnotations: ImageAnnotation[];
+  sizeReady: boolean;
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
   /** Колбэк для синхронизации hover-состояния с родительским компонентом */
   onHoverChange: (annotation: ImageAnnotation | null) => void;
   contextMenu: ContextMenuState | null;
   onContextMenuClose: () => void;
-  onPrev?: () => void;
   onNext?: () => void;
 }
 
@@ -110,11 +110,11 @@ export function AnnotatorController({
   activeTag,
   tags,
   initialAnnotations,
+  sizeReady,
   onAnnotationsChange,
   onHoverChange,
   contextMenu,
   onContextMenuClose,
-  onPrev,
   onNext,
 }: AnnotatorControllerProps) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
@@ -123,12 +123,10 @@ export function AnnotatorController({
   const activeTagRef = useRef(activeTag);
   const onChangeRef = useRef(onAnnotationsChange);
   const onHoverRef = useRef(onHoverChange);
-  const onPrevRef = useRef(onPrev);
   const onNextRef = useRef(onNext);
   useEffect(() => { activeTagRef.current = activeTag; }, [activeTag]);
   useEffect(() => { onChangeRef.current = onAnnotationsChange; }, [onAnnotationsChange]);
   useEffect(() => { onHoverRef.current = onHoverChange; }, [onHoverChange]);
-  useEffect(() => { onPrevRef.current = onPrev; }, [onPrev]);
   useEffect(() => { onNextRef.current = onNext; }, [onNext]);
 
   // Передаём наружу, какая аннотация под курсором (нужно для контекстного меню)
@@ -150,12 +148,19 @@ export function AnnotatorController({
     }
   }, [anno, activeTool]);
 
-  // Восстановление сохранённых аннотаций при монтировании (смена таски)
+  // Восстановление сохранённых аннотаций — ждём anno и sizeReady, затем двойной rAF,
+  // чтобы ResizeObserver Annotorious точно успел пересчитать масштаб.
   useEffect(() => {
-    if (!anno || initialAnnotations.length === 0) return;
-    anno.setAnnotations(initialAnnotations);
+    if (!anno || !sizeReady || initialAnnotations.length === 0) return;
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        anno.setAnnotations(initialAnnotations);
+      });
+    });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anno]); // только при инициализации anno
+  }, [anno, sizeReady]); // initialAnnotations стабильны благодаря key на родителе
 
   // Привязка активного тега к только что нарисованной аннотации
   useEffect(() => {
@@ -228,10 +233,7 @@ export function AnnotatorController({
         e.preventDefault(); anno.redo(); return;
       }
 
-      // D — предыдущая задача, F — следующая
-      if (e.code === 'KeyD' && !e.ctrlKey && !e.shiftKey) {
-        e.preventDefault(); onPrevRef.current?.(); return;
-      }
+      // F — следующая задача
       if (e.code === 'KeyF' && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault(); onNextRef.current?.(); return;
       }

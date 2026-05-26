@@ -32,4 +32,16 @@ export interface TaskService {
 
   /** Удаляет задачу по ID. */
   deleteTask(taskId: string): Promise<void>;
+
+  /**
+   * Отправляет вердикт валидации.
+   * Использует тот же эндпоинт PUT /tasks/{id}/labels с данными {is_correct: boolean}.
+   */
+  submitValidation(taskId: string, isCorrect: boolean): Promise<void>;
+
+  /** Очищает локальный кэш задач и аннотаций (используется при перезаходе на страницу). */
+  clearCache(): void;
+
+  /** Удаляет одну задачу из кэша (вызывается после перехода вперёд — пути назад нет). */
+  removeFromCache(taskId: string): void;
 }

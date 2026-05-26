@@ -5,15 +5,13 @@ from pydantic import BaseModel, ConfigDict
 class UserDatasetAccessResponse(BaseModel):
     user_id: uuid.UUID
     dataset_id: uuid.UUID
-    labeling_limit: int
-    labeled_count: int
+    tasks_limit: int
+    tasks_done: int
     can_label: bool
-    can_validate: bool
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class UserDatasetAccessUpdate(BaseModel):
-    labeling_limit: int | None = None
+    tasks_limit: int | None = None
     can_label: bool | None = None
-    can_validate: bool | None = None

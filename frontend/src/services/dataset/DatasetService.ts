@@ -5,7 +5,6 @@ import type { Tag } from '../../types/annotation';
 export interface DatasetListParams {
   search?: string;
   status?: 'new' | 'started' | 'done';
-  ownerId?: string;
   limit?: number;
   offset?: number;
 }
@@ -22,13 +21,19 @@ export interface DatasetUpdateInput {
   description?: string;
   tagIds?: string[];
   annotationLabels?: Tag[];
+  requiredAnswers?: number;
+  validationQuorum?: number;
+  requiresValidation?: boolean;
+  defaultTasksLimit?: number;
+  settings?: Record<string, unknown> | null;
 }
 
 export interface DatasetService {
   list(params?: DatasetListParams): Promise<Dataset[]>;
-  listMine(ownerId: string, search?: string): Promise<Dataset[]>;
   get(id: string): Promise<Dataset>;
   getTasks(datasetId: string): Promise<AnnotationTask[]>;
   create(data: DatasetCreateInput): Promise<Dataset>;
   update(id: string, data: DatasetUpdateInput): Promise<Dataset>;
+  delete(id: string): Promise<void>;
+  exportLabels(id: string): Promise<unknown[]>;
 }

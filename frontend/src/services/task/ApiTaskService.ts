@@ -8,6 +8,7 @@ interface TaskDto {
   id: string;
   dataset_id: string;
   url: string;
+  type?: string;
   task_metadata?: Record<string, unknown>;
   expires_at?: string;
 }
@@ -34,14 +35,20 @@ export class ApiTaskService implements TaskService {
         id: dto.id,
         datasetId: dto.dataset_id,
         imageUrl: dto.url,
+        type: dto.type as AnnotationTask['type'],
         metadata: dto.task_metadata,
         expiresAt: dto.expires_at,
       };
 
       const existingIdx = existingById.get(dto.id);
       if (existingIdx !== undefined) {
-        // Задача была перевыдана (после истечения) — обновляем expiresAt
-        this.tasks[existingIdx] = { ...this.tasks[existingIdx], expiresAt: dto.expires_at };
+        const existingTask = this.tasks[existingIdx];
+        // Если expiresAt изменился — это новое назначение (реджект/истечение), а не восстановление сессии.
+        // Сбрасываем сохранённую разметку, чтобы пользователь начал с чистого листа.
+        if (existingTask.expiresAt !== dto.expires_at) {
+          this.annotationsMap.delete(dto.id);
+        }
+        this.tasks[existingIdx] = { ...existingTask, expiresAt: dto.expires_at };
         if (!firstTask) firstTask = this.tasks[existingIdx];
       } else {
         this.tasks.push(mapped);
@@ -79,6 +86,9 @@ export class ApiTaskService implements TaskService {
     }
 
     const size = imageSize ?? this.imageSizeMap.get(taskId);
+    if (!size && annotations.length > 0) {
+      throw new Error('[ApiTaskService] Размер изображения неизвестен — нельзя нормализовать координаты');
+    }
     const serialized = serializeTaskAnnotations(
       taskId,
       annotations,
@@ -103,6 +113,26 @@ export class ApiTaskService implements TaskService {
     await apiFetch(API.tasks.delete(taskId), { method: 'DELETE' });
     const idx = this.tasks.findIndex(t => t.id === taskId);
     if (idx !== -1) this.tasks.splice(idx, 1);
+  }
+
+  clearCache(): void {
+    this.tasks.splice(0);
+    this.annotationsMap.clear();
+    this.imageSizeMap.clear();
+  }
+
+  removeFromCache(taskId: string): void {
+    const idx = this.tasks.findIndex(t => t.id === taskId);
+    if (idx !== -1) this.tasks.splice(idx, 1);
+    this.annotationsMap.delete(taskId);
+    this.imageSizeMap.delete(taskId);
+  }
+
+  async submitValidation(taskId: string, isCorrect: boolean): Promise<void> {
+    await apiFetch(API.tasks.saveLabel(taskId), {
+      method: 'PUT',
+      body: JSON.stringify({ data: { is_correct: isCorrect } }),
+    });
   }
 
   exportAllAnnotations(): void {

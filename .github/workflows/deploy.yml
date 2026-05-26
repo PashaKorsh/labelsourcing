@@ -16,12 +16,13 @@ on:
         required: true
         type: choice
         options:
+          - deploy
           - stop-vm
 
 jobs:
   build-and-push:
     name: Build & Push to Registry
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'deploy')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -43,8 +43,8 @@ def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
 def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
     if access is None:
         return False
-    effective_limit = min(access.labeling_limit, tasks_count)
-    return not access.can_label or access.labeled_count >= effective_limit
+    effective_limit = min(access.tasks_limit, tasks_count)
+    return not access.can_label or access.tasks_done >= effective_limit
 
 
 async def _get_dataset_with_counts(
@@ -67,8 +67,8 @@ async def _get_dataset_with_counts(
         )).scalar_one_or_none()
         dataset.user_done = _compute_user_done(access, dataset.tasks_count)
         if access is not None:
-            dataset.user_labeling_limit = min(access.labeling_limit, dataset.tasks_count)
-            dataset.user_labeled_count = access.labeled_count
+            dataset.user_tasks_limit = access.tasks_limit
+            dataset.user_tasks_done = access.tasks_done
 
     return dataset
 
@@ -85,7 +85,7 @@ async def create_dataset(
         title=dataset_in.title,
         description=dataset_in.description,
         required_answers=dataset_in.required_answers,
-        default_labeling_limit=dataset_in.default_labeling_limit,
+        default_tasks_limit=dataset_in.default_tasks_limit,
         annotation_labels=labels_data,
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
@@ -113,14 +113,14 @@ def _get_user_status(
     if dataset.status == DatasetStatus.COMPLETED:
         return "COMPLETED"
     if access is not None:
-        effective_limit = min(access.labeling_limit, tasks_count)
-        if not access.can_label or access.labeled_count >= effective_limit:
-            if dataset.requires_validation and has_pending_validation and access.labeled_count < access.labeling_limit:
+        effective_limit = min(access.tasks_limit, tasks_count)
+        if not access.can_label or access.tasks_done >= effective_limit:
+            if dataset.requires_validation and has_pending_validation and access.tasks_done < access.tasks_limit:
                 return "IN_PROGRESS"
             if dataset.requires_validation and has_pending_own_validation:
                 return "WAITING_VALIDATION"
             return "USER_DONE"
-        if access.labeled_count > 0:
+        if access.tasks_done > 0:
             return "IN_PROGRESS"
     return "NOT_STARTED"
 
@@ -332,7 +332,7 @@ async def get_next_task(
         .values(
             user_id=current_user.id,
             dataset_id=dataset_id,
-            labeling_limit=dataset.default_labeling_limit,
+            tasks_limit=dataset.default_tasks_limit,
         )
         .on_conflict_do_nothing(index_elements=["user_id", "dataset_id"])
     )
@@ -352,7 +352,7 @@ async def get_next_task(
     result_tasks: list[Task] = []
 
     # Validation-задачи в приоритете (только если пользователь не исчерпал лимит)
-    if dataset.requires_validation and access.labeled_count < access.labeling_limit:
+    if dataset.requires_validation and access.tasks_done < access.tasks_limit:
         val_task_stmt = (
             select(Task)
             .where(Task.dataset_id == dataset_id)
@@ -378,9 +378,9 @@ async def get_next_task(
 
     # Annotation-задачи — только если валидации не нашлось
     if len(result_tasks) == 0 and access.can_label:
-        effective_limit = min(access.labeling_limit, dataset.tasks_count)
+        effective_limit = min(access.tasks_limit, dataset.tasks_count)
 
-        if access.labeled_count < effective_limit:
+        if access.tasks_done < effective_limit:
             ann_task_stmt = (
                 select(Task)
                 .where(Task.dataset_id == dataset_id)
@@ -564,13 +564,13 @@ async def upsert_user_access(
         access = UserDatasetAccess(
             user_id=user_id,
             dataset_id=dataset_id,
-            labeling_limit=update_in.labeling_limit if update_in.labeling_limit is not None else dataset.default_labeling_limit,
+            tasks_limit=update_in.tasks_limit if update_in.tasks_limit is not None else dataset.default_tasks_limit,
             can_label=update_in.can_label if update_in.can_label is not None else True,
         )
         db.add(access)
     else:
-        if update_in.labeling_limit is not None:
-            access.labeling_limit = update_in.labeling_limit
+        if update_in.tasks_limit is not None:
+            access.tasks_limit = update_in.tasks_limit
         if update_in.can_label is not None:
             access.can_label = update_in.can_label
 
@@ -691,8 +691,8 @@ async def update_dataset(
         dataset.description = update_data.description
     if update_data.required_answers is not None:
         dataset.required_answers = update_data.required_answers
-    if update_data.default_labeling_limit is not None:
-        dataset.default_labeling_limit = update_data.default_labeling_limit
+    if update_data.default_tasks_limit is not None:
+        dataset.default_tasks_limit = update_data.default_tasks_limit
     if update_data.status is not None:
         dataset.status = update_data.status
     if update_data.annotation_labels is not None:

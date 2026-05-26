@@ -74,7 +74,7 @@ async def _process_validation_verdict(
     ).with_for_update()
     access = (await db.execute(access_stmt)).scalar_one_or_none()
     if access is not None:
-        access.labeled_count = max(0, access.labeled_count - 1)
+        access.tasks_done = max(0, access.tasks_done - 1)
 
 
 @router.post("/", response_model=TaskResponse)
@@ -134,7 +134,7 @@ async def delete_task(
     if task.type == TaskType.VALIDATION:
         raise HTTPException(status_code=400, detail="Validation-задачи управляются автоматически и не могут быть удалены напрямую.")
 
-    # Корректируем labeled_count у всех, кто выполнил эту аннотационную задачу
+    # Корректируем tasks_done у всех, кто выполнил эту аннотационную задачу
     if task.type == TaskType.ANNOTATION:
         done_assignments = (await db.execute(
             select(Assignment).where(
@@ -150,7 +150,7 @@ async def delete_task(
                 )
             )).scalar_one_or_none()
             if access:
-                access.labeled_count = max(0, access.labeled_count - 1)
+                access.tasks_done = max(0, access.tasks_done - 1)
 
         dataset = await db.get(Dataset, task.dataset_id)
         if dataset:
@@ -242,7 +242,7 @@ async def submit_label(
 
         access = (await db.execute(access_stmt)).scalar_one_or_none()
         if access is not None:
-            access.labeled_count += 1
+            access.tasks_done += 1
 
         if task.type == TaskType.ANNOTATION:
             if dataset.requires_validation and task.completed_answers >= dataset.required_answers:

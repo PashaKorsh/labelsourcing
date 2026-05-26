@@ -34,7 +34,7 @@ export function DatasetEditPage() {
   const [requiredAnswers, setRequiredAnswers] = useState<number | ''>('');
   const [validationQuorum, setValidationQuorum] = useState<number | ''>('');
   const [requiresValidation, setRequiresValidation] = useState(false);
-  const [defaultLabelingLimit, setDefaultLabelingLimit] = useState<number | ''>('');
+  const [defaultTasksLimit, setDefaultTasksLimit] = useState<number | ''>('');
   const [extra, setExtra] = useState<Record<string, unknown>>({});
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -56,7 +56,7 @@ export function DatasetEditPage() {
       setRequiredAnswers(ds.requiredAnswers ?? '');
       setValidationQuorum(ds.validationQuorum ?? '');
       setRequiresValidation(ds.requiresValidation ?? false);
-      setDefaultLabelingLimit(ds.defaultLabelingLimit ?? '');
+      setDefaultTasksLimit(ds.defaultTasksLimit ?? '');
     }).catch(console.error);
   }, [datasetId]);
 
@@ -90,7 +90,7 @@ export function DatasetEditPage() {
         requiredAnswers: requiredAnswers === '' ? undefined : requiredAnswers,
         validationQuorum: validationQuorum === '' ? undefined : validationQuorum,
         requiresValidation,
-        defaultLabelingLimit: defaultLabelingLimit === '' ? undefined : defaultLabelingLimit,
+        defaultTasksLimit: defaultTasksLimit === '' ? undefined : defaultTasksLimit,
         extra,
       });
 
@@ -207,8 +207,8 @@ export function DatasetEditPage() {
                 min={1}
                 className={styles.input}
                 placeholder="Без ограничений"
-                value={defaultLabelingLimit}
-                onChange={e => setDefaultLabelingLimit(e.target.value === '' ? '' : Number(e.target.value))}
+                value={defaultTasksLimit}
+                onChange={e => setDefaultTasksLimit(e.target.value === '' ? '' : Number(e.target.value))}
               />
             </div>
           </div>

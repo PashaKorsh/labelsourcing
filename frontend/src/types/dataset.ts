@@ -11,11 +11,11 @@ export interface Dataset {
   imageUrl?: string;
   userStatus: UserDatasetStatus;
   taskCount?: number;
-  userLabelingLimit?: number;
-  userLabeledCount?: number;
+  userTasksLimit?: number;
+  userTasksDone?: number;
   annotationLabels?: Tag[];
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;
-  defaultLabelingLimit?: number;
+  defaultTasksLimit?: number;
 }

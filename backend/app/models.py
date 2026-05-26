@@ -77,7 +77,7 @@ class Dataset(Base):
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     required_answers: Mapped[int] = mapped_column(Integer, server_default="3")
-    default_labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
+    default_tasks_limit: Mapped[int] = mapped_column(Integer, server_default="50")
     status: Mapped[DatasetStatus] = mapped_column(SAEnum(DatasetStatus, name="dataset_status", values_callable=lambda x: [e.value for e in x]), default=DatasetStatus.ACTIVE)
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
     requires_validation: Mapped[bool] = mapped_column(Boolean, server_default="false")
@@ -178,8 +178,8 @@ class UserDatasetAccess(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     dataset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), primary_key=True)
 
-    labeling_limit: Mapped[int] = mapped_column(Integer, server_default="50")
-    labeled_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    tasks_limit: Mapped[int] = mapped_column(Integer, server_default="50")
+    tasks_done: Mapped[int] = mapped_column(Integer, server_default="0")
     can_label: Mapped[bool] = mapped_column(Boolean, default=True, server_default='true')
 
     user: Mapped["User"] = relationship(back_populates="dataset_accesses")

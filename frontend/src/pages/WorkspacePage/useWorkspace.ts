@@ -12,7 +12,7 @@ export function useWorkspace() {
 
   const [tasks, setTasks] = useState<readonly AnnotationTask[]>([]);
   const [hasMoreTasks, setHasMoreTasks] = useState(true);
-  const [labelingLimit, setLabelingLimit] = useState<number | null>(null);
+  const [tasksLimit, setTasksLimit] = useState<number | null>(null);
   const [taskOffset, setTaskOffset] = useState(0);
   const [sessionCompleted, setSessionCompleted] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
@@ -33,20 +33,18 @@ export function useWorkspace() {
     setHasMoreTasks(true);
     setSessionCompleted(0);
     setIsSaved(false);
-    setLabelingLimit(null);
+    setTasksLimit(null);
     setTaskOffset(0);
     taskService.clearCache();
 
     taskService.loadNextTask(datasetId, TASK_BATCH_SIZE)
       .then(newTask => {
-        setTasks(taskService.getTasks());
         if (!newTask) setHasMoreTasks(false);
-
         return datasetService.get(datasetId);
       })
       .then(ds => {
-        if (ds.userLabelingLimit != null) setLabelingLimit(ds.userLabelingLimit);
-        if (ds.userLabeledCount != null) setTaskOffset(ds.userLabeledCount);
+        if (ds.userTasksLimit != null) setTasksLimit(ds.userTasksLimit);
+        if (ds.userTasksDone != null) setTaskOffset(ds.userTasksDone);
         if (ds.annotationLabels?.length) {
           const HOTKEYS = '1234567890';
           const withHotkeys = ds.annotationLabels.map((l, i) => ({
@@ -55,8 +53,13 @@ export function useWorkspace() {
           }));
           setTags(withHotkeys);
         }
+        setTasks(taskService.getTasks());
       })
-      .catch(err => console.error('[WorkspacePage] init:', err));
+      .catch(err => {
+        console.error('[WorkspacePage] init:', err);
+        // Показываем задачи даже при ошибке загрузки метаданных датасета
+        setTasks(taskService.getTasks());
+      });
   }, [datasetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const markSaved = useCallback(() => setIsSaved(true), []);
@@ -105,7 +108,7 @@ export function useWorkspace() {
     task,
     taskNumber,
     hasMoreTasks,
-    labelingLimit,
+    tasksLimit,
     tags,
     isExpired,
     canGoNext,

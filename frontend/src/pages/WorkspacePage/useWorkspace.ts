@@ -17,6 +17,7 @@ export function useWorkspace() {
   const [sessionCompleted, setSessionCompleted] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [allowedTools, setAllowedTools] = useState<string[] | undefined>(undefined);
 
   const task = tasks[0] ?? null;
   const isExpired = useIsExpired(task?.expiresAt);
@@ -45,6 +46,10 @@ export function useWorkspace() {
       .then(ds => {
         if (ds.userTasksLimit != null) setTasksLimit(ds.userTasksLimit);
         if (ds.userTasksDone != null) setTaskOffset(ds.userTasksDone);
+        const tools = ds.settings?.allowed_tools;
+        if (Array.isArray(tools) && tools.length > 0) {
+          setAllowedTools(tools as string[]);
+        }
         if (ds.annotationLabels?.length) {
           const HOTKEYS = '1234567890';
           const withHotkeys = ds.annotationLabels.map((l, i) => ({
@@ -109,6 +114,7 @@ export function useWorkspace() {
     taskNumber,
     hasMoreTasks,
     tasksLimit,
+    allowedTools,
     tags,
     isExpired,
     canGoNext,

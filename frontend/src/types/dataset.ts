@@ -18,4 +18,5 @@ export interface Dataset {
   validationQuorum?: number;
   requiresValidation?: boolean;
   defaultTasksLimit?: number;
+  settings?: Record<string, unknown>;
 }

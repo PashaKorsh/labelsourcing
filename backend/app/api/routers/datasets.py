@@ -701,6 +701,8 @@ async def update_dataset(
         dataset.requires_validation = update_data.requires_validation
     if update_data.validation_quorum is not None:
         dataset.validation_quorum = update_data.validation_quorum
+    if update_data.settings is not None:
+        dataset.settings = update_data.settings
 
     if update_data.tag_ids is not None:
         tags_stmt = select(Tag).where(Tag.id.in_(update_data.tag_ids))

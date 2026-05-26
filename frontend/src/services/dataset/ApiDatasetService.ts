@@ -24,6 +24,7 @@ interface DatasetDto {
   validation_quorum?: number | null;
   requires_validation?: boolean | null;
   default_tasks_limit?: number | null;
+  settings?: Record<string, unknown> | null;
 }
 
 interface TaskDto {
@@ -53,6 +54,7 @@ function mapDto(dto: DatasetDto): Dataset {
     validationQuorum: dto.validation_quorum ?? undefined,
     requiresValidation: dto.requires_validation ?? undefined,
     defaultTasksLimit: dto.default_tasks_limit ?? undefined,
+    settings: dto.settings ?? undefined,
   };
 }
 
@@ -111,8 +113,7 @@ export class ApiDatasetService implements DatasetService {
   }
 
   async update(id: string, data: DatasetUpdateInput): Promise<Dataset> {
-    const body = {
-      ...data.extra,
+    const body: Record<string, unknown> = {
       title: data.title,
       description: data.description,
       tag_ids: data.tagIds,
@@ -122,6 +123,10 @@ export class ApiDatasetService implements DatasetService {
       requires_validation: data.requiresValidation,
       default_tasks_limit: data.defaultTasksLimit,
     };
+    // settings передаём явно: null → {} (сброс), объект → обновление, undefined → не трогаем
+    if (data.settings !== undefined) {
+      body.settings = data.settings ?? {};
+    }
     const res = await apiFetch(API.datasets.update(id), {
       method: 'PATCH',
       body: JSON.stringify(body),

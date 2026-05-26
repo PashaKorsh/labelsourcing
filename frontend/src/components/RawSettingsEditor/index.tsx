@@ -1,19 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './RawSettingsEditor.module.css';
 
 interface Props {
-  onChange: (value: Record<string, unknown>) => void;
+  value?: Record<string, unknown> | null;
+  onChange: (value: Record<string, unknown> | null) => void;
 }
 
-export function RawSettingsEditor({ onChange }: Props) {
+export function RawSettingsEditor({ value, onChange }: Props) {
   const [raw, setRaw] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current) return;
+    if (value != null) {
+      initializedRef.current = true;
+      setRaw(Object.keys(value).length > 0 ? JSON.stringify(value, null, 2) : '');
+    }
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (text: string) => {
     setRaw(text);
     if (!text.trim()) {
       setError(null);
-      onChange({});
+      onChange(null);
       return;
     }
     try {
@@ -35,7 +45,7 @@ export function RawSettingsEditor({ onChange }: Props) {
       <p className={styles.hint}>
         Поля из этого редактора будут отправлены вместе с остальными настройками.
         Явные поля выше имеют приоритет над одноимёнными ключами здесь.
-      </p>
+        </p>
       <textarea
         className={`${styles.textarea}${error ? ` ${styles.hasError}` : ''}`}
         value={raw}

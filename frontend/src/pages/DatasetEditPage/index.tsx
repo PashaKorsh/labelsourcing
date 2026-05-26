@@ -35,7 +35,7 @@ export function DatasetEditPage() {
   const [validationQuorum, setValidationQuorum] = useState<number | ''>('');
   const [requiresValidation, setRequiresValidation] = useState(false);
   const [defaultTasksLimit, setDefaultTasksLimit] = useState<number | ''>('');
-  const [extra, setExtra] = useState<Record<string, unknown>>({});
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -57,6 +57,7 @@ export function DatasetEditPage() {
       setValidationQuorum(ds.validationQuorum ?? '');
       setRequiresValidation(ds.requiresValidation ?? false);
       setDefaultTasksLimit(ds.defaultTasksLimit ?? '');
+      setSettings(ds.settings ?? null);
     }).catch(console.error);
   }, [datasetId]);
 
@@ -91,7 +92,7 @@ export function DatasetEditPage() {
         validationQuorum: validationQuorum === '' ? undefined : validationQuorum,
         requiresValidation,
         defaultTasksLimit: defaultTasksLimit === '' ? undefined : defaultTasksLimit,
-        extra,
+        settings,
       });
 
       const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
@@ -253,7 +254,7 @@ export function DatasetEditPage() {
         {SHOW_RAW_SETTINGS && (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Дополнительные настройки</h2>
-            <RawSettingsEditor onChange={setExtra} />
+            <RawSettingsEditor value={settings} onChange={setSettings} />
           </div>
         )}
 

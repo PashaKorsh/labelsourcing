@@ -11,6 +11,7 @@ export function WorkspacePage() {
     taskNumber,
     hasMoreTasks,
     tasksLimit,
+    allowedTools,
     tags,
     isExpired,
     canGoNext,
@@ -65,6 +66,7 @@ export function WorkspacePage() {
           task={task}
           hasMoreTasks={hasMoreTasks}
           tags={tags}
+          allowedTools={allowedTools}
           isExpired={isExpired}
           isSaved={isSaved}
           onSaved={markSaved}

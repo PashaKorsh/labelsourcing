@@ -213,14 +213,28 @@ async def submit_label(
     if existing_label is not None:
         raise HTTPException(status_code=409, detail="Разметка уже отправлена и не может быть изменена.")
 
+    dataset = await db.get(Dataset, task.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    # Проверка разрешённых инструментов (только для аннотационных задач)
+    if task.type == TaskType.ANNOTATION:
+        allowed_tools: list | None = (dataset.settings or {}).get('allowed_tools')
+        if allowed_tools:
+            for shape in label_in.data.get('result', []):
+                tool = shape.get('shape')
+                if tool and tool not in allowed_tools:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Инструмент '{tool}' не разрешён для этого датасета. Разрешены: {', '.join(str(t) for t in allowed_tools)}",
+                    )
+
     # Первый (и единственный) сабмит
     label = Label(assignment_id=assignment.id, result=label_in.data)
     db.add(label)
 
     if assignment.status == AssignmentStatus.IN_PROGRESS:
         assignment.status = AssignmentStatus.DONE
-
-        dataset = await db.get(Dataset, task.dataset_id)
 
         task.active_assignments = max(0, task.active_assignments - 1)
         task.completed_answers += 1

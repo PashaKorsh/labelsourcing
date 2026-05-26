@@ -42,7 +42,7 @@ export function DatasetEditPage() {
 
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [taskRows, setTaskRows] = useState<TaskRow[]>([{ url: '' }]);
-  const [originalTaskIds, setOriginalTaskIds] = useState<string[]>([]);
+  const [originalTaskRows, setOriginalTaskRows] = useState<TaskRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -58,7 +58,7 @@ export function DatasetEditPage() {
       setDataset(ds);
       const rows: TaskRow[] = tasks.map(t => ({ id: t.id, url: t.imageUrl }));
       setTaskRows(rows.length > 0 ? rows : [{ url: '' }]);
-      setOriginalTaskIds(tasks.map(t => t.id));
+      setOriginalTaskRows(rows);
 
       // Собираем все поля датасета в единый объект настроек
       const merged: Record<string, unknown> = { ...(ds.settings ?? {}) };
@@ -149,7 +149,9 @@ export function DatasetEditPage() {
       });
 
       const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
-      const deletedIds = originalTaskIds.filter(id => !currentIds.has(id));
+      const deletedIds = originalTaskRows
+        .filter(r => r.id && !currentIds.has(r.id))
+        .map(r => r.id!);
       await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
 
       const urlsToCreate: string[] = [];
@@ -158,9 +160,8 @@ export function DatasetEditPage() {
         if (!row.id) {
           urlsToCreate.push(row.url.trim());
         } else {
-          const origUrl = taskRows.find(r => r.id === row.id)?.url;
-          const wasChanged = origUrl !== undefined && origUrl !== row.url.trim();
-          if (wasChanged) {
+          const origUrl = originalTaskRows.find(r => r.id === row.id)?.url;
+          if (origUrl !== undefined && origUrl !== row.url.trim()) {
             await taskService.deleteTask(row.id);
             urlsToCreate.push(row.url.trim());
           }

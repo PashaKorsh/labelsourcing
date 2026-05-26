@@ -180,3 +180,16 @@
   cursor: pointer;
   user-select: none;
 }
+
+.checkboxRow:has(input:disabled) {
+  cursor: default;
+}
+
+.checkboxRow input:disabled {
+  cursor: not-allowed;
+}
+
+.toolsGroup {
+  display: flex;
+  gap: 20px;
+}

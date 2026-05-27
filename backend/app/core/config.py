@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     YANDEX_CLIENT_SECRET: str
     YANDEX_REDIRECT_URI: str
 
+    DEV_MODE: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

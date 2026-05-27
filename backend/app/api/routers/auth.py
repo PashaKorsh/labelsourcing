@@ -10,9 +10,10 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import User
+from app.models import User, Role, UserRole
 from app.core.config import settings
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.api.dependencies import get_current_user, get_user_from_refresh_token
@@ -176,6 +177,61 @@ async def yandex_callback(
     response = RedirectResponse(success_url)
     _set_auth_cookies(response, user.id)
     return response
+
+
+_DEV_USERS: dict[str, dict] = {
+    "admin": {"email": "dev-admin@localhost", "name": "Dev Admin", "roles": ["admin"]},
+    "annotator-1": {"email": "dev-annotator-1@localhost", "name": "Dev Annotator 1", "roles": []},
+    "annotator-2": {"email": "dev-annotator-2@localhost", "name": "Dev Annotator 2", "roles": []},
+}
+
+
+@router.post("/dev-login")
+async def dev_login(
+        response: Response,
+        user: str = Query(...),
+        db: AsyncSession = Depends(get_db),
+):
+    if not settings.DEV_MODE:
+        raise HTTPException(status_code=403, detail="Доступно только в DEV_MODE")
+
+    preset = _DEV_USERS.get(user)
+    if not preset:
+        raise HTTPException(status_code=400, detail=f"Неизвестный пользователь: {user}. Доступны: {list(_DEV_USERS)}")
+
+    existing = (await db.execute(
+        select(User).where(User.email == preset["email"]).options(selectinload(User.roles))
+    )).scalar_one_or_none()
+
+    if existing:
+        db_user = existing
+        existing_role_names = {r.name for r in db_user.roles}
+    else:
+        db_user = User(
+            email=preset["email"],
+            name=preset["name"],
+            password=get_password_hash(str(uuid.uuid4())),
+        )
+        db.add(db_user)
+        await db.flush()
+        existing_role_names: set[str] = set()
+
+    # Назначаем роли, которых ещё нет у пользователя
+    for role_name in preset["roles"]:
+        if role_name in existing_role_names:
+            continue
+        role = (await db.execute(select(Role).where(Role.name == role_name))).scalar_one_or_none()
+        if not role:
+            role = Role(name=role_name)
+            db.add(role)
+            await db.flush()
+        db.add(UserRole(user_id=db_user.id, role_id=role.id))
+
+    await db.commit()
+    await db.refresh(db_user)
+
+    _set_auth_cookies(response, db_user.id)
+    return {"ok": True}
 
 
 @router.post("/refresh")

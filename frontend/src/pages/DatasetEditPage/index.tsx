@@ -29,7 +29,7 @@ const API_FIELDS = [
   'required_answers', 'validation_quorum', 'requires_validation', 'default_tasks_limit',
 ] as const;
 
-const SHOW_RAW_SETTINGS = import.meta.env.VITE_ENABLE_RAW_SETTINGS === 'true';
+const SHOW_RAW_SETTINGS = import.meta.env.VITE_DEV_PANEL === 'true';
 
 interface TaskRow {
   id?: string;

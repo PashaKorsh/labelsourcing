@@ -33,6 +33,9 @@ export const API = {
     delete:    (id: string) => `${API_BASE}/api/v1/tasks/${id}`,
     saveLabel: (taskId: string) => `${API_BASE}/api/v1/tasks/${taskId}/labels`,
   },
+  proxy: {
+    image: (taskId: string) => `${API_BASE}/api/v1/proxy/${taskId}`,
+  },
   labels: {
     updateStatus: (id: string) => `${API_BASE}/api/v1/labels/${id}/status`,
   },

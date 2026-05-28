@@ -7,7 +7,6 @@ import { API, apiFetch } from '../../config/api';
 interface TaskDto {
   id: string;
   dataset_id: string;
-  url: string;
   type?: string;
   task_metadata?: Record<string, unknown>;
   expires_at?: string;
@@ -34,7 +33,7 @@ export class ApiTaskService implements TaskService {
       const mapped: AnnotationTask = {
         id: dto.id,
         datasetId: dto.dataset_id,
-        imageUrl: dto.url,
+        imageUrl: API.proxy.image(dto.id),
         type: dto.type as AnnotationTask['type'],
         metadata: dto.task_metadata,
         expiresAt: dto.expires_at,

@@ -9,6 +9,7 @@ export const API = {
     refresh:        () => `${API_BASE}/api/v1/auth/refresh`,
     yandexLogin:    () => `${API_BASE}/api/v1/auth/yandex/login`,
     yandexCallback: () => `${API_BASE}/api/v1/auth/yandex/callback`,
+    devLogin:       (user: string) => `${API_BASE}/api/v1/auth/dev-login?user=${user}`,
   },
   users: {
     me:     () => `${API_BASE}/api/v1/users/me`,
@@ -32,6 +33,9 @@ export const API = {
     batch:     () => `${API_BASE}/api/v1/tasks/batch`,
     delete:    (id: string) => `${API_BASE}/api/v1/tasks/${id}`,
     saveLabel: (taskId: string) => `${API_BASE}/api/v1/tasks/${taskId}/labels`,
+  },
+  proxy: {
+    image: (taskId: string) => `${API_BASE}/api/v1/proxy/${taskId}`,
   },
   labels: {
     updateStatus: (id: string) => `${API_BASE}/api/v1/labels/${id}/status`,

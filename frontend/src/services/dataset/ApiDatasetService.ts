@@ -97,6 +97,11 @@ export class ApiDatasetService implements DatasetService {
         description: data.description,
         tag_ids: data.tagIds,
         annotation_labels: data.annotationLabels,
+        required_answers: data.requiredAnswers,
+        validation_quorum: data.validationQuorum,
+        requires_validation: data.requiresValidation,
+        default_tasks_limit: data.defaultTasksLimit,
+        settings: data.settings,
       }),
     });
     const dto: DatasetDto = await res.json();

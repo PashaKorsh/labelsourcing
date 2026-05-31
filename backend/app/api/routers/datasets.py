@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, exists, cast, String, delete, or_
+from sqlalchemy import select, func, exists, cast, String, delete, update, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload, aliased
 import uuid
@@ -735,6 +735,62 @@ async def reset_user_progress(
     )).scalar_one_or_none()
     if access:
         await db.delete(access)
+
+    await db.commit()
+
+
+@router.delete("/{dataset_id}/users-data", status_code=204)
+async def reset_dataset_users_data(
+        dataset_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        _: User = Depends(require_roles(["admin"]))
+):
+    """[DEV] Сбросить все пользовательские данные по датасету.
+
+    Датасет возвращается в состояние «как новый»:
+    - Annotation-задачи сохраняются, но их счётчики и статусы обнуляются.
+    - Все validation-задачи удаляются (DB CASCADE → их ассайнменты и лейблы).
+    - Все ассайнменты и лейблы по annotation-задачам удаляются.
+    - Все записи доступа пользователей (UserDatasetAccess) удаляются.
+    """
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    # 1. Удаляем все validation-задачи.
+    #    DB CASCADE (tasks → assignments → labels) чистит дочерние записи автоматически.
+    await db.execute(
+        delete(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.VALIDATION)
+    )
+
+    # 2. Удаляем все ассайнменты по annotation-задачам.
+    #    DB CASCADE (assignments → labels) чистит лейблы автоматически.
+    await db.execute(
+        delete(Assignment)
+        .where(
+            Assignment.task_id.in_(
+                select(Task.id)
+                .where(Task.dataset_id == dataset_id)
+                .where(Task.type == TaskType.ANNOTATION)
+            )
+        )
+    )
+
+    # 3. Сбрасываем счётчики и статусы annotation-задач.
+    await db.execute(
+        update(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.ANNOTATION)
+        .values(status=TaskStatus.PENDING, completed_answers=0, active_assignments=0)
+    )
+
+    # 4. Удаляем все записи доступа пользователей к датасету.
+    await db.execute(
+        delete(UserDatasetAccess)
+        .where(UserDatasetAccess.dataset_id == dataset_id)
+    )
 
     await db.commit()
 

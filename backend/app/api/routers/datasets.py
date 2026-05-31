@@ -109,19 +109,54 @@ def _get_user_status(
         tasks_count: int,
         has_pending_validation: bool = False,
         has_pending_own_validation: bool = False,
+        has_done_on_pending_ann: bool = False,
+        has_any_rejected: bool = False,
 ) -> str:
+    """
+    Вычисляет статус пользователя в датасете.
+
+    Инварианты:
+      NOT_STARTED        — пользователь не начинал (нет access-записи и не было активности)
+      IN_PROGRESS        — у пользователя есть незакрытая работа (аннотации или валидации)
+      WAITING_VALIDATION — пользователь выполнил свою квоту, его работа ожидает проверки
+                           (либо есть PENDING validation-задачи, либо аннотации ещё не набрали
+                           кворум и validation-задачи ещё не созданы)
+      USER_DONE          — всё выполнено и проверено
+      COMPLETED          — датасет закрыт глобально администратором
+
+    Параметры:
+      has_pending_validation   — есть PENDING validation-задачи, которые user может выполнить
+                                 (аннотировал не он, ещё не сделал)
+      has_pending_own_validation — есть PENDING validation-задачи по его аннотациям
+      has_done_on_pending_ann  — у user-а есть DONE-аннотации на задачах, ещё не набравших
+                                 кворум (validation-задачи для них ещё не созданы)
+      has_any_rejected         — у user-а есть хотя бы один REJECTED ассайнмент; означает,
+                                 что tasks_done мог обнулиться после штрафа, но работа была
+    """
     if dataset.status == DatasetStatus.COMPLETED:
         return "COMPLETED"
-    if access is not None:
-        effective_limit = min(access.tasks_limit, tasks_count)
-        if not access.can_label or access.tasks_done >= effective_limit:
-            if dataset.requires_validation and has_pending_validation and access.tasks_done < access.tasks_limit:
-                return "IN_PROGRESS"
-            if dataset.requires_validation and has_pending_own_validation:
-                return "WAITING_VALIDATION"
-            return "USER_DONE"
-        if access.tasks_done > 0:
+
+    if access is None:
+        return "NOT_STARTED"
+
+    effective_limit = min(access.tasks_limit, tasks_count)
+
+    # Пользователь исчерпал квоту аннотаций (или лишён доступа)
+    if not access.can_label or access.tasks_done >= effective_limit:
+        # Можно ещё делать чужие validation-задачи в пределах общего лимита
+        if dataset.requires_validation and has_pending_validation and access.tasks_done < access.tasks_limit:
             return "IN_PROGRESS"
+        # Аннотации user-а ожидают проверки: либо validation-задачи уже созданы и PENDING,
+        # либо задача ещё не набрала кворум и они ещё не созданы (pre-validation limbo)
+        if dataset.requires_validation and (has_pending_own_validation or has_done_on_pending_ann):
+            return "WAITING_VALIDATION"
+        return "USER_DONE"
+
+    # Пользователь не исчерпал квоту — нужно ли показывать прогресс?
+    # has_any_rejected: tasks_done мог обнулиться после штрафа, но user уже начинал
+    if access.tasks_done > 0 or has_any_rejected:
+        return "IN_PROGRESS"
+
     return "NOT_STARTED"
 
 
@@ -136,6 +171,10 @@ async def get_datasets(
     ValTask = aliased(Task)
     ValAssignment = aliased(Assignment)
     OwnValTask = aliased(Task)
+    DoneAnnTask = aliased(Task)
+    DoneAnnAssign = aliased(Assignment)
+    RejTask = aliased(Task)
+    RejAssign = aliased(Assignment)
 
     # Подзапрос: PENDING validation-задачи, которые текущий пользователь ещё не сделал
     # и которые он вообще может выполнить (т.е. аннотировал не он сам).
@@ -169,12 +208,46 @@ async def get_datasets(
         .scalar_subquery()
     )
 
+    # Подзапрос: DONE-аннотации пользователя на задачах, ещё не набравших кворум.
+    # Такие задачи ещё PENDING — validation-задачи для них ещё не созданы.
+    # Это «pre-validation limbo»: работа сдана, но формально в очереди валидации не стоит.
+    # SELECT id ... LIMIT 1: останавливается на первой строке — нам нужен только факт наличия.
+    # Возвращает UUID задачи или NULL; bool(UUID) = True, bool(None) = False.
+    user_done_on_pending_ann_sq = (
+        select(DoneAnnTask.id)
+        .join(DoneAnnAssign, DoneAnnAssign.task_id == DoneAnnTask.id)
+        .where(DoneAnnTask.dataset_id == Dataset.id)
+        .where(DoneAnnTask.type == TaskType.ANNOTATION)
+        .where(DoneAnnTask.status == TaskStatus.PENDING)
+        .where(DoneAnnAssign.user_id == current_user.id)
+        .where(DoneAnnAssign.status == AssignmentStatus.DONE)
+        .limit(1)
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
+    # Подзапрос: есть ли у пользователя отклонённые ассайнменты в этом датасете.
+    # Нужно, чтобы отличить «никогда не начинал» от «начинал, но tasks_done обнулился после штрафа».
+    # SELECT id ... LIMIT 1: аналогично — только булевый факт, не количество.
+    has_user_rejected_sq = (
+        select(RejAssign.id)
+        .join(RejTask, RejAssign.task_id == RejTask.id)
+        .where(RejTask.dataset_id == Dataset.id)
+        .where(RejAssign.user_id == current_user.id)
+        .where(RejAssign.status == AssignmentStatus.REJECTED)
+        .limit(1)
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
     stmt = (
         select(
             Dataset,
             func.count(Label.id.distinct()).label("labeled_count"),
             pending_val_for_user_sq.label("pending_val_count"),
             own_pending_val_sq.label("own_pending_val_count"),
+            user_done_on_pending_ann_sq.label("done_on_pending_ann"),
+            has_user_rejected_sq.label("has_rejected"),
             UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
@@ -215,11 +288,13 @@ async def get_datasets(
         dataset.labeled_count = row[1]
         pending_val_count = row[2]
         own_pending_val_count = row[3]
-        user_access = row[4]
+        user_access = row[6]
         dataset.user_status = _get_user_status(
             dataset, user_access, dataset.tasks_count,
             has_pending_validation=pending_val_count > 0,
             has_pending_own_validation=own_pending_val_count > 0,
+            has_done_on_pending_ann=bool(row[4]),  # UUID или None
+            has_any_rejected=bool(row[5]),          # UUID или None
         )
 
         datasets_with_counts.append(dataset)

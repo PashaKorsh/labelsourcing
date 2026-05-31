@@ -14,6 +14,11 @@ export interface DatasetCreateInput {
   description: string;
   tagIds?: string[];
   annotationLabels?: Tag[];
+  requiredAnswers?: number;
+  validationQuorum?: number;
+  requiresValidation?: boolean;
+  defaultTasksLimit?: number;
+  settings?: Record<string, unknown>;
 }
 
 export interface DatasetUpdateInput {

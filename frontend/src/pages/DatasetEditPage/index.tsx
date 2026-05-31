@@ -11,7 +11,6 @@ import { datasetService, taskService } from '../../services';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import type { AppTag } from '../../types/appTag';
 import type { Tag } from '../../types/annotation';
-import type { Dataset } from '../../types/dataset';
 import styles from './DatasetEditPage.module.css';
 
 const ANNOTATION_TOOLS = IMAGE_DRAWING_TOOLS.filter(t => t.id !== 'cursor');
@@ -29,7 +28,7 @@ const API_FIELDS = [
   'required_answers', 'validation_quorum', 'requires_validation', 'default_tasks_limit',
 ] as const;
 
-const SHOW_RAW_SETTINGS = import.meta.env.VITE_ENABLE_RAW_SETTINGS === 'true';
+const SHOW_RAW_SETTINGS = import.meta.env.VITE_DEV_PANEL === 'true';
 
 interface TaskRow {
   id?: string;
@@ -39,8 +38,9 @@ interface TaskRow {
 export function DatasetEditPage() {
   const { datasetId } = useParams<{ datasetId: string }>();
   const navigate = useNavigate();
+  const isCreateMode = !datasetId;
 
-  const [dataset, setDataset] = useState<Dataset | null>(null);
+  const [isLoading, setIsLoading] = useState(!isCreateMode);
   const [taskRows, setTaskRows] = useState<TaskRow[]>([{ url: '' }]);
   const [originalTaskRows, setOriginalTaskRows] = useState<TaskRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -50,12 +50,11 @@ export function DatasetEditPage() {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
-    if (!datasetId) return;
+    if (isCreateMode) return;
     Promise.all([
-      datasetService.get(datasetId),
-      datasetService.getTasks(datasetId),
+      datasetService.get(datasetId!),
+      datasetService.getTasks(datasetId!),
     ]).then(([ds, tasks]) => {
-      setDataset(ds);
       const rows: TaskRow[] = tasks.map(t => ({ id: t.id, url: t.imageUrl }));
       setTaskRows(rows.length > 0 ? rows : [{ url: '' }]);
       setOriginalTaskRows(rows);
@@ -71,8 +70,8 @@ export function DatasetEditPage() {
       if (ds.requiresValidation) merged.requires_validation = true;
       if (ds.defaultTasksLimit !== undefined) merged.default_tasks_limit = ds.defaultTasksLimit;
       setSettings(Object.keys(merged).length > 0 ? merged : null);
-    }).catch(console.error);
-  }, [datasetId]);
+    }).catch(console.error).finally(() => setIsLoading(false));
+  }, [datasetId, isCreateMode]);
 
   // Записывает или удаляет одно поле в settings
   // (null / undefined / '' / false удаляют ключ)
@@ -126,7 +125,7 @@ export function DatasetEditPage() {
   };
 
   const handleSave = async () => {
-    if (!datasetId || !description.trim()) return;
+    if (!description.trim()) return;
     setSubmitting(true);
     try {
       const s = settings ?? {};
@@ -136,7 +135,7 @@ export function DatasetEditPage() {
         Object.entries(s).filter(([k]) => !(API_FIELDS as readonly string[]).includes(k)),
       );
 
-      await datasetService.update(datasetId, {
+      const commonFields = {
         title: typeof s.title === 'string' ? s.title.trim() || undefined : undefined,
         description: typeof s.description === 'string' ? s.description.trim() : '',
         tagIds: Array.isArray(s.tags) ? (s.tags as AppTag[]).map(t => t.id) : [],
@@ -145,30 +144,36 @@ export function DatasetEditPage() {
         validationQuorum: typeof s.validation_quorum === 'number' ? s.validation_quorum : undefined,
         requiresValidation: s.requires_validation === true ? true : undefined,
         defaultTasksLimit: typeof s.default_tasks_limit === 'number' ? s.default_tasks_limit : undefined,
-        settings: Object.keys(extraSettings).length > 0 ? extraSettings : null,
-      });
+        settings: Object.keys(extraSettings).length > 0 ? extraSettings : undefined,
+      };
 
-      const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
-      const deletedIds = originalTaskRows
-        .filter(r => r.id && !currentIds.has(r.id))
-        .map(r => r.id!);
-      await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
+      const urlsToCreate = taskRows.filter(r => !r.id && r.url.trim()).map(r => r.url.trim());
 
-      const urlsToCreate: string[] = [];
-      for (const row of taskRows) {
-        if (!row.url.trim()) continue;
-        if (!row.id) {
-          urlsToCreate.push(row.url.trim());
-        } else {
+      if (isCreateMode) {
+        const created = await datasetService.create(commonFields);
+        if (urlsToCreate.length > 0) {
+          await taskService.createBatch(created.id, urlsToCreate);
+        }
+      } else {
+        await datasetService.update(datasetId!, { ...commonFields, settings: commonFields.settings ?? null });
+
+        const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
+        const deletedIds = originalTaskRows
+          .filter(r => r.id && !currentIds.has(r.id))
+          .map(r => r.id!);
+        await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
+
+        for (const row of taskRows) {
+          if (!row.url.trim() || !row.id) continue;
           const origUrl = originalTaskRows.find(r => r.id === row.id)?.url;
           if (origUrl !== undefined && origUrl !== row.url.trim()) {
             await taskService.deleteTask(row.id);
             urlsToCreate.push(row.url.trim());
           }
         }
-      }
-      if (urlsToCreate.length > 0) {
-        await taskService.createBatch(datasetId, urlsToCreate);
+        if (urlsToCreate.length > 0) {
+          await taskService.createBatch(datasetId!, urlsToCreate);
+        }
       }
 
       navigate(ROUTES.myDatasets);
@@ -179,7 +184,7 @@ export function DatasetEditPage() {
     }
   };
 
-  if (!dataset) {
+  if (isLoading) {
     return (
       <main className={styles.page}>
         <div className={styles.content}>
@@ -245,7 +250,7 @@ export function DatasetEditPage() {
                 type="number"
                 min={1}
                 className={styles.input}
-                placeholder="1"
+                placeholder="3"
                 value={requiredAnswers}
                 onChange={e => patchSettings('required_answers', e.target.value === '' ? null : Number(e.target.value))}
               />
@@ -267,7 +272,7 @@ export function DatasetEditPage() {
                 type="number"
                 min={1}
                 className={styles.input}
-                placeholder="Без ограничений"
+                placeholder="50"
                 value={defaultTasksLimit}
                 onChange={e => patchSettings('default_tasks_limit', e.target.value === '' ? null : Number(e.target.value))}
               />
@@ -349,16 +354,20 @@ export function DatasetEditPage() {
             onClick={handleSave}
             disabled={submitting || !description.trim()}
           >
-            {submitting ? 'Сохранение…' : 'Сохранить'}
+            {submitting
+              ? (isCreateMode ? 'Создание…' : 'Сохранение…')
+              : (isCreateMode ? 'Создать датасет' : 'Сохранить')}
           </button>
-          <button
-            type="button"
-            className={styles.deleteButton}
-            onClick={() => setShowDeleteConfirm(true)}
-            disabled={submitting}
-          >
-            Удалить датасет
-          </button>
+          {!isCreateMode && (
+            <button
+              type="button"
+              className={styles.deleteButton}
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={submitting}
+            >
+              Удалить датасет
+            </button>
+          )}
         </div>
       </div>
 

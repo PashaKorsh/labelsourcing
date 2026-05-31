@@ -6,7 +6,6 @@ import { AuthPage }            from './pages/AuthPage';
 import { DatasetsListPage }    from './pages/DatasetsListPage';
 import { ProfilePage }         from './pages/ProfilePage';
 import { MyDatasetsPage }      from './pages/MyDatasetsPage';
-import { DatasetNewPage }      from './pages/DatasetNewPage';
 import { DatasetEditPage }     from './pages/DatasetEditPage';
 import { UsersPage }           from './pages/UsersPage';
 import { TagsPage }            from './pages/TagsPage';
@@ -29,7 +28,7 @@ export default function App() {
             <Route path={ROUTES.profile}           element={<P><ProfilePage /></P>} />
             <Route path={ROUTES.datasetAnnotation} element={<P><WorkspacePage /></P>} />
             <Route path={ROUTES.myDatasets}        element={<P roles={[ROLE_ADMIN, ROLE_CREATOR]}><MyDatasetsPage /></P>} />
-            <Route path={ROUTES.datasetNew}        element={<P roles={[ROLE_ADMIN]}><DatasetNewPage /></P>} />
+            <Route path={ROUTES.datasetNew}        element={<P roles={[ROLE_ADMIN]}><DatasetEditPage /></P>} />
             <Route path={ROUTES.datasetEdit}       element={<P roles={[ROLE_ADMIN]}><DatasetEditPage /></P>} />
             <Route path={ROUTES.users}             element={<P roles={[ROLE_ADMIN]}><UsersPage /></P>} />
             <Route path={ROUTES.tags}              element={<P roles={[ROLE_ADMIN]}><TagsPage /></P>} />

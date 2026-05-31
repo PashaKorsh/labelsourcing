@@ -9,8 +9,9 @@ services:
       - ./pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U test -d testdb"]
-      interval: 5s
-      timeout: 5s
+      interval: 1s
+      timeout: 1s
+      retries: 1000000
 
   migrate:
     build: ./backend
@@ -43,7 +44,7 @@ services:
       context: ./frontend
       args:
         - VITE_API_MODE=${VITE_API_MODE:-real}
-        - VITE_ENABLE_RAW_SETTINGS=${VITE_ENABLE_RAW_SETTINGS:-false}
+        - VITE_DEV_PANEL=${VITE_DEV_PANEL:-true}
     ports:
       - "80:80"
     volumes:

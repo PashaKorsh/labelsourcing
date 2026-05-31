@@ -15,7 +15,7 @@ from app.models import (
 from app.api.dependencies import get_current_user, require_roles
 from app.api.helpers import _ensure_validation_tasks
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
-from app.schemas.task import TaskResponse
+from app.schemas.task import TaskResponse, TaskPublicResponse
 from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
@@ -291,7 +291,7 @@ async def _assign_task(
     task.expires_at = expires_at
 
 
-@router.get("/{dataset_id}/next", response_model=list[TaskResponse])
+@router.get("/{dataset_id}/next", response_model=list[TaskPublicResponse])
 async def get_next_task(
         dataset_id: uuid.UUID,
         count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST),

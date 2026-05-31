@@ -8,6 +8,7 @@ on:
       - 'backend/**'
       - 'docker-compose.prod.yml'
       - 'nginx/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
     inputs:
       job:
@@ -15,13 +16,13 @@ on:
         required: true
         type: choice
         options:
-          - start-vm
+          - deploy
           - stop-vm
 
 jobs:
   build-and-push:
     name: Build & Push to Registry
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'deploy')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,6 +61,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Start VM and wait for SSH
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -i ~/yc -n
+          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > sa-key.json
+          echo '${{ secrets.SSH_PRIVATE_KEY }}' > ssh_key
+          chmod 600 ssh_key
+          ~/yc/bin/yc config set service-account-key sa-key.json
+          ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+          ~/yc/bin/yc compute instance start ${{ secrets.YC_INSTANCE_ID }} || true
+
+          for i in {1..12}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i ssh_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo ready"; then
+              echo "SSH is ready"
+              break
+            fi
+            echo "Waiting for SSH... ($i/12)"
+            sleep 5
+          done
 
       - name: Copy docker-compose and configs to server
         uses: appleboy/scp-action@v0.1.7
@@ -110,7 +130,7 @@ jobs:
 
   manage-vm:
     name: Manage VM
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.job == 'stop-vm'
     runs-on: ubuntu-latest
     steps:
       - name: Install Yandex Cloud CLI
@@ -124,10 +144,5 @@ jobs:
           ~/yc/bin/yc config set service-account-key sa-key.json
           ~/yc/bin/yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
 
-      - name: Start VM
-        if: github.event.inputs.job == 'start-vm'
-        run: yc compute instance start ${{ secrets.YC_INSTANCE_ID }}
-
       - name: Stop VM
-        if: github.event.inputs.job == 'stop-vm'
         run: yc compute instance stop ${{ secrets.YC_INSTANCE_ID }}

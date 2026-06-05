@@ -1,7 +1,7 @@
 import type { AppTag } from './appTag';
 import type { Tag } from './annotation';
 
-export type UserDatasetStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'USER_DONE' | 'COMPLETED' | 'WAITING_VALIDATION';
+export type UserDatasetStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'WAITING_VALIDATION' | 'LIMIT_REACHED' | 'IDLE' | 'COMPLETED';
 
 export interface Dataset {
   id: string;

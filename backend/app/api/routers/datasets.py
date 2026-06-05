@@ -115,11 +115,12 @@ def _get_user_status(
       NOT_STARTED        — нет access-записи (пользователь не начинал)
       IN_PROGRESS        — лимит не исчерпан и есть задачи (аннотация или валидация)
       WAITING_VALIDATION — собственная разметка ожидает проверки
-      USER_DONE          — нечего делать и нет неподтверждённой разметки
-      CLOSED             — датасет закрыт администратором
+      LIMIT_REACHED      — пользователь исчерпал свою квоту
+      IDLE               — задач нет, но квота не исчерпана (датасет ещё может пополниться)
+      COMPLETED          — датасет закрыт администратором
     """
     if dataset.status == DatasetStatus.CLOSED:
-        return "CLOSED"
+        return "COMPLETED"
 
     if access is None:
         return "NOT_STARTED"
@@ -135,7 +136,10 @@ def _get_user_status(
     if dataset.requires_validation and has_unvalidated_work:
         return "WAITING_VALIDATION"
 
-    return "USER_DONE"
+    if limit_reached:
+        return "LIMIT_REACHED"
+
+    return "IDLE"
 
 
 @router.get("/", response_model=list[DatasetResponse])

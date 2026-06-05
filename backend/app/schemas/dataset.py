@@ -36,7 +36,7 @@ class DatasetResponse(BaseModel):
     tasks_count: int = 0
     requires_validation: bool = False
     validation_quorum: int = 1
-    # Единый статус для фронтенда (NOT_STARTED, IN_PROGRESS, WAITING_VALIDATION, USER_DONE, CLOSED)
+    # Единый статус для фронтенда (NOT_STARTED, IN_PROGRESS, WAITING_VALIDATION, LIMIT_REACHED, IDLE, COMPLETED)
     user_status: str = "NOT_STARTED"
     user_done: bool = False
     user_tasks_limit: int | None = None

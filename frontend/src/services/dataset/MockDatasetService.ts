@@ -36,7 +36,7 @@ const MOCK_LIST: Dataset[] = [
     description: 'Небольшое описание набора 4.',
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-4/400/240',
     tags: [TAG_MEDIC],
-    userStatus: 'USER_DONE',
+    userStatus: 'IDLE',
   },
 ];
 

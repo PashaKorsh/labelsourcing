@@ -40,11 +40,10 @@ def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
             )
 
 
-def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
+def _compute_user_done(access: UserDatasetAccess | None) -> bool:
     if access is None:
         return False
-    effective_limit = min(access.tasks_limit, tasks_count)
-    return not access.can_label or access.tasks_done >= effective_limit
+    return not access.can_label or access.tasks_done >= access.tasks_limit
 
 
 async def _get_dataset_with_counts(
@@ -65,7 +64,7 @@ async def _get_dataset_with_counts(
                 UserDatasetAccess.dataset_id == dataset_id,
             )
         )).scalar_one_or_none()
-        dataset.user_done = _compute_user_done(access, dataset.tasks_count)
+        dataset.user_done = _compute_user_done(access)
         if access is not None:
             dataset.user_tasks_limit = access.tasks_limit
             dataset.user_tasks_done = access.tasks_done
@@ -106,58 +105,37 @@ async def create_dataset(
 def _get_user_status(
         dataset: Dataset,
         access: UserDatasetAccess | None,
-        tasks_count: int,
         has_pending_validation: bool = False,
-        has_pending_own_validation: bool = False,
-        has_done_on_pending_ann: bool = False,
-        has_any_rejected: bool = False,
+        has_pending_annotation: bool = False,
+        has_unvalidated_work: bool = False,
 ) -> str:
     """
     Вычисляет статус пользователя в датасете.
 
-    Инварианты:
-      NOT_STARTED        — пользователь не начинал (нет access-записи и не было активности)
-      IN_PROGRESS        — у пользователя есть незакрытая работа (аннотации или валидации)
-      WAITING_VALIDATION — пользователь выполнил свою квоту, его работа ожидает проверки
-                           (либо есть PENDING validation-задачи, либо аннотации ещё не набрали
-                           кворум и validation-задачи ещё не созданы)
-      USER_DONE          — всё выполнено и проверено
-      COMPLETED          — датасет закрыт глобально администратором
-
-    Параметры:
-      has_pending_validation   — есть PENDING validation-задачи, которые user может выполнить
-                                 (аннотировал не он, ещё не сделал)
-      has_pending_own_validation — есть PENDING validation-задачи по его аннотациям
-      has_done_on_pending_ann  — у user-а есть DONE-аннотации на задачах, ещё не набравших
-                                 кворум (validation-задачи для них ещё не созданы)
-      has_any_rejected         — у user-а есть хотя бы один REJECTED ассайнмент; означает,
-                                 что tasks_done мог обнулиться после штрафа, но работа была
+      NOT_STARTED        — нет access-записи (пользователь не начинал)
+      IN_PROGRESS        — лимит не исчерпан и есть задачи (аннотация или валидация)
+      WAITING_VALIDATION — собственная разметка ожидает проверки
+      USER_DONE          — нечего делать и нет неподтверждённой разметки
+      CLOSED             — датасет закрыт администратором
     """
-    if dataset.status == DatasetStatus.COMPLETED:
-        return "COMPLETED"
+    if dataset.status == DatasetStatus.CLOSED:
+        return "CLOSED"
 
     if access is None:
         return "NOT_STARTED"
 
-    effective_limit = min(access.tasks_limit, tasks_count)
+    limit_reached = access.tasks_done >= access.tasks_limit
 
-    # Пользователь исчерпал квоту аннотаций (или лишён доступа)
-    if not access.can_label or access.tasks_done >= effective_limit:
-        # Можно ещё делать чужие validation-задачи в пределах общего лимита
-        if dataset.requires_validation and has_pending_validation and access.tasks_done < access.tasks_limit:
-            return "IN_PROGRESS"
-        # Аннотации user-а ожидают проверки: либо validation-задачи уже созданы и PENDING,
-        # либо задача ещё не набрала кворум и они ещё не созданы (pre-validation limbo)
-        if dataset.requires_validation and (has_pending_own_validation or has_done_on_pending_ann):
-            return "WAITING_VALIDATION"
-        return "USER_DONE"
-
-    # Пользователь не исчерпал квоту — нужно ли показывать прогресс?
-    # has_any_rejected: tasks_done мог обнулиться после штрафа, но user уже начинал
-    if access.tasks_done > 0 or has_any_rejected:
+    if not limit_reached and (
+        (dataset.requires_validation and has_pending_validation) or
+        (access.can_label and has_pending_annotation)
+    ):
         return "IN_PROGRESS"
 
-    return "NOT_STARTED"
+    if dataset.requires_validation and has_unvalidated_work:
+        return "WAITING_VALIDATION"
+
+    return "USER_DONE"
 
 
 @router.get("/", response_model=list[DatasetResponse])
@@ -170,16 +148,16 @@ async def get_datasets(
 ):
     ValTask = aliased(Task)
     ValAssignment = aliased(Assignment)
-    OwnValTask = aliased(Task)
-    DoneAnnTask = aliased(Task)
-    DoneAnnAssign = aliased(Assignment)
-    RejTask = aliased(Task)
-    RejAssign = aliased(Assignment)
+    UnvalLabel = aliased(Label)
+    UnvalAnnAssign = aliased(Assignment)
+    UnvalAnnTask = aliased(Task)
+    AnnTask2 = aliased(Task)
+    AnnAssign2 = aliased(Assignment)
 
-    # Подзапрос: PENDING validation-задачи, которые текущий пользователь ещё не сделал
-    # и которые он вообще может выполнить (т.е. аннотировал не он сам).
+    # Подзапрос: есть ли PENDING validation-задачи, которые пользователь ещё не сделал
+    # (аннотировал не он сам)
     pending_val_for_user_sq = (
-        select(func.count())
+        select(ValTask.id)
         .where(ValTask.dataset_id == Dataset.id)
         .where(ValTask.type == TaskType.VALIDATION)
         .where(ValTask.status == TaskStatus.PENDING)
@@ -193,48 +171,41 @@ async def get_datasets(
                 .correlate(ValTask)
             )
         )
-        .correlate(Dataset)
-        .scalar_subquery()
-    )
-
-    # Подзапрос: PENDING validation-задачи по аннотациям самого пользователя (его работа ждёт проверки)
-    own_pending_val_sq = (
-        select(func.count())
-        .where(OwnValTask.dataset_id == Dataset.id)
-        .where(OwnValTask.type == TaskType.VALIDATION)
-        .where(OwnValTask.status == TaskStatus.PENDING)
-        .where(cast(OwnValTask.task_metadata['annotator_id'], String) == f'"{current_user.id}"')
-        .correlate(Dataset)
-        .scalar_subquery()
-    )
-
-    # Подзапрос: DONE-аннотации пользователя на задачах, ещё не набравших кворум.
-    # Такие задачи ещё PENDING — validation-задачи для них ещё не созданы.
-    # Это «pre-validation limbo»: работа сдана, но формально в очереди валидации не стоит.
-    # SELECT id ... LIMIT 1: останавливается на первой строке — нам нужен только факт наличия.
-    # Возвращает UUID задачи или NULL; bool(UUID) = True, bool(None) = False.
-    user_done_on_pending_ann_sq = (
-        select(DoneAnnTask.id)
-        .join(DoneAnnAssign, DoneAnnAssign.task_id == DoneAnnTask.id)
-        .where(DoneAnnTask.dataset_id == Dataset.id)
-        .where(DoneAnnTask.type == TaskType.ANNOTATION)
-        .where(DoneAnnTask.status == TaskStatus.PENDING)
-        .where(DoneAnnAssign.user_id == current_user.id)
-        .where(DoneAnnAssign.status == AssignmentStatus.DONE)
         .limit(1)
         .correlate(Dataset)
         .scalar_subquery()
     )
 
-    # Подзапрос: есть ли у пользователя отклонённые ассайнменты в этом датасете.
-    # Нужно, чтобы отличить «никогда не начинал» от «начинал, но tasks_done обнулился после штрафа».
-    # SELECT id ... LIMIT 1: аналогично — только булевый факт, не количество.
-    has_user_rejected_sq = (
-        select(RejAssign.id)
-        .join(RejTask, RejAssign.task_id == RejTask.id)
-        .where(RejTask.dataset_id == Dataset.id)
-        .where(RejAssign.user_id == current_user.id)
-        .where(RejAssign.status == AssignmentStatus.REJECTED)
+    # Подзапрос: есть ли у пользователя аннотационные лейблы, ещё не прошедшие валидацию
+    user_has_unvalidated_work_sq = (
+        select(UnvalLabel.id)
+        .join(UnvalAnnAssign, UnvalLabel.assignment_id == UnvalAnnAssign.id)
+        .join(UnvalAnnTask, UnvalAnnAssign.task_id == UnvalAnnTask.id)
+        .where(UnvalAnnTask.dataset_id == Dataset.id)
+        .where(UnvalAnnTask.type == TaskType.ANNOTATION)
+        .where(UnvalAnnAssign.user_id == current_user.id)
+        .where(UnvalAnnAssign.status == AssignmentStatus.DONE)
+        .where(UnvalLabel.is_validated == False)
+        .limit(1)
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
+    # Подзапрос: есть ли PENDING annotation-задачи, которые пользователь ещё не выполнил
+    pending_ann_for_user_sq = (
+        select(AnnTask2.id)
+        .where(AnnTask2.dataset_id == Dataset.id)
+        .where(AnnTask2.type == TaskType.ANNOTATION)
+        .where(AnnTask2.status == TaskStatus.PENDING)
+        .where(
+            ~exists(
+                select(AnnAssign2.id)
+                .where(AnnAssign2.task_id == AnnTask2.id)
+                .where(AnnAssign2.user_id == current_user.id)
+                .where(AnnAssign2.status == AssignmentStatus.DONE)
+                .correlate(AnnTask2)
+            )
+        )
         .limit(1)
         .correlate(Dataset)
         .scalar_subquery()
@@ -244,10 +215,9 @@ async def get_datasets(
         select(
             Dataset,
             func.count(Label.id.distinct()).label("labeled_count"),
-            pending_val_for_user_sq.label("pending_val_count"),
-            own_pending_val_sq.label("own_pending_val_count"),
-            user_done_on_pending_ann_sq.label("done_on_pending_ann"),
-            has_user_rejected_sq.label("has_rejected"),
+            pending_val_for_user_sq.label("pending_val"),
+            user_has_unvalidated_work_sq.label("has_unvalidated_work"),
+            pending_ann_for_user_sq.label("has_pending_ann"),
             UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
@@ -286,15 +256,15 @@ async def get_datasets(
     for row in result.all():
         dataset = row[0]
         dataset.labeled_count = row[1]
-        pending_val_count = row[2]
-        own_pending_val_count = row[3]
-        user_access = row[6]
+        # row[2]: UUID или None — есть ли PENDING val-задачи для пользователя
+        # row[3]: UUID или None — есть ли непроверенные лейблы пользователя
+        # row[4]: UUID или None — есть ли PENDING ann-задачи для пользователя
+        user_access = row[5]
         dataset.user_status = _get_user_status(
-            dataset, user_access, dataset.tasks_count,
-            has_pending_validation=pending_val_count > 0,
-            has_pending_own_validation=own_pending_val_count > 0,
-            has_done_on_pending_ann=bool(row[4]),  # UUID или None
-            has_any_rejected=bool(row[5]),          # UUID или None
+            dataset, user_access,
+            has_pending_validation=bool(row[2]),
+            has_unvalidated_work=bool(row[3]),
+            has_pending_annotation=bool(row[4]),
         )
 
         datasets_with_counts.append(dataset)
@@ -349,8 +319,8 @@ async def _assign_task(
     )).scalar_one_or_none()
 
     if existing:
-        if existing.status in (AssignmentStatus.EXPIRED, AssignmentStatus.REJECTED):
-            task.active_assignments += 1
+        # Единственный возможный случай: устаревший IN_PROGRESS (expires_at истёк, но не был
+        # сдан — active_assignments уже был посчитан при создании, не инкрементируем повторно)
         existing.status = AssignmentStatus.IN_PROGRESS
         existing.expires_at = expires_at
         existing.assigned_at = datetime.utcnow()
@@ -452,27 +422,24 @@ async def get_next_task(
     remaining_count = count - len(result_tasks)
 
     # Annotation-задачи — только если валидации не нашлось
-    if len(result_tasks) == 0 and access.can_label:
-        effective_limit = min(access.tasks_limit, dataset.tasks_count)
+    if len(result_tasks) == 0 and access.can_label and access.tasks_done < access.tasks_limit:
+        ann_task_stmt = (
+            select(Task)
+            .where(Task.dataset_id == dataset_id)
+            .where(Task.type == TaskType.ANNOTATION)
+            .where(Task.status == TaskStatus.PENDING)
+            .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
+            .where(~user_busy_sq)
+            .order_by(Task.created_at)
+            .limit(remaining_count)
+            .with_for_update(of=Task, skip_locked=True)
+        )
 
-        if access.tasks_done < effective_limit:
-            ann_task_stmt = (
-                select(Task)
-                .where(Task.dataset_id == dataset_id)
-                .where(Task.type == TaskType.ANNOTATION)
-                .where(Task.status == TaskStatus.PENDING)
-                .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
-                .where(~user_busy_sq)
-                .order_by(Task.created_at)
-                .limit(remaining_count)
-                .with_for_update(of=Task, skip_locked=True)
-            )
+        annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
 
-            annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
-
-            for task in annotation_tasks:
-                await _assign_task(db, task, current_user.id, expires_at)
-                result_tasks.append(task)
+        for task in annotation_tasks:
+            await _assign_task(db, task, current_user.id, expires_at)
+            result_tasks.append(task)
 
     if not result_tasks:
         await db.rollback()
@@ -693,9 +660,7 @@ async def reset_user_progress(
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
     # 1. Удаляем все validation-задачи, созданные из разметки этого пользователя.
-    #    Это покрывает все состояния аннотации: DONE (валидация ещё идёт),
-    #    REJECTED (валидация завершена, лейбл уже удалён — per-label запрос не работал).
-    #    DB-уровень CASCADE (tasks→assignments→labels) сам чистит дочерние записи.
+    #    DB CASCADE (tasks→assignments→labels) чистит дочерние записи автоматически.
     await db.execute(
         delete(Task)
         .where(Task.dataset_id == dataset_id)
@@ -724,7 +689,6 @@ async def reset_user_progress(
                 task.status = TaskStatus.PENDING
         elif assignment.status == AssignmentStatus.IN_PROGRESS:
             task.active_assignments = max(0, task.active_assignments - 1)
-        # REJECTED: задача уже откачена в _process_validation_verdict
         await db.delete(assignment)
 
     access = (await db.execute(
@@ -791,6 +755,14 @@ async def reset_dataset_users_data(
         delete(UserDatasetAccess)
         .where(UserDatasetAccess.dataset_id == dataset_id)
     )
+
+    # 5. Пересчитываем tasks_count по факту — защита от рассинхрона счётчика.
+    actual_count = (await db.execute(
+        select(func.count())
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.ANNOTATION)
+    )).scalar_one()
+    dataset.tasks_count = actual_count
 
     await db.commit()
 

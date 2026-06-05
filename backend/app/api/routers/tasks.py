@@ -31,11 +31,6 @@ async def _process_validation_verdict(
     approve_count = sum(1 for l in labels if l.result.get('is_correct') is True)
     reject_count = len(labels) - approve_count
 
-    # При равенстве голосов считаем одобренным
-    if reject_count <= approve_count:
-        return
-
-    # Большинство отклонило — откатываем исходную разметку
     meta = validation_task.task_metadata or {}
     annotation_label_id_str = meta.get('annotation_label_id')
     if not annotation_label_id_str:
@@ -45,6 +40,12 @@ async def _process_validation_verdict(
     if not annotation_label:
         return
 
+    # При равенстве голосов считаем одобренным
+    if reject_count < approve_count:
+        annotation_label.is_validated = True
+        return
+
+    # Большинство отклонило — откатываем исходную разметку
     annotation_assignment = await db.get(Assignment, annotation_label.assignment_id)
     if not annotation_assignment:
         return
@@ -58,14 +59,14 @@ async def _process_validation_verdict(
     if not annotation_task:
         return
 
-    # Помечаем исходный ассайнмент как отклонённый и возвращаем задачу в пул
-    annotation_assignment.status = AssignmentStatus.REJECTED
+    # Возвращаем задачу в пул
     annotation_task.completed_answers = max(0, annotation_task.completed_answers - 1)
     if annotation_task.completed_answers < dataset.required_answers:
         annotation_task.status = TaskStatus.PENDING
 
-    # Удаляем отклонённый лейбл
+    # Удаляем лейбл и ассайнмент (явный порядок: сначала child, потом parent)
     await db.delete(annotation_label)
+    await db.delete(annotation_assignment)
 
     # Возвращаем слот в счётчик разметки аннотатора
     access_stmt = select(UserDatasetAccess).where(
@@ -202,7 +203,7 @@ async def submit_label(
     # Ленивая проверка истечения
     if assignment.status == AssignmentStatus.IN_PROGRESS and assignment.expires_at < datetime.utcnow():
         task.active_assignments = max(0, task.active_assignments - 1)
-        assignment.status = AssignmentStatus.EXPIRED
+        await db.delete(assignment)
         await db.commit()
         raise HTTPException(status_code=410, detail="Время на выполнение задания истекло. Получите новую задачу.")
 

@@ -800,6 +800,11 @@ async def update_dataset(
         dataset.required_answers = update_data.required_answers
     if update_data.default_tasks_limit is not None:
         dataset.default_tasks_limit = update_data.default_tasks_limit
+        await db.execute(
+            update(UserDatasetAccess)
+            .where(UserDatasetAccess.dataset_id == dataset_id)
+            .values(tasks_limit=update_data.default_tasks_limit)
+        )
     if update_data.status is not None:
         dataset.status = update_data.status
     if update_data.annotation_labels is not None:

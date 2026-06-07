@@ -547,12 +547,23 @@ async def export_dataset_labels(
             if not coords:
                 continue
 
+            x_coords = coords[0::2]
+            y_coords = coords[1::2]
+
+            x_min = min(x_coords)
+            y_min = min(y_coords)
+            width = max(x_coords) - x_min
+            height = max(y_coords) - y_min
+
+            bbox = [round(x_min, 2), round(y_min, 2), round(width, 2), round(height, 2)]
+
             tag_name = label_map.get(tag_id, tag_id)
             area = _calculate_area(coords)
 
             shapes.append({
                 "tag": tag_name,
                 "area": round(area, 2),
+                "bbox": bbox,
                 "segmentation": [coords],
                 "iscrowd": 0
             })

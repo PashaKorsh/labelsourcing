@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class ExportShape(BaseModel):
     tag: str
     area: float
+    bbox: list[float]
     segmentation: List[List[float]]
     iscrowd: int = 0
 

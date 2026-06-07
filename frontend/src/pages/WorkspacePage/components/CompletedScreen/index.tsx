@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../../config/routes';
+import { ROUTES } from '../../../../config/routes';
 import styles from './CompletedScreen.module.css';
 
 interface Props {

@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { AnnotationCanvas } from '../../components/AnnotationCanvas';
-import { ToolSelector } from '../../components/ToolSelector';
-import { TagSelector } from '../../components/TagSelector';
-import { HintsBar } from '../../components/HintsBar';
-import { CompletedScreen } from '../../components/CompletedScreen';
+import { ToolSelector } from './components/ToolSelector';
+import { TagSelector } from './components/TagSelector';
+import { HintsBar } from './components/HintsBar';
+import { CompletedScreen } from './components/CompletedScreen';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
 import { taskService } from '../../services';

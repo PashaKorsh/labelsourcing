@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { toUTC } from '../../utils/time';
+import { toUTC } from '../../../../utils/time';
 import styles from './ExpiryTimer.module.css';
 
 function formatTimeLeft(seconds: number): string {

@@ -1,4 +1,4 @@
-import { getHints } from '../../tools/toolHints';
+import { getHints } from '../../../../tools/toolHints';
 import styles from './HintsBar.module.css';
 
 interface HintsBarProps {

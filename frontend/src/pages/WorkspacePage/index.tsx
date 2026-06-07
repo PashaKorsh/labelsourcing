@@ -1,5 +1,5 @@
 import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { ExpiryTimer } from '../../components/ExpiryTimer';
+import { ExpiryTimer } from './components/ExpiryTimer';
 import { AnnotationView } from './AnnotationView';
 import { ValidationView } from './ValidationView';
 import { useWorkspace } from './useWorkspace';

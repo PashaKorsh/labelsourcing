@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { type Dataset } from '../../../../types/dataset';
-import { PlayButton } from '../../../../components/PlayButton';
+import { PlayButton } from '../PlayButton';
 import { RoleBadge } from '../../../../components/RoleBadge';
 import { ROUTES, buildRoute } from '../../../../config/routes';
 import styles from './DatasetCard.module.css';

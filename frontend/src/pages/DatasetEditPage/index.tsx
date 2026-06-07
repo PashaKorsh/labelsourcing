@@ -4,7 +4,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { AppTagSelector } from '../../components/AppTagSelector';
 import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
-import { RawSettingsEditor } from '../../components/RawSettingsEditor';
+import { RawSettingsEditor } from './components/RawSettingsEditor';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { ROUTES } from '../../config/routes';
 import { datasetService, taskService } from '../../services';

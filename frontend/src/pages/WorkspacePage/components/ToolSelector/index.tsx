@@ -1,4 +1,4 @@
-import type { DrawingToolDef } from '../../types/tools';
+import type { DrawingToolDef } from '../../../../types/tools';
 import styles from './ToolSelector.module.css';
 
 interface Props {

@@ -87,7 +87,7 @@ export class MockDatasetService implements DatasetService {
     let result = [...this.datasets];
     if (params?.search) {
       const q = params.search.toLowerCase();
-      result = result.filter(d => (d.title ?? d.description).toLowerCase().includes(q));
+      result = result.filter(d => (d.title ?? d.description ?? '').toLowerCase().includes(q));
     }
     return result;
   }

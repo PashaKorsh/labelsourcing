@@ -11,7 +11,7 @@ export interface DatasetListParams {
 
 export interface DatasetCreateInput {
   title?: string;
-  description: string;
+  description?: string;
   tagIds?: string[];
   annotationLabels?: Tag[];
   requiredAnswers?: number;

@@ -6,7 +6,7 @@ export type UserDatasetStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'WAITING_VALIDAT
 export interface Dataset {
   id: string;
   title?: string;
-  description: string;
+  description?: string;
   tags: AppTag[];
   imageUrl?: string;
   userStatus: UserDatasetStatus;

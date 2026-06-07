@@ -29,6 +29,7 @@ const API_FIELDS = [
 ] as const;
 
 const SHOW_RAW_SETTINGS = import.meta.env.VITE_DEV_PANEL === 'true';
+const DEFAULT_ANNOTATION_LABEL = { id: 'object', label: 'Object', color: '#f59e0b' };
 
 interface TaskRow {
   id?: string;
@@ -47,7 +48,9 @@ export function DatasetEditPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Единый источник правды для всех настроек датасета. Ключи в API_FIELDS + пользовательские поля
-  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(
+    isCreateMode ? { annotation_labels: [DEFAULT_ANNOTATION_LABEL] } : null
+  );
 
   useEffect(() => {
     if (isCreateMode) return;
@@ -125,7 +128,6 @@ export function DatasetEditPage() {
   };
 
   const handleSave = async () => {
-    if (!description.trim()) return;
     setSubmitting(true);
     try {
       const s = settings ?? {};
@@ -137,7 +139,7 @@ export function DatasetEditPage() {
 
       const commonFields = {
         title: typeof s.title === 'string' ? s.title.trim() || undefined : undefined,
-        description: typeof s.description === 'string' ? s.description.trim() : '',
+        description: typeof s.description === 'string' ? s.description.trim() || undefined : undefined,
         tagIds: Array.isArray(s.tags) ? (s.tags as AppTag[]).map(t => t.id) : [],
         annotationLabels: Array.isArray(s.annotation_labels) ? (s.annotation_labels as Tag[]) : [],
         requiredAnswers: typeof s.required_answers === 'number' ? s.required_answers : undefined,
@@ -352,7 +354,7 @@ export function DatasetEditPage() {
             type="button"
             className={styles.saveButton}
             onClick={handleSave}
-            disabled={submitting || !description.trim()}
+            disabled={submitting || !title.trim()}
           >
             {submitting
               ? (isCreateMode ? 'Создание…' : 'Сохранение…')

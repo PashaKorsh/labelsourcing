@@ -88,6 +88,7 @@ async def create_dataset(
         annotation_labels=labels_data,
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
+        settings=dataset_in.settings,
     )
 
     if dataset_in.tag_ids:

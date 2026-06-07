@@ -6,6 +6,7 @@ from sqlalchemy import select, func, exists, cast, String, delete, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload, aliased
 import uuid
+import re
 
 from app.database import get_db
 from app.models import (
@@ -16,6 +17,7 @@ from app.api.dependencies import get_current_user, require_roles
 from app.api.helpers import _ensure_validation_tasks
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse, TaskPublicResponse
+from app.schemas.export import ExportTask
 from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
 
 router = APIRouter(prefix="/datasets", tags=["Datasets"])
@@ -79,7 +81,8 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["admin"]))
 ):
-    labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
+    labels_data = [l.model_dump() for l in
+                   dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
     new_dataset = Dataset(
         owner_id=current_user.id,
         title=dataset_in.title,
@@ -461,48 +464,108 @@ async def get_dataset_stats(
     }
 
 
-@router.get("/{dataset_id}/export")
+def _calculate_area(coords: list[float]) -> float:
+    if len(coords) < 6:
+        return 0.0
+
+    x = coords[0::2]
+    y = coords[1::2]
+    area = 0.0
+    n = len(x)
+    for i in range(n):
+        j = (i + 1) % n
+        area += x[i] * y[j]
+        area -= x[j] * y[i]
+    return abs(area) / 2.0
+
+
+def _extract_annotorious_data(item: dict) -> tuple[str, list[float]]:
+    tag_id = "unknown"
+    bodies = item.get("body", [])
+    if isinstance(bodies, list) and len(bodies) > 0:
+        tag_id = bodies[0].get("value", "unknown")
+
+    coords = []
+    selector = item.get("target", {}).get("selector", {})
+    val = selector.get("value", "")
+
+    match = re.search(r'points="([^"]+)"', val)
+    if match:
+        points_str = match.group(1)
+        raw_numbers = re.findall(r"[\d\.]+", points_str)
+        coords = [float(n) for n in raw_numbers]
+
+    return tag_id, coords
+
+
+@router.get("/{dataset_id}/export", response_model=list[ExportTask])
 async def export_dataset_labels(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
-):
-    """Выгрузка всех разметок по датасету (без агрегации).
-    Возвращает список annotation-задач с вложенными разметками всех пользователей.
-    """
+        current_user: User = Depends(get_current_user)):
+    """Экспорт разметки датасета 52"""
+
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    _check_dataset_access(dataset, current_user)
+
+    label_map = {
+        item.get("id"): item.get("label", item.get("id"))
+        for item in dataset.annotation_labels
+    } if dataset.annotation_labels else {}
 
     stmt = (
         select(Task, Assignment, Label)
         .join(Assignment, Assignment.task_id == Task.id)
         .join(Label, Label.assignment_id == Assignment.id)
         .where(Task.dataset_id == dataset_id)
-        .where(Task.type == TaskType.ANNOTATION)
-        .order_by(Task.created_at, Assignment.assigned_at)
+        .where(Assignment.status == AssignmentStatus.DONE)
     )
     rows = (await db.execute(stmt)).all()
 
-    tasks_map: dict[str, dict] = {}
+    tasks_dict = {}
+
     for task, assignment, label in rows:
-        task_id_str = str(task.id)
-        if task_id_str not in tasks_map:
-            tasks_map[task_id_str] = {
-                "task_id": task_id_str,
+        if task.id not in tasks_dict:
+            tasks_dict[task.id] = {
+                "task_id": task.id,
                 "task_url": task.url,
-                "task_status": task.status.value,
-                "labels": [],
+                "task_status": task.status.value if hasattr(task.status, 'value') else task.status,
+                "labels": []
             }
-        tasks_map[task_id_str]["labels"].append({
-            "label_id": str(label.id),
-            "annotator_id": str(assignment.user_id),
-            "assignment_status": assignment.status.value,
-            "result": label.result,
-            "created_at": label.created_at.isoformat(),
+
+        raw_data = label.result or {}
+        items = raw_data.get("result", []) if isinstance(raw_data, dict) else raw_data
+        if not isinstance(items, list):
+            items = []
+
+        shapes = []
+        for item in items:
+            tag_id, coords = _extract_annotorious_data(item)
+            if not coords:
+                continue
+
+            tag_name = label_map.get(tag_id, tag_id)
+            area = _calculate_area(coords)
+
+            shapes.append({
+                "tag": tag_name,
+                "area": round(area, 2),
+                "segmentation": [coords],
+                "iscrowd": 0
+            })
+
+        tasks_dict[task.id]["labels"].append({
+            "label_id": label.id,
+            "assignment_status": assignment.status.value if hasattr(assignment.status, 'value') else assignment.status,
+            "result": shapes
         })
 
-    return list(tasks_map.values())
+    result = [t for t in tasks_dict.values() if t["labels"]]
+    return result
+
 
 
 @router.get("/{dataset_id}/tasks", response_model=list[TaskResponse])
@@ -678,11 +741,11 @@ async def update_dataset(
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
     enabling_validation = (
-        update_data.requires_validation is True and not dataset.requires_validation
+            update_data.requires_validation is True and not dataset.requires_validation
     )
     decreasing_required_answers = (
-        update_data.required_answers is not None and
-        update_data.required_answers < dataset.required_answers
+            update_data.required_answers is not None and
+            update_data.required_answers < dataset.required_answers
     )
 
     if update_data.title is not None:

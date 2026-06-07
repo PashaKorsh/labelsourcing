@@ -18,6 +18,7 @@ export function useWorkspace() {
   const [isSaved, setIsSaved] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [allowedTools, setAllowedTools] = useState<string[] | undefined>(undefined);
+  const [annotationInstructions, setAnnotationInstructions] = useState<string | null>(null);
 
   const task = tasks[0] ?? null;
   const isExpired = useIsExpired(task?.expiresAt);
@@ -36,6 +37,7 @@ export function useWorkspace() {
     setIsSaved(false);
     setTasksLimit(null);
     setTaskOffset(0);
+    setAnnotationInstructions(null);
     taskService.clearCache();
 
     taskService.loadNextTask(datasetId, TASK_BATCH_SIZE)
@@ -49,6 +51,10 @@ export function useWorkspace() {
         const tools = ds.settings?.allowed_tools;
         if (Array.isArray(tools) && tools.length > 0) {
           setAllowedTools(tools as string[]);
+        }
+        const instr = ds.settings?.annotation_instructions;
+        if (typeof instr === 'string' && instr.trim()) {
+          setAnnotationInstructions(instr);
         }
         if (ds.annotationLabels?.length) {
           const HOTKEYS = '1234567890';
@@ -116,6 +122,7 @@ export function useWorkspace() {
     tasksLimit,
     allowedTools,
     tags,
+    annotationInstructions,
     isExpired,
     canGoNext,
     isSaved,

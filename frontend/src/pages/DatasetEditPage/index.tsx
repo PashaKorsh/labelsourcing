@@ -108,6 +108,7 @@ export function DatasetEditPage() {
   const validationQuorum = typeof settings?.validation_quorum === 'number' ? settings.validation_quorum : '';
   const requiresValidation = settings?.requires_validation === true;
   const defaultTasksLimit = typeof settings?.default_tasks_limit === 'number' ? settings.default_tasks_limit : '';
+  const annotationInstructions = typeof settings?.annotation_instructions === 'string' ? settings.annotation_instructions : '';
 
   const handleUrlChange = (index: number, value: string) =>
     setTaskRows(prev => prev.map((r, i) => i === index ? { ...r, url: value } : r));
@@ -223,6 +224,17 @@ export function DatasetEditPage() {
               placeholder="Описание датасета"
               value={description}
               onChange={e => patchSettings('description', e.target.value || null)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Инструкции для разметчиков</label>
+            <textarea
+              className={styles.textarea}
+              placeholder="Правила разметки, которые увидит пользователь перед стартом"
+              rows={5}
+              value={annotationInstructions}
+              onChange={e => patchSettings('annotation_instructions', e.target.value || null)}
             />
           </div>
 

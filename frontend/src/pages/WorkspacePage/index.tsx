@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import { ExpiryTimer } from './components/ExpiryTimer';
 import { AnnotationView } from './AnnotationView';
 import { ValidationView } from './ValidationView';
@@ -7,18 +9,23 @@ import styles from './WorkspacePage.module.css';
 
 export function WorkspacePage() {
   const {
+    datasetId,
     task,
     taskNumber,
     hasMoreTasks,
     tasksLimit,
     allowedTools,
     tags,
+    annotationInstructions,
     isExpired,
     canGoNext,
     isSaved,
     markSaved,
     goNext,
   } = useWorkspace();
+
+  const [instructionsAccepted, setInstructionsAccepted] = useState(false);
+  useEffect(() => { setInstructionsAccepted(false); }, [datasetId]);
 
   const isValidationTask = task?.type === 'validation';
 
@@ -71,6 +78,15 @@ export function WorkspacePage() {
           isSaved={isSaved}
           onSaved={markSaved}
           onNext={canGoNext ? goNext : undefined}
+        />
+      )}
+
+      {annotationInstructions && !instructionsAccepted && (
+        <ConfirmModal
+          title="Инструкции к разметке"
+          message={annotationInstructions}
+          confirmLabel="Принять"
+          onConfirm={() => setInstructionsAccepted(true)}
         />
       )}
     </div>

@@ -78,17 +78,18 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["admin"]))
 ):
-    labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
+    settings = dict(dataset_in.settings)
+    if 'annotation_labels' not in settings:
+        settings['annotation_labels'] = DEFAULT_ANNOTATION_LABELS
     new_dataset = Dataset(
         owner_id=current_user.id,
         title=dataset_in.title,
         description=dataset_in.description,
         required_answers=dataset_in.required_answers,
         default_tasks_limit=dataset_in.default_tasks_limit,
-        annotation_labels=labels_data,
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
-        settings=dataset_in.settings,
+        settings=settings,
     )
 
     if dataset_in.tag_ids:
@@ -795,7 +796,7 @@ async def update_dataset(
 
     if update_data.title is not None:
         dataset.title = update_data.title
-    if update_data.description is not None:
+    if 'description' in update_data.model_fields_set:
         dataset.description = update_data.description
     if update_data.required_answers is not None:
         dataset.required_answers = update_data.required_answers
@@ -808,8 +809,6 @@ async def update_dataset(
         )
     if update_data.status is not None:
         dataset.status = update_data.status
-    if update_data.annotation_labels is not None:
-        dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
     if update_data.requires_validation is not None:
         dataset.requires_validation = update_data.requires_validation
     if update_data.validation_quorum is not None:

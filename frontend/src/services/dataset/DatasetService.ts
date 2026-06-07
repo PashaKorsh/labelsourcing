@@ -1,6 +1,5 @@
 import type { Dataset } from '../../types/dataset';
 import type { AnnotationTask } from '../../types/task';
-import type { Tag } from '../../types/annotation';
 
 export interface DatasetListParams {
   search?: string;
@@ -11,9 +10,8 @@ export interface DatasetListParams {
 
 export interface DatasetCreateInput {
   title?: string;
-  description?: string;
+  description?: string | null;
   tagIds?: string[];
-  annotationLabels?: Tag[];
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;
@@ -23,9 +21,8 @@ export interface DatasetCreateInput {
 
 export interface DatasetUpdateInput {
   title?: string;
-  description?: string;
+  description?: string | null;
   tagIds?: string[];
-  annotationLabels?: Tag[];
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;

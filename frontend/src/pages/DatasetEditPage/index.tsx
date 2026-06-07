@@ -24,7 +24,7 @@ const getActiveTools = (s: Record<string, unknown> | null): string[] => {
 
 // Поля settings, которые имеют выделенные поля API и не попадают в settings на бэке
 const API_FIELDS = [
-  'title', 'description', 'tags', 'annotation_labels',
+  'title', 'description', 'tags',
   'required_answers', 'validation_quorum', 'requires_validation', 'default_tasks_limit',
 ] as const;
 
@@ -65,9 +65,8 @@ export function DatasetEditPage() {
       // Собираем все поля датасета в единый объект настроек
       const merged: Record<string, unknown> = { ...(ds.settings ?? {}) };
       if (ds.title) merged.title = ds.title;
-      merged.description = ds.description;
+      if (ds.description) merged.description = ds.description;
       if (ds.tags.length > 0) merged.tags = ds.tags;
-      if ((ds.annotationLabels ?? []).length > 0) merged.annotation_labels = ds.annotationLabels;
       if (ds.requiredAnswers !== undefined) merged.required_answers = ds.requiredAnswers;
       if (ds.validationQuorum !== undefined) merged.validation_quorum = ds.validationQuorum;
       if (ds.requiresValidation) merged.requires_validation = true;
@@ -140,12 +139,11 @@ export function DatasetEditPage() {
 
       const commonFields = {
         title: typeof s.title === 'string' ? s.title.trim() || undefined : undefined,
-        description: typeof s.description === 'string' ? s.description.trim() || undefined : undefined,
+        description: typeof s.description === 'string' ? s.description.trim() || null : null,
         tagIds: Array.isArray(s.tags) ? (s.tags as AppTag[]).map(t => t.id) : [],
-        annotationLabels: Array.isArray(s.annotation_labels) ? (s.annotation_labels as Tag[]) : [],
         requiredAnswers: typeof s.required_answers === 'number' ? s.required_answers : undefined,
         validationQuorum: typeof s.validation_quorum === 'number' ? s.validation_quorum : undefined,
-        requiresValidation: s.requires_validation === true ? true : undefined,
+        requiresValidation: s.requires_validation === true,
         defaultTasksLimit: typeof s.default_tasks_limit === 'number' ? s.default_tasks_limit : undefined,
         settings: Object.keys(extraSettings).length > 0 ? extraSettings : undefined,
       };

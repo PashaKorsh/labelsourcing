@@ -80,7 +80,6 @@ class Dataset(Base):
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
     requires_validation: Mapped[bool] = mapped_column(Boolean, server_default="false")
     validation_quorum: Mapped[int] = mapped_column(Integer, server_default="1")
-    annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     settings: Mapped[dict] = mapped_column(JSONB, server_default='{}', default=dict)
 

@@ -56,9 +56,12 @@ export function useWorkspace() {
         if (typeof instr === 'string' && instr.trim()) {
           setAnnotationInstructions(instr);
         }
-        if (ds.annotationLabels?.length) {
+        const annotationLabels = Array.isArray(ds.settings?.annotation_labels)
+          ? (ds.settings.annotation_labels as typeof tags)
+          : [];
+        if (annotationLabels.length) {
           const HOTKEYS = '1234567890';
-          const withHotkeys = ds.annotationLabels.map((l, i) => ({
+          const withHotkeys = annotationLabels.map((l, i) => ({
             ...l,
             hotkey: i < HOTKEYS.length ? HOTKEYS[i] : undefined,
           }));

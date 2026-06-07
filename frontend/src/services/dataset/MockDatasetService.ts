@@ -106,10 +106,9 @@ export class MockDatasetService implements DatasetService {
     const dataset: Dataset = {
       id: String(Date.now()),
       title: data.title,
-      description: data.description,
+      description: data.description ?? undefined,
       tags: [],
       userStatus: 'NOT_STARTED',
-      annotationLabels: data.annotationLabels,
     };
     this.mineDatasets.push(dataset);
     return dataset;
@@ -123,7 +122,6 @@ export class MockDatasetService implements DatasetService {
       ...target,
       title: data.title ?? target.title,
       description: data.description ?? target.description,
-      annotationLabels: data.annotationLabels ?? target.annotationLabels,
       id,
     };
 

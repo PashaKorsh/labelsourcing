@@ -489,14 +489,18 @@ def _extract_annotorious_data(item: dict) -> tuple[str, list[float]]:
     selector = item.get("target", {}).get("selector", {})
     val = selector.get("value", "")
 
-    match = re.search(r'points="([^"]+)"', val)
-    if match:
-        points_str = match.group(1)
+    match_poly = re.search(r'points="([^"]+)"', val)
+    if match_poly:
+        points_str = match_poly.group(1)
         raw_numbers = re.findall(r"[\d\.]+", points_str)
         coords = [float(n) for n in raw_numbers]
+    else:
+        match_rect = re.search(r'<rect\s+x="([^"]+)"\s+y="([^"]+)"\s+width="([^"]+)"\s+height="([^"]+)"', val)
+        if match_rect:
+            x, y, w, h = map(float, match_rect.groups())
+            coords = [x, y, x + w, y, x + w, y + h, x, y + h]
 
     return tag_id, coords
-
 
 @router.get("/{dataset_id}/export", response_model=list[ExportTask])
 async def export_dataset_labels(

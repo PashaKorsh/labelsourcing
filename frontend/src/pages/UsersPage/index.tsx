@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { SearchBar } from '../../components/SearchBar';
-import { RoleBadge } from '../../components/RoleBadge';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { SearchBar } from '@/components/SearchBar';
+import { RoleBadge } from '@/components/RoleBadge';
 import { UserEditModal } from './components/UserEditModal';
-import { userService } from '../../services';
-import type { UserListItem } from '../../types/user';
+import { userService } from '@/services';
+import type { UserListItem } from '@/types/user';
 import styles from './UsersPage.module.css';
 
 export function UsersPage() {

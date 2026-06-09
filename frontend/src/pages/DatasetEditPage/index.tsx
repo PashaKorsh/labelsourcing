@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { AppTagSelector } from '../../components/AppTagSelector';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { AppTagSelector } from '@/components/AppTagSelector';
 import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
 import { RawSettingsEditor } from './components/RawSettingsEditor';
-import { ConfirmModal } from '../../components/ConfirmModal';
-import { ROUTES } from '../../config/routes';
-import { datasetService, taskService } from '../../services';
-import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
-import type { AppTag } from '../../types/appTag';
-import type { Tag } from '../../types/annotation';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { ROUTES } from '@/config/routes';
+import { datasetService, taskService } from '@/services';
+import { IMAGE_DRAWING_TOOLS } from '@/tools/imageTools';
+import type { AppTag } from '@/types/appTag';
+import type { Tag } from '@/types/annotation';
 import styles from './DatasetEditPage.module.css';
 
 const ANNOTATION_TOOLS = IMAGE_DRAWING_TOOLS.filter(t => t.id !== 'cursor');

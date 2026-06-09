@@ -1,4 +1,4 @@
-import type { AppTag } from '../../types/appTag';
+import type { AppTag } from '@/types/appTag';
 
 export interface TagListParams {
   search?: string;

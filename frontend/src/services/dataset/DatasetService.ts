@@ -1,5 +1,5 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
+import type { Dataset } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 
 export interface DatasetListParams {
   search?: string;

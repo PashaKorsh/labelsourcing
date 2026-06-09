@@ -1,5 +1,5 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
+import type { Dataset } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
 
 const TAG_MEDIC = { id: 'tag-medic', name: 'Медик', color: '#eb5757' };

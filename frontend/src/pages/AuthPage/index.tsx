@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './AuthPage.module.css';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { API } from '../../config/api';
-import { ROUTES } from '../../config/routes';
-import { useAuth } from '../../context/auth';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { API } from '@/config/api';
+import { ROUTES } from '@/config/routes';
+import { useAuth } from '@/context/auth';
 
 const DEV_USERS = [
   { key: 'admin',       label: 'Admin' },

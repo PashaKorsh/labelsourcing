@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import { ReadOnlyAnnotationCanvas } from '../../components/ReadOnlyAnnotationCanvas';
-import { taskService } from '../../services';
-import { deserializeAnnotations } from '../../utils/annotationDeserializer';
-import { useHotkeys } from '../../hooks/useHotkeys';
-import type { HotkeyMap } from '../../hooks/useHotkeys';
-import type { AnnotationTask } from '../../types/task';
-import type { Tag } from '../../types/annotation';
-import type { SerializedShape } from '../../utils/annotationSerializer';
+import { ReadOnlyAnnotationCanvas } from '@/components/ReadOnlyAnnotationCanvas';
+import { taskService } from '@/services';
+import { deserializeAnnotations } from '@/utils/annotationDeserializer';
+import { useHotkeys } from '@/hooks/useHotkeys';
+import type { HotkeyMap } from '@/hooks/useHotkeys';
+import type { AnnotationTask } from '@/types/task';
+import type { Tag } from '@/types/annotation';
+import type { SerializedShape } from '@/utils/annotationSerializer';
 import styles from './ValidationView.module.css';
 
 interface ValidationState {

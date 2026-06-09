@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { SearchBar } from '../../components/SearchBar';
-import { RoleBadge } from '../../components/RoleBadge';
-import { ROUTES, buildRoute } from '../../config/routes';
-import { datasetService } from '../../services';
-import { useAuth } from '../../context/auth';
-import type { Dataset } from '../../types/dataset';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { SearchBar } from '@/components/SearchBar';
+import { RoleBadge } from '@/components/RoleBadge';
+import { ROUTES, buildRoute } from '@/config/routes';
+import { datasetService } from '@/services';
+import { useAuth } from '@/context/auth';
+import type { Dataset } from '@/types/dataset';
 import styles from './MyDatasetsPage.module.css';
 
 function triggerJsonDownload(data: unknown, filename: string) {

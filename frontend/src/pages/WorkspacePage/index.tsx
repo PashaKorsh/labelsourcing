@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { ConfirmModal } from '../../components/ConfirmModal';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { ExpiryTimer } from './components/ExpiryTimer';
-import { AnnotationView } from './AnnotationView';
-import { ValidationView } from './ValidationView';
+import { AnnotationView } from './components/AnnotationView';
+import { ValidationView } from './components/ValidationView';
 import { useWorkspace } from './useWorkspace';
 import styles from './WorkspacePage.module.css';
 

@@ -1,7 +1,7 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import type { AnnotationTask } from '../../types/task';
+import type { AnnotationTask } from '@/types/task';
 import type { TaskService } from './TaskService';
-import { serializeTaskAnnotations } from '../../utils/annotationSerializer';
+import { serializeTaskAnnotations } from '@/utils/annotationSerializer';
 
 export const MOCK_DATASET_ID = 'mock-dataset';
 

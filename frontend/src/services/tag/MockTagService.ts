@@ -1,4 +1,4 @@
-import type { AppTag } from '../../types/appTag';
+import type { AppTag } from '@/types/appTag';
 import type { TagService, TagListParams, TagCreateInput, TagUpdateInput } from './TagService';
 
 export class MockTagService implements TagService {

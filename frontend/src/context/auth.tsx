@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { userService } from '../services';
-import { API, apiFetch } from '../config/api';
-import type { UserProfile } from '../types/user';
+import { userService } from '@/services';
+import { API, apiFetch } from '@/config/api';
+import type { UserProfile } from '@/types/user';
 
 const STORAGE_KEY = 'user_profile';
 

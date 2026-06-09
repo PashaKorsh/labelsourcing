@@ -1,4 +1,4 @@
-import type { ValidationTask, ValidationVerdict, ValidationResult } from '../../types/validationTask';
+import type { ValidationTask, ValidationVerdict, ValidationResult } from '@/types/validationTask';
 import type { ValidationService } from './ValidationService';
 
 export class MockValidationService implements ValidationService {

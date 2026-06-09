@@ -1,7 +1,7 @@
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { RoleBadge } from '../../components/RoleBadge';
-import { useAuth } from '../../context/auth';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { RoleBadge } from '@/components/RoleBadge';
+import { useAuth } from '@/context/auth';
 import styles from './ProfilePage.module.css';
 
 export function ProfilePage() {

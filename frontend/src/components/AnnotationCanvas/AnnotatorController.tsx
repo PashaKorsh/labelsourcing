@@ -8,7 +8,7 @@ import {
 } from '@annotorious/react';
 import type { ImageAnnotator as ImageAnnotatorInstance } from '@annotorious/annotorious';
 import type { ImageAnnotation, AnnotationBody } from '@annotorious/annotorious';
-import type { Tag } from '../../types/annotation';
+import type { Tag } from '@/types/annotation';
 import type { ContextMenuState } from './types';
 import styles from './AnnotationCanvas.module.css';
 

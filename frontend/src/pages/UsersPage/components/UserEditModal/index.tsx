@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { AppTagSelector } from '../../../../components/AppTagSelector';
-import { userService } from '../../../../services';
-import type { AppTag } from '../../../../types/appTag';
-import type { UserListItem } from '../../../../types/user';
+import { AppTagSelector } from '@/components/AppTagSelector';
+import { userService } from '@/services';
+import type { AppTag } from '@/types/appTag';
+import type { UserListItem } from '@/types/user';
 import styles from './UserEditModal.module.css';
 
 interface Props {

@@ -1,4 +1,4 @@
-import type { UserProfile, UserListItem } from '../../types/user';
+import type { UserProfile, UserListItem } from '@/types/user';
 import type { UserService, UserListParams, UserUpdateInput } from './UserService';
 
 const MOCK_PROFILE: UserProfile = {

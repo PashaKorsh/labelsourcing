@@ -1,35 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Annotorious, ImageAnnotator, useAnnotator, useHover, useSelection } from '@annotorious/react';
 import { UserSelectAction } from '@annotorious/annotorious';
-import type { ImageAnnotation, DrawingStyle } from '@annotorious/annotorious';
+import type { ImageAnnotation } from '@annotorious/annotorious';
 import type { ImageAnnotator as ImageAnnotatorInstance } from '@annotorious/annotorious';
-import type { Tag } from '../../types/annotation';
-import type { ContextMenuState } from '../AnnotationCanvas/types';
-import { useZoomPan } from '../AnnotationCanvas/useZoomPan';
+import type { Tag } from '@/types/annotation';
+import { useCanvasBase } from '../AnnotationCanvas/useCanvasBase';
+import { buildTagStyler } from '../AnnotationCanvas/buildTagStyler';
 import '@annotorious/react/annotorious-react.css';
 import styles from './ReadOnlyAnnotationCanvas.module.css';
-
-function buildTagStyler(tags: Tag[]) {
-  return (annotation: ImageAnnotation): DrawingStyle | undefined => {
-    const body = annotation.bodies.find(b => b.purpose === 'classifying');
-    const tag = tags.find(t => t.id === body?.value);
-    if (!tag) return undefined;
-    const color = tag.color as DrawingStyle['fill'];
-    return { fill: color, fillOpacity: 0.25, stroke: color, strokeWidth: 2 };
-  };
-}
 
 // ─── Контекстное меню (только просмотр тега) ──────────────────────────────────
 // Рендерится через portal в document.body, чтобы не попасть под CSS-трансформации канваса.
 
-interface TagContextMenuPortalProps {
-  state: ContextMenuState;
+interface PortalTagMenuProps {
+  state: { x: number; y: number; annotation: ImageAnnotation };
   tags: Tag[];
   onClose: () => void;
 }
 
-function TagContextMenuPortal({ state, tags, onClose }: TagContextMenuPortalProps) {
+function PortalTagMenu({ state, tags, onClose }: PortalTagMenuProps) {
   useEffect(() => {
     window.addEventListener('mousedown', onClose);
     return () => window.removeEventListener('mousedown', onClose);
@@ -126,60 +116,25 @@ export function ReadOnlyAnnotationCanvas({
   initialAnnotations,
   tags,
 }: ReadOnlyAnnotationCanvasProps) {
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const panRef = useRef(true);
-  const { zoom, panX, panY, reset } = useZoomPan(wrapperRef, panRef);
+  const {
+    wrapperRef,
+    zoom,
+    panX,
+    panY,
+    reset,
+    originalSize,
+    displayStyle,
+    handleHoverChange,
+    contextMenu,
+    setContextMenu,
+    handleContextMenu,
+  } = useCanvasBase(imageUrl, true);
 
-  const [originalSize, setOriginalSize] = useState<{ w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    setOriginalSize(null);
-    let cancelled = false;
-    const probe = new Image();
-    probe.onload = () => {
-      if (cancelled) return;
-      const nw = probe.naturalWidth;
-      const nh = probe.naturalHeight;
-      if (!nw || !nh) return;
-      const scale = Math.min(1, (window.innerWidth * 0.8) / nw, (window.innerHeight * 0.8) / nh);
-      setOriginalSize({ w: Math.round(nw * scale), h: Math.round(nh * scale) });
-    };
-    probe.src = imageUrl;
-    return () => { cancelled = true; };
-  }, [imageUrl]);
-
-  const displayStyle = originalSize
-    ? {
-        width: originalSize.w * zoom,
-        height: originalSize.h * zoom,
-        maxWidth: 'none' as const,
-        maxHeight: 'none' as const,
-      }
-    : undefined;
-
-  // Аннотация под курсором — синхронизируется из ReadOnlyController через ref,
-  // чтобы обработчик contextmenu мог её прочитать синхронно.
-  const hoveredRef = useRef<ImageAnnotation | null>(null);
-  const handleHoverChange = useCallback((ann: ImageAnnotation | null) => {
-    hoveredRef.current = ann;
-  }, []);
-
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-
-  // ПКМ — предотвращаем браузерное меню, показываем своё
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    const annotation = hoveredRef.current;
-    if (!annotation) return;
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, annotation });
-  }, []);
-
-  // ЛКМ — приходит из ReadOnlyController через useSelection
   const handleAnnotationSelect = useCallback((annotation: ImageAnnotation, x: number, y: number) => {
     setContextMenu({ x, y, annotation });
-  }, []);
+  }, [setContextMenu]);
 
-  const tagStyler = buildTagStyler(tags);
+  const tagStyler = buildTagStyler(tags, 0.25);
 
   return (
     <div
@@ -222,7 +177,7 @@ export function ReadOnlyAnnotationCanvas({
             onAnnotationSelect={handleAnnotationSelect}
           />
           {contextMenu && (
-            <TagContextMenuPortal
+            <PortalTagMenu
               state={contextMenu}
               tags={tags}
               onClose={() => setContextMenu(null)}

@@ -1,4 +1,4 @@
-import type { UserProfile, UserListItem } from '../../types/user';
+import type { UserProfile, UserListItem } from '@/types/user';
 
 export interface UserListParams {
   search?: string;

@@ -1,6 +1,6 @@
-import type { UserProfile, UserListItem } from '../../types/user';
+import type { UserProfile, UserListItem } from '@/types/user';
 import type { UserService, UserListParams, UserUpdateInput } from './UserService';
-import { API, apiFetch } from '../../config/api';
+import { API, apiFetch } from '@/config/api';
 
 interface UserDto {
   id: string;

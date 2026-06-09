@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { AppTagSelector } from '../../components/AppTagSelector';
-import { ROUTES } from '../../config/routes';
-import { datasetService } from '../../services';
-import type { AppTag } from '../../types/appTag';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { AppTagSelector } from '@/components/AppTagSelector';
+import { ROUTES } from '@/config/routes';
+import { datasetService } from '@/services';
+import type { AppTag } from '@/types/appTag';
 import styles from './DatasetNewPage.module.css';
 
 export function DatasetNewPage() {

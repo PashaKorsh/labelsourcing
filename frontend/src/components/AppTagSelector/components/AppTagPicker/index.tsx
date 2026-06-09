@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { tagService } from '../../services';
-import { RoleBadge } from '../RoleBadge';
-import type { AppTag } from '../../types/appTag';
+import { tagService } from '@/services';
+import { RoleBadge } from '@/components/RoleBadge';
+import type { AppTag } from '@/types/appTag';
 import styles from './AppTagPicker.module.css';
 
 interface Props {

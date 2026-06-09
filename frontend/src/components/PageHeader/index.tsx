@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ROUTES } from '../../config/routes';
-import { useAuth } from '../../context/auth';
-import { NAV_ITEMS, hasRole } from '../../config/permissions';
+import { ROUTES } from '@/config/routes';
+import { useAuth } from '@/context/auth';
+import { NAV_ITEMS, hasRole } from '@/config/permissions';
 import styles from './PageHeader.module.css';
 import profileLogo from '/src/assets/profile-image-stock-white-theme.png';
 

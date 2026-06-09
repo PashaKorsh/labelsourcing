@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { AnnotationTask } from '../../types/task';
-import type { Tag } from '../../types/annotation';
-import { taskService, datasetService } from '../../services';
-import { useDatasetId } from '../../hooks/useRouteParams';
-import { useIsExpired } from '../../hooks/useIsExpired';
+import type { AnnotationTask } from '@/types/task';
+import type { Tag } from '@/types/annotation';
+import { taskService, datasetService } from '@/services';
+import { useDatasetId } from '@/hooks/useRouteParams';
+import { useIsExpired } from '@/hooks/useIsExpired';
 
 const TASK_BATCH_SIZE = 3;
 

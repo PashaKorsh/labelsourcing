@@ -1,6 +1,6 @@
-import type { AppTag } from '../../types/appTag';
+import type { AppTag } from '@/types/appTag';
 import type { TagService, TagListParams, TagCreateInput, TagUpdateInput } from './TagService';
-import { API, apiFetch } from '../../config/api';
+import { API, apiFetch } from '@/config/api';
 
 interface TagDto {
   id: string;

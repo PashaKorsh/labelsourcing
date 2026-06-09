@@ -1,7 +1,7 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
+import type { Dataset } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
-import { API, apiFetch } from '../../config/api';
+import { API, apiFetch } from '@/config/api';
 
 interface DatasetDto {
   id: string;

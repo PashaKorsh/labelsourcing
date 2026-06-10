@@ -23,6 +23,8 @@ class DatasetCreate(BaseModel):
     requires_validation: bool = False
     validation_quorum: int = 1
     settings: dict = Field(default_factory=dict)
+    source_type: str = "url"
+    utility_id: Optional[uuid.UUID] = None
 
 
 class DatasetResponse(BaseModel):
@@ -44,6 +46,9 @@ class DatasetResponse(BaseModel):
     tags: list[TagResponse] = []
     annotation_labels: List[AnnotationLabelSchema] = []
     settings: dict = Field(default_factory=dict)
+    source_type: str = "url"
+    utility_id: Optional[uuid.UUID] = None
+    utility_folder: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
     @field_validator('annotation_labels', mode='before')
@@ -63,3 +68,5 @@ class DatasetUpdate(BaseModel):
     requires_validation: Optional[bool] = None
     validation_quorum: Optional[int] = None
     settings: Optional[dict] = None
+    source_type: Optional[str] = None
+    utility_id: Optional[uuid.UUID] = None

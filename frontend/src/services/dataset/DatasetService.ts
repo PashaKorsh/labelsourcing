@@ -1,4 +1,4 @@
-import type { Dataset } from '../../types/dataset';
+import type { Dataset, SourceType } from '../../types/dataset';
 import type { AnnotationTask } from '../../types/task';
 import type { Tag } from '../../types/annotation';
 
@@ -19,6 +19,8 @@ export interface DatasetCreateInput {
   requiresValidation?: boolean;
   defaultTasksLimit?: number;
   settings?: Record<string, unknown>;
+  sourceType?: SourceType;
+  utilityId?: string;
 }
 
 export interface DatasetUpdateInput {
@@ -31,6 +33,8 @@ export interface DatasetUpdateInput {
   requiresValidation?: boolean;
   defaultTasksLimit?: number;
   settings?: Record<string, unknown> | null;
+  sourceType?: SourceType;
+  utilityId?: string;
 }
 
 export interface DatasetService {

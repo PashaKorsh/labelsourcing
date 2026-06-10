@@ -8,11 +8,14 @@ import { MockUserService } from './user/MockUserService';
 import { ApiUserService } from './user/ApiUserService';
 import { MockTagService } from './tag/MockTagService';
 import { ApiTagService } from './tag/ApiTagService';
+import { MockUtilityService } from './utility/MockUtilityService';
+import { ApiUtilityService } from './utility/ApiUtilityService';
 import type { TaskService } from './task/TaskService';
 import type { ValidationService } from './validation/ValidationService';
 import type { DatasetService } from './dataset/DatasetService';
 import type { UserService } from './user/UserService';
 import type { TagService } from './tag/TagService';
+import type { UtilityService } from './utility/UtilityService';
 
 const USE_REAL_API = import.meta.env.VITE_API_MODE !== 'mock';
 console.debug(`Is real launch mode: ${USE_REAL_API}`);
@@ -23,6 +26,7 @@ interface Services {
   dataset: DatasetService;
   user: UserService;
   tag: TagService;
+  utility: UtilityService;
 }
 
 const services: Services = USE_REAL_API
@@ -32,6 +36,7 @@ const services: Services = USE_REAL_API
       dataset:    new ApiDatasetService(),
       user:       new ApiUserService(),
       tag:        new ApiTagService(),
+      utility:    new ApiUtilityService(),
     }
   : {
       task:       new MockTaskService(),
@@ -39,6 +44,7 @@ const services: Services = USE_REAL_API
       dataset:    new MockDatasetService(),
       user:       new MockUserService(),
       tag:        new MockTagService(),
+      utility:    new MockUtilityService(),
     };
 
 export const {
@@ -47,6 +53,7 @@ export const {
   dataset:    datasetService,
   user:       userService,
   tag:        tagService,
+  utility:    utilityService,
 } = services;
 
 export type { TaskService }       from './task/TaskService';
@@ -54,3 +61,4 @@ export type { ValidationService } from './validation/ValidationService';
 export type { DatasetService }    from './dataset/DatasetService';
 export type { UserService }       from './user/UserService';
 export type { TagService }        from './tag/TagService';
+export type { UtilityService }    from './utility/UtilityService';

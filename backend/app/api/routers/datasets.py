@@ -10,7 +10,7 @@ import uuid
 from app.database import get_db
 from app.models import (
     Dataset, User, Tag, Task, Assignment, Label, UserDatasetAccess,
-    AssignmentStatus, TaskStatus, TaskType, DatasetStatus
+    AssignmentStatus, TaskStatus, TaskType, DatasetStatus, SourceType, Utility
 )
 from app.api.dependencies import get_current_user, require_roles
 from app.api.helpers import _ensure_validation_tasks
@@ -23,6 +23,23 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 ASSIGNMENT_EXPIRY_MINUTES = 10
 
 DEFAULT_ANNOTATION_LABELS = [{"id": "object", "label": "Object", "color": "#f59e0b"}]
+
+
+async def _validate_utility(
+    db: AsyncSession,
+    source_type: SourceType,
+    utility_id: uuid.UUID | None,
+    current_user: User,
+) -> uuid.UUID | None:
+    """Для utility-датасета проверяет, что указана утилита текущего пользователя."""
+    if source_type != SourceType.UTILITY:
+        return None
+    if utility_id is None:
+        raise HTTPException(status_code=400, detail="Для типа 'utility' нужно указать утилиту")
+    utility = await db.get(Utility, utility_id)
+    if utility is None or utility.owner_id != current_user.id:
+        raise HTTPException(status_code=400, detail="Утилита не найдена")
+    return utility_id
 
 
 def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
@@ -80,6 +97,10 @@ async def create_dataset(
         current_user: User = Depends(require_roles(["admin"]))
 ):
     labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
+
+    source_type = SourceType(dataset_in.source_type)
+    utility_id = await _validate_utility(db, source_type, dataset_in.utility_id, current_user)
+
     new_dataset = Dataset(
         owner_id=current_user.id,
         title=dataset_in.title,
@@ -89,6 +110,9 @@ async def create_dataset(
         annotation_labels=labels_data,
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
+        settings=dataset_in.settings or {},
+        source_type=source_type,
+        utility_id=utility_id,
     )
 
     if dataset_in.tag_ids:
@@ -291,6 +315,35 @@ async def _assign_task(
     task.expires_at = expires_at
 
 
+def _resolve_url(task: Task, use_proxy: bool, direct_base: str | None) -> str | None:
+    """Картинку отдаём напрямую (url) или через наш прокси (None → браузер идёт на /proxy)."""
+    if use_proxy:
+        return None
+    if direct_base is None:
+        return task.url  # URL-датасет: задача уже хранит прямую ссылку
+    # utility direct: публичный адрес + dataset_id + относительный путь (dataset_id разводит папки)
+    return f"{direct_base.rstrip('/')}/{task.dataset_id}/{task.url.lstrip('/')}"
+
+
+def _build_task_responses(
+    tasks: list[Task], use_proxy: bool, direct_base: str | None = None,
+) -> list[TaskPublicResponse]:
+    return [
+        TaskPublicResponse(
+            id=task.id,
+            dataset_id=task.dataset_id,
+            type=task.type,
+            completed_answers=task.completed_answers,
+            active_assignments=task.active_assignments,
+            status=task.status,
+            task_metadata=task.task_metadata,
+            expires_at=task.expires_at,
+            url=_resolve_url(task, use_proxy, direct_base),
+        )
+        for task in tasks
+    ]
+
+
 @router.get("/{dataset_id}/next", response_model=list[TaskPublicResponse])
 async def get_next_task(
         dataset_id: uuid.UUID,
@@ -302,13 +355,28 @@ async def get_next_task(
     Приоритет: validation-задачи → annotation-задачи.
     Типы не смешиваются в рамках одного запроса.
     """
-    stmt = select(Dataset).where(Dataset.id == dataset_id).options(selectinload(Dataset.tags))
+    stmt = (
+        select(Dataset).where(Dataset.id == dataset_id)
+        .options(selectinload(Dataset.tags), selectinload(Dataset.utility))
+    )
     dataset = (await db.execute(stmt)).scalar_one_or_none()
 
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
     _check_dataset_access(dataset, current_user)
+
+    # Direct-режим: картинка идёт от источника к браузеру, минуя наш сервер.
+    # Для utility доступен только если у утилиты есть публичный HTTPS-адрес.
+    use_proxy_setting: bool = (dataset.settings or {}).get('use_proxy', True)
+    direct_base: str | None = None
+    if dataset.source_type == SourceType.UTILITY:
+        can_direct = dataset.utility is not None and bool(dataset.utility.public_base_url)
+        use_proxy = use_proxy_setting if can_direct else True
+        if not use_proxy:
+            direct_base = dataset.utility.public_base_url
+    else:
+        use_proxy = use_proxy_setting
 
     # Восстановление сессии: живые ассайнменты любого типа
     existing_stmt = (
@@ -324,7 +392,7 @@ async def get_next_task(
     if existing_rows:
         for task, exp in existing_rows:
             task.expires_at = exp
-        return [task for task, _ in existing_rows]
+        return _build_task_responses([t for t, _ in existing_rows], use_proxy, direct_base)
 
     # Upsert access-записи
     upsert_stmt = (
@@ -406,7 +474,7 @@ async def get_next_task(
     await db.commit()
     for task in result_tasks:
         await db.refresh(task)
-    return result_tasks
+    return _build_task_responses(result_tasks, use_proxy, direct_base)
 
 
 @router.get("/{dataset_id}/stats")
@@ -703,6 +771,15 @@ async def update_dataset(
         dataset.validation_quorum = update_data.validation_quorum
     if update_data.settings is not None:
         dataset.settings = update_data.settings
+    if update_data.source_type is not None:
+        dataset.source_type = SourceType(update_data.source_type)
+    # utility_id валидируем относительно итогового source_type
+    if update_data.utility_id is not None or update_data.source_type is not None:
+        dataset.utility_id = await _validate_utility(
+            db, dataset.source_type,
+            update_data.utility_id if update_data.utility_id is not None else dataset.utility_id,
+            admin_user,
+        )
 
     if update_data.tag_ids is not None:
         tags_stmt = select(Tag).where(Tag.id.in_(update_data.tag_ids))

@@ -1,7 +1,9 @@
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { RoleBadge } from '../../components/RoleBadge';
+import { UtilitiesSection } from './UtilitiesSection';
 import { useAuth } from '../../context/auth';
+import { hasRole, ROLE_ADMIN, ROLE_CREATOR } from '../../config/permissions';
 import styles from './ProfilePage.module.css';
 
 export function ProfilePage() {
@@ -32,6 +34,8 @@ export function ProfilePage() {
                 Выйти
               </button>
             </div>
+
+            {hasRole(user.roles, [ROLE_ADMIN, ROLE_CREATOR]) && <UtilitiesSection />}
           </>
         )}
       </div>

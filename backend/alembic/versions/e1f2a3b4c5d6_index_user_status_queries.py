@@ -9,7 +9,7 @@ from alembic import op
 
 
 revision: str = 'e1f2a3b4c5d6'
-down_revision: Union[str, None] = 'a9b8c7d6e5f4'
+down_revision: Union[str, None] = 'e2f3a4b5c6d7'
 branch_labels = None
 depends_on = None
 

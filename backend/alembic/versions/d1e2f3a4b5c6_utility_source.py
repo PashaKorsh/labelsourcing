@@ -1,7 +1,7 @@
 """utilities, pairing codes, dataset source_type/utility_id
 
 Revision ID: d1e2f3a4b5c6
-Revises: a4b5c6d7e8f9
+Revises: a9b8c7d6e5f4
 Create Date: 2026-06-11 12:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 
 revision: str = 'd1e2f3a4b5c6'
-down_revision: Union[str, None] = 'a4b5c6d7e8f9'
+down_revision: Union[str, None] = 'a9b8c7d6e5f4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

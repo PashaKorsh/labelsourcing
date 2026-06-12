@@ -37,6 +37,16 @@ export const API = {
   proxy: {
     image: (taskId: string) => `${API_BASE}/api/v1/proxy/${taskId}`,
   },
+  utilities: {
+    list:        () => `${API_BASE}/api/v1/utility/`,
+    pairingCode: () => `${API_BASE}/api/v1/utility/pairing-code`,
+    delete:      (id: string) => `${API_BASE}/api/v1/utility/${id}`,
+    dirs:        (id: string, path: string) =>
+      `${API_BASE}/api/v1/utility/${id}/dirs?path=${encodeURIComponent(path)}`,
+    scan:        (id: string) => `${API_BASE}/api/v1/utility/${id}/scan`,
+    rescan:      (id: string, datasetId: string) =>
+      `${API_BASE}/api/v1/utility/${id}/rescan/${datasetId}`,
+  },
   labels: {
     updateStatus: (id: string) => `${API_BASE}/api/v1/labels/${id}/status`,
   },

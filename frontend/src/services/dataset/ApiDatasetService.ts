@@ -17,6 +17,9 @@ interface DatasetDto {
   requires_validation?: boolean | null;
   default_tasks_limit?: number | null;
   settings?: Record<string, unknown> | null;
+  source_type?: string | null;
+  utility_id?: string | null;
+  utility_folder?: string | null;
 }
 
 interface TaskDto {
@@ -41,6 +44,9 @@ function mapDto(dto: DatasetDto): Dataset {
     requiresValidation: dto.requires_validation ?? undefined,
     defaultTasksLimit: dto.default_tasks_limit ?? undefined,
     settings: dto.settings ?? undefined,
+    sourceType: (dto.source_type ?? 'url') as Dataset['sourceType'],
+    utilityId: dto.utility_id ?? undefined,
+    utilityFolder: dto.utility_folder ?? undefined,
   };
 }
 
@@ -87,6 +93,8 @@ export class ApiDatasetService implements DatasetService {
         requires_validation: data.requiresValidation,
         default_tasks_limit: data.defaultTasksLimit,
         settings: data.settings,
+        source_type: data.sourceType,
+        utility_id: data.utilityId,
       }),
     });
     const dto: DatasetDto = await res.json();
@@ -116,6 +124,8 @@ export class ApiDatasetService implements DatasetService {
     if (data.settings !== undefined) {
       body.settings = data.settings ?? {};
     }
+    if (data.sourceType !== undefined) body.source_type = data.sourceType;
+    if (data.utilityId !== undefined) body.utility_id = data.utilityId;
     const res = await apiFetch(API.datasets.update(id), {
       method: 'PATCH',
       body: JSON.stringify(body),

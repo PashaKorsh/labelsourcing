@@ -1,71 +1,34 @@
 .body {
   display: flex;
   flex: 1;
-  overflow: hidden;
   min-height: 0;
+  gap: 12px;
+  padding: 0 12px 12px;
+  overflow: hidden;
 }
 
 .sidebar {
   width: 200px;
   flex-shrink: 0;
-  background: #141414;
-  border-right: 1px solid #2a2a2a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  padding: 12px 0;
 }
 
-.divider {
-  height: 1px;
-  background: #2a2a2a;
-  margin: 4px 0;
-}
-
-.sidebarBottom {
+.legend {
   margin-top: auto;
-  padding: 12px;
-  border-top: 1px solid #2a2a2a;
-}
-
-.saveError {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 11px;
-  color: #f87171;
-  text-align: center;
-}
-
-.saveButton {
-  width: 100%;
-  height: 48px;
-  font-size: 15px;
-  font-weight: 600;
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  border-radius: 6px;
-  color: #a5b4fc;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.saveButton:hover {
-  background: rgba(99, 102, 241, 0.35);
-  border-color: rgba(99, 102, 241, 0.6);
-  color: #c7d2fe;
-}
-
-.saveButton:disabled {
-  opacity: 0.45;
-  cursor: default;
-  background: rgba(99, 102, 241, 0.08);
-  border-color: rgba(99, 102, 241, 0.2);
-  color: #6b6b8a;
+  border-top: 1px solid var(--border);
 }
 
 .canvasArea {
   flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
   overflow: hidden;
 }
 
@@ -81,5 +44,78 @@
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: #888;
+  color: var(--text-muted);
+}
+
+.toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 5;
+}
+
+.taskInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.taskName {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.taskIndex {
+  font-variant-numeric: tabular-nums;
+}
+
+.saveError {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.toolbarRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tools {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px var(--shadow);
+}
+
+.primaryButton {
+  height: 56px;
+  padding: 0 22px;
+  background: var(--btn-primary);
+  color: var(--btn-primary-text);
+  border: none;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--shadow);
+  transition: background 0.15s;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

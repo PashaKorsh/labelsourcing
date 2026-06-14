@@ -10,7 +10,7 @@ interface Props {
 export function TagSelector({ tags, activeTagId, onSelect }: Props) {
   return (
     <div className={styles.container}>
-      <h3 className={styles.title}>Tags</h3>
+      <h3 className={styles.title}>Метки</h3>
       <ul className={styles.list}>
         {tags.map(tag => (
           <li key={tag.id}>

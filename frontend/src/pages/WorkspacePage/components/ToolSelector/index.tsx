@@ -10,21 +10,17 @@ interface Props {
 export function ToolSelector({ tools, activeTool, onSelect }: Props) {
   return (
     <div className={styles.container}>
-      <h3 className={styles.title}>Tools</h3>
-      <ul className={styles.list}>
-        {tools.map(tool => (
-          <li key={tool.id}>
-            <button
-              className={`${styles.button} ${activeTool === tool.id ? styles.active : ''}`}
-              onClick={() => onSelect(tool.id)}
-              title={tool.hotkey ? `${tool.label}  [${tool.hotkey.toUpperCase()}]` : tool.label}
-            >
-              <span className={styles.icon}>{tool.icon}</span>
-              {tool.label}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {tools.map(tool => (
+        <button
+          key={tool.id}
+          className={`${styles.button} ${activeTool === tool.id ? styles.active : ''}`}
+          onClick={() => onSelect(tool.id)}
+          title={tool.hotkey ? `${tool.label}  [${tool.hotkey.toUpperCase()}]` : tool.label}
+          aria-label={tool.label}
+        >
+          <span className={styles.icon}>{tool.icon}</span>
+        </button>
+      ))}
     </div>
   );
 }

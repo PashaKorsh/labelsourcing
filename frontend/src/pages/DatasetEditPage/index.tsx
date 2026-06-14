@@ -404,25 +404,6 @@ export function DatasetEditPage() {
             Утилита — раздача с вашего компьютера
           </label>
 
-          {sourceType === 'utility' && (
-            <div className={styles.field}>
-              <label className={styles.label}>Утилита</label>
-              <select className={styles.input} value={utilityId} onChange={e => setUtilityId(e.target.value)}>
-                <option value="">— выберите утилиту —</option>
-                {utilities.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}{u.online ? ' (в сети)' : ''}</option>
-                ))}
-              </select>
-              {utilities.length === 0 && (
-                <p className={styles.hint}>Нет привязанных утилит — привяжите в профиле.</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Изображения</h2>
-
           {sourceType === 'url' && (
             <>
               <label className={styles.checkboxRow}>
@@ -470,6 +451,18 @@ export function DatasetEditPage() {
 
           {sourceType === 'utility' && (
             <>
+              <div className={styles.field}>
+                <label className={styles.label}>Утилита</label>
+                <select className={styles.input} value={utilityId} onChange={e => setUtilityId(e.target.value)}>
+                  <option value="">— выберите утилиту —</option>
+                  {utilities.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}{u.online ? ' (в сети)' : ''}</option>
+                  ))}
+                </select>
+                {utilities.length === 0 && (
+                  <p className={styles.hint}>Нет привязанных утилит — привяжите в профиле.</p>
+                )}
+              </div>
               {utilities.find(u => u.id === utilityId)?.publicBaseUrl && (
                 <label className={styles.checkboxRow}>
                   <input

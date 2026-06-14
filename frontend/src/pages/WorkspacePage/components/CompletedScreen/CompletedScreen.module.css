@@ -9,7 +9,7 @@
 
 .message {
   font-size: 16px;
-  color: #888;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -17,16 +17,14 @@
   padding: 10px 24px;
   font-size: 14px;
   font-weight: 500;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  color: #ccc;
+  background: var(--btn-primary);
+  border: none;
+  border-radius: 12px;
+  color: var(--btn-primary-text);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: background 0.15s;
 }
 
 .button:hover {
-  background: #383838;
-  border-color: #555;
-  color: #fff;
+  background: var(--btn-primary-hover);
 }

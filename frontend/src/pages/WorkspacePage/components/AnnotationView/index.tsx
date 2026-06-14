@@ -5,6 +5,7 @@ import { ToolSelector } from '../ToolSelector';
 import { TagSelector } from '../TagSelector';
 import { HintsBar } from '../HintsBar';
 import { CompletedScreen } from '../CompletedScreen';
+import { ExpiryTimer } from '../ExpiryTimer';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { IMAGE_DRAWING_TOOLS } from '@/tools/imageTools';
 import { taskService } from '@/services';
@@ -17,6 +18,8 @@ import styles from './AnnotationView.module.css';
 interface Props {
   task: AnnotationTask | null;
   hasMoreTasks: boolean;
+  taskNumber: number;
+  tasksLimit: number | null;
   tags: Tag[];
   allowedTools?: string[];
   isExpired: boolean;
@@ -25,8 +28,7 @@ interface Props {
   onNext?: () => void;
 }
 
-export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpired, isSaved, onSaved, onNext }: Props) {
-  // cursor всегда доступен (режим пана), фильтруем только инструменты разметки
+export function AnnotationView({ task, hasMoreTasks, taskNumber, tasksLimit, tags, allowedTools, isExpired, isSaved, onSaved, onNext }: Props) {
   const visibleTools = useMemo(
     () => allowedTools && allowedTools.length > 0
       ? IMAGE_DRAWING_TOOLS.filter(t => t.id === 'cursor' || allowedTools.includes(t.id))
@@ -38,7 +40,6 @@ export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpir
     () => visibleTools.find(t => t.id !== 'cursor')?.id ?? visibleTools[0].id,
   );
 
-  // Если после загрузки настроек активный инструмент оказался скрыт — переключаемся
   useEffect(() => {
     if (!visibleTools.find(t => t.id === activeTool)) {
       setActiveTool(visibleTools.find(t => t.id !== 'cursor')?.id ?? visibleTools[0].id);
@@ -47,8 +48,6 @@ export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpir
 
   const [activeTagId, setActiveTagId] = useState<string | null>(tags[0]?.id ?? null);
 
-  // При обновлении списка тегов (первая загрузка от бэкенда) сбрасываем activeTagId
-  // на первый доступный — иначе activeTag становится null и аннотации без тега/цвета.
   useEffect(() => {
     if (!tags.find(t => t.id === activeTagId)) {
       setActiveTagId(tags[0]?.id ?? null);
@@ -94,6 +93,13 @@ export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpir
     doSave();
   }, [task, isExpired, doSave]);
 
+  const canAdvance = isSaved || isExpired;
+
+  const primaryAction = useCallback(() => {
+    if (canAdvance) onNext?.();
+    else handleSave();
+  }, [canAdvance, onNext, handleSave]);
+
   const hotkeys = useMemo<HotkeyMap>(() => {
     const map: HotkeyMap = {};
     for (const tool of visibleTools) {
@@ -103,36 +109,26 @@ export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpir
       if (tag.hotkey) map[tag.hotkey] = () => setActiveTagId(tag.id);
     }
     map['g'] = handleSave;
+    if (onNext) map['f'] = () => onNext();
     return map;
-  }, [visibleTools, tags, handleSave]);
+  }, [visibleTools, tags, handleSave, onNext]);
   useHotkeys(hotkeys);
 
-  const saveLabel = isSaved
-    ? 'Отправлено'
-    : (isExpired ? 'Истекло' : 'Отправить');
+  const primaryLabel = canAdvance ? 'Следующая →' : 'Отправить';
+  const primaryDisabled = canAdvance ? !onNext : false;
+  const primaryTitle = canAdvance
+    ? (isExpired ? 'Время истекло — следующая задача (F)' : 'Следующая задача (F)')
+    : 'Отправить разметку (G)';
 
-  const saveTitle = isSaved
-    ? 'Разметка отправлена'
-    : (isExpired ? 'Время на выполнение истекло' : 'Отправить разметку');
+  const taskName = (task?.metadata?.name as string | undefined)
+    ?? (task ? `Задача ${taskNumber}` : '');
 
   return (
     <div className={styles.body}>
       <aside className={styles.sidebar}>
-        <ToolSelector tools={visibleTools} activeTool={activeTool} onSelect={setActiveTool} />
-        <div className={styles.divider} />
         <TagSelector tags={tags} activeTagId={activeTagId} onSelect={setActiveTagId} />
-        <div className={styles.sidebarBottom}>
-          {saveError && (
-            <span className={styles.saveError}>Ошибка сохранения</span>
-          )}
-          <button
-            className={styles.saveButton}
-            onClick={handleSave}
-            disabled={isSaved || isExpired}
-            title={saveTitle}
-          >
-            {saveLabel}
-          </button>
+        <div className={styles.legend}>
+          <HintsBar activeTool={activeTool} />
         </div>
       </aside>
 
@@ -155,7 +151,33 @@ export function AnnotationView({ task, hasMoreTasks, tags, allowedTools, isExpir
             )
           }
         </div>
-        <HintsBar activeTool={activeTool} />
+
+        {task && (
+          <div className={styles.toolbar}>
+            <div className={styles.taskInfo}>
+              <span className={styles.taskName}>{taskName}</span>
+              <span className={styles.taskIndex}>
+                {taskNumber}{tasksLimit != null ? ` / ${tasksLimit}` : ''}
+              </span>
+              {task.expiresAt && <ExpiryTimer expiresAt={task.expiresAt} />}
+              {saveError && <span className={styles.saveError}>Ошибка сохранения</span>}
+            </div>
+            <div className={styles.toolbarRow}>
+              <div className={styles.tools}>
+                <ToolSelector tools={visibleTools} activeTool={activeTool} onSelect={setActiveTool} />
+              </div>
+              <button
+                className={styles.primaryButton}
+                onClick={primaryAction}
+                disabled={primaryDisabled}
+                title={primaryTitle}
+              >
+                {primaryLabel}
+              </button>
+            </div>
+          </div>
+        )}
+
         {showEmptyConfirm && (
           <ConfirmModal
             message="Вы не добавили ни одной аннотации. Отправить пустую разметку?"

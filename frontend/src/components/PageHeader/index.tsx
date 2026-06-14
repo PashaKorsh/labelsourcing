@@ -25,7 +25,14 @@ export function PageHeader() {
     img.src = user.avatarUrl;
   }, [user?.avatarUrl]);
 
-  const visibleItems = NAV_ITEMS.filter(item => hasRole(user?.roles ?? [], item.roles));
+  const seenPaths = new Set<string>();
+  const visibleItems = NAV_ITEMS
+    .filter(item => hasRole(user?.roles ?? [], item.roles))
+    .filter(item => {
+      if (seenPaths.has(item.path)) return false;
+      seenPaths.add(item.path);
+      return true;
+    });
 
   return (
     <nav className={styles.nav}>

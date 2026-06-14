@@ -25,7 +25,6 @@ export function AppTagSelector({ selectedTags, onTagsChange }: Props) {
         <RoleBadge key={tag.id} role={tag} />
       ))}
       <ContextMenu
-        centered
         trigger={<button type="button" className={styles.addButton}>+</button>}
       >
         <AppTagPicker selectedTags={selectedTags} onToggle={handleToggle} />

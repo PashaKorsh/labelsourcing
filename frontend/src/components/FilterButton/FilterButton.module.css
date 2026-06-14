@@ -28,6 +28,8 @@
   gap: 12px;
   padding: 8px;
   min-width: 240px;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .section {
@@ -43,13 +45,16 @@
   color: var(--text-muted);
 }
 
-.statusList {
+.chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.statusItem {
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -59,11 +64,11 @@
   cursor: pointer;
 }
 
-.statusItem:hover {
+.chip:hover {
   background: var(--hover);
 }
 
-.statusSelected {
+.chipSelected {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-text);

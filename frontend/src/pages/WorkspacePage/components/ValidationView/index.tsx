@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import { ReadOnlyAnnotationCanvas } from '@/components/ReadOnlyAnnotationCanvas';
+import { ExpiryTimer } from '../ExpiryTimer';
 import { taskService } from '@/services';
 import { deserializeAnnotations } from '@/utils/annotationDeserializer';
 import { useHotkeys } from '@/hooks/useHotkeys';
@@ -21,13 +22,15 @@ interface ValidationState {
 
 interface Props {
   task: AnnotationTask;
+  taskNumber: number;
+  tasksLimit: number | null;
   tags: Tag[];
   isSaved: boolean;
   onSaved: () => void;
   onNext?: () => void;
 }
 
-export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) {
+export function ValidationView({ task, taskNumber, tasksLimit, tags, isSaved, onSaved, onNext }: Props) {
   const [state, setState] = useState<ValidationState>({
     annotations: [],
     ready: false,
@@ -79,6 +82,11 @@ export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) 
     }
   }, [task.id, state.verdict, state.submitting, state.submitted, onSaved]);
 
+  const primaryAction = useCallback(() => {
+    if (state.submitted) onNext?.();
+    else handleSubmit();
+  }, [state.submitted, onNext, handleSubmit]);
+
   const hotkeys = useMemo<HotkeyMap>(() => ({
     s: () => selectVerdict(true),
     a: () => selectVerdict(false),
@@ -87,7 +95,11 @@ export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) 
   }), [selectVerdict, handleSubmit, onNext]);
   useHotkeys(hotkeys);
 
-  const submitLabel = state.submitted ? 'Отправлено' : (state.submitting ? 'Отправка…' : 'Отправить');
+  const primaryLabel = state.submitted ? 'Следующая →' : (state.submitting ? 'Отправка…' : 'Отправить');
+  const primaryDisabled = state.submitted ? !onNext : (state.verdict === null || state.submitting);
+  const primaryTitle = state.submitted ? 'Следующая задача (F)' : 'Отправить вердикт (G)';
+
+  const taskName = (task.metadata?.name as string | undefined) ?? `Задача ${taskNumber}`;
 
   return (
     <div className={styles.container}>
@@ -105,50 +117,46 @@ export function ValidationView({ task, tags, isSaved, onSaved, onNext }: Props) 
               />
             )
         }
-      </div>
 
-      <div className={styles.verdictBar}>
-        <div className={styles.hints}>
-          <span>S — корректно</span>
-          <span>A — некорректно</span>
-          <span>G — отправить</span>
-          {onNext && <span>F — следующая</span>}
-        </div>
-        <div className={styles.buttons}>
-          <button
-            className={styles.rejectButton}
-            data-active={state.verdict === false}
-            onClick={() => selectVerdict(false)}
-            disabled={state.submitting || state.submitted}
-            title="Разметка некорректна (A)"
-          >
-            ✗ Некорректно
-          </button>
-          <button
-            className={styles.approveButton}
-            data-active={state.verdict === true}
-            onClick={() => selectVerdict(true)}
-            disabled={state.submitting || state.submitted}
-            title="Разметка корректна (S)"
-          >
-            ✓ Корректно
-          </button>
-          <button
-            className={styles.submitButton}
-            onClick={handleSubmit}
-            disabled={state.verdict === null || state.submitting || state.submitted}
-            title="Отправить вердикт (G)"
-          >
-            {submitLabel}
-          </button>
-          <button
-            className={styles.navButton}
-            onClick={onNext}
-            disabled={!onNext}
-            title="Следующая задача (F)"
-          >
-            След →
-          </button>
+        <div className={styles.toolbar}>
+          <div className={styles.taskInfo}>
+            <span className={styles.taskName}>{taskName}</span>
+            <span className={styles.validationBadge}>Валидация</span>
+            <span className={styles.taskIndex}>
+              {taskNumber}{tasksLimit != null ? ` / ${tasksLimit}` : ''}
+            </span>
+            {task.expiresAt && <ExpiryTimer expiresAt={task.expiresAt} />}
+          </div>
+          <div className={styles.toolbarRow}>
+            <div className={styles.verdicts}>
+              <button
+                className={styles.rejectButton}
+                data-active={state.verdict === false}
+                onClick={() => selectVerdict(false)}
+                disabled={state.submitting || state.submitted}
+                title="Разметка некорректна (A)"
+              >
+                ✗
+              </button>
+              <button
+                className={styles.approveButton}
+                data-active={state.verdict === true}
+                onClick={() => selectVerdict(true)}
+                disabled={state.submitting || state.submitted}
+                title="Разметка корректна (S)"
+              >
+                ✓
+              </button>
+            </div>
+            <button
+              className={styles.primaryButton}
+              onClick={primaryAction}
+              disabled={primaryDisabled}
+              title={primaryTitle}
+            >
+              {primaryLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>

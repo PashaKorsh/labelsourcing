@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { SearchBar } from '../../components/SearchBar';
-import { AppTagSelector } from '../../components/AppTagSelector';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { SearchBar } from '@/components/SearchBar';
+import { AppTagSelector } from '@/components/AppTagSelector';
 import { RoleMenu, roleLabel } from './components/RoleMenu';
-import { userService } from '../../services';
-import type { UserListItem, Role } from '../../types/user';
-import type { AppTag } from '../../types/appTag';
+import { UserFilter } from './components/UserFilter';
+import { userService } from '@/services';
+import type { UserListItem, Role } from '@/types/user';
+import type { AppTag } from '@/types/appTag';
 import styles from './UsersPage.module.css';
 
 export function UsersPage() {
@@ -14,6 +15,8 @@ export function UsersPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterRoles, setFilterRoles] = useState<string[]>([]);
+  const [filterTags, setFilterTags] = useState<AppTag[]>([]);
 
   useEffect(() => {
     userService.listRoles().then(setRoles).catch(err => console.error('[UsersPage] roles', err));
@@ -34,7 +37,6 @@ export function UsersPage() {
     const roleIds = patch.roleNames
       ? roles.filter(r => patch.roleNames!.includes(r.name)).map(r => r.id)
       : undefined;
-    // Оптимистичное обновление
     setUsers(prev => prev.map(u => u.id === user.id ? {
       ...u,
       roles: patch.roleNames ?? u.roles,
@@ -47,18 +49,34 @@ export function UsersPage() {
     }
   };
 
+  const visibleUsers = users.filter(u =>
+    (filterRoles.length === 0 || filterRoles.some(r => u.roles.includes(r))) &&
+    (filterTags.length === 0 || filterTags.some(t => u.tags.some(ut => ut.id === t.id)))
+  );
+
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
-        <SearchBar value={search} onChange={setSearch} />
+        <div className={styles.searchRow}>
+          <div className={styles.searchField}>
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          <UserFilter
+            allRoles={roles}
+            selectedRoles={filterRoles}
+            selectedTags={filterTags}
+            onRolesChange={setFilterRoles}
+            onTagsChange={setFilterTags}
+          />
+        </div>
 
         <section className={styles.list}>
           {loading ? (
             <p>Загрузка…</p>
           ) : (
-            users.map((user) => (
+            visibleUsers.map((user) => (
               <div key={user.id} className={styles.row}>
                 {user.avatarUrl && (
                   <img src={user.avatarUrl} alt="" className={styles.avatar} />

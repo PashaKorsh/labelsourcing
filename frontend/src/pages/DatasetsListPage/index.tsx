@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PageHeader } from '../../components/PageHeader';
-import { SearchBar } from '../../components/SearchBar';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
+import { PageHeader } from '@/components/PageHeader';
+import { SearchBar } from '@/components/SearchBar';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 import { TaskList } from './components/TaskList';
-import { DatasetFilter } from './components/DatasetFilter';
-import { datasetService } from '../../services';
-import type { Dataset } from '../../types/dataset';
-import type { AppTag } from '../../types/appTag';
+import { DatasetFilter } from '@/components/DatasetFilter';
+import { datasetService } from '@/services';
+import type { Dataset } from '@/types/dataset';
+import type { AppTag } from '@/types/appTag';
 
 export function DatasetsListPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);

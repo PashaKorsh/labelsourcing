@@ -1,4 +1,4 @@
-import { getHints } from '../../tools/toolHints';
+import { getHints, type HotkeyHint } from '@/tools/toolHints';
 import styles from './HintsBar.module.css';
 
 interface HintsBarProps {
@@ -11,7 +11,7 @@ export function HintsBar({ activeTool }: HintsBarProps) {
 
   return (
     <div className={styles.bar}>
-      {hints.map(h => (
+      {hints.map((h: HotkeyHint) => (
         <span key={h.key} className={styles.hint}>
           <kbd className={styles.key}>{h.key}</kbd>
           <span className={styles.desc}>{h.description}</span>

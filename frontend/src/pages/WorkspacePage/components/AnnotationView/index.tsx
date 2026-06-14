@@ -1,17 +1,17 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import { AnnotationCanvas } from '../../components/AnnotationCanvas';
-import { ToolSelector } from '../../components/ToolSelector';
-import { TagSelector } from '../../components/TagSelector';
-import { HintsBar } from '../../components/HintsBar';
-import { CompletedScreen } from '../../components/CompletedScreen';
-import { ConfirmModal } from '../../components/ConfirmModal';
-import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
-import { taskService } from '../../services';
-import { useHotkeys } from '../../hooks/useHotkeys';
-import type { HotkeyMap } from '../../hooks/useHotkeys';
-import type { AnnotationTask } from '../../types/task';
-import type { Tag } from '../../types/annotation';
+import { AnnotationCanvas } from '@/components/AnnotationCanvas';
+import { ToolSelector } from '../ToolSelector';
+import { TagSelector } from '../TagSelector';
+import { HintsBar } from '../HintsBar';
+import { CompletedScreen } from '../CompletedScreen';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { IMAGE_DRAWING_TOOLS } from '@/tools/imageTools';
+import { taskService } from '@/services';
+import { useHotkeys } from '@/hooks/useHotkeys';
+import type { HotkeyMap } from '@/hooks/useHotkeys';
+import type { AnnotationTask } from '@/types/task';
+import type { Tag } from '@/types/annotation';
 import styles from './AnnotationView.module.css';
 
 interface Props {

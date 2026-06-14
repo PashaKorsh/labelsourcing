@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { RoleBadge } from '../../components/RoleBadge';
-import { tagService } from '../../services';
-import type { AppTag } from '../../types/appTag';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { RoleBadge } from '@/components/RoleBadge';
+import { tagService } from '@/services';
+import type { AppTag } from '@/types/appTag';
 import styles from './TagsPage.module.css';
 
 export function TagsPage() {

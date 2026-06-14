@@ -1,6 +1,6 @@
-import type { ValidationTask, ValidationVerdict, ValidationResult } from '../../types/validationTask';
+import type { ValidationTask, ValidationVerdict, ValidationResult } from '@/types/validationTask';
 import type { ValidationService } from './ValidationService';
-import { API, apiFetch } from '../../config/api';
+import { API, apiFetch } from '@/config/api';
 
 // NOTE: Загрузка задач для валидации требует эндпоинта GET /api/labels/task/{id}
 // или аналогичного, которого пока нет на бэкенде. Когда появится — реализовать

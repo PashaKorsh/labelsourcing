@@ -1,13 +1,15 @@
-import { ContextMenu } from '../../../../components/ContextMenu';
-import { AppTagPicker } from '../../../../components/AppTagPicker';
-import type { AppTag } from '../../../../types/appTag';
+import { ContextMenu } from '@/components/AppTagSelector/components/ContextMenu';
+import { AppTagPicker } from '@/components/AppTagSelector/components/AppTagPicker';
+import type { AppTag } from '@/types/appTag';
 import styles from './DatasetFilter.module.css';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'Любой' },
   { value: 'NOT_STARTED', label: 'Не начато' },
   { value: 'IN_PROGRESS', label: 'В работе' },
-  { value: 'USER_DONE', label: 'Выполнено мной' },
+  { value: 'WAITING_VALIDATION', label: 'Ждёт проверки' },
+  { value: 'LIMIT_REACHED', label: 'Квота выполнена' },
+  { value: 'IDLE', label: 'Ожидание задач' },
   { value: 'COMPLETED', label: 'Завершён' },
 ];
 

@@ -90,6 +90,17 @@
   white-space: nowrap;
 }
 
+.idleBadge {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--warn-text);
+  padding: 6px 12px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 .actions {
   display: flex;
   align-items: center;

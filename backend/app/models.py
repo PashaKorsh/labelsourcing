@@ -16,8 +16,6 @@ class Base(DeclarativeBase):
 class AssignmentStatus(str, enum.Enum):
     IN_PROGRESS = "in_progress"
     DONE = "done"
-    EXPIRED = "expired"
-    REJECTED = "rejected"
 
 
 class TaskStatus(str, enum.Enum):
@@ -32,7 +30,7 @@ class TaskType(str, enum.Enum):
 
 class DatasetStatus(str, enum.Enum):
     ACTIVE = "active"
-    COMPLETED = "completed"
+    CLOSED = "closed"
 
 
 class SourceType(str, enum.Enum):
@@ -88,7 +86,6 @@ class Dataset(Base):
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
     requires_validation: Mapped[bool] = mapped_column(Boolean, server_default="false")
     validation_quorum: Mapped[int] = mapped_column(Integer, server_default="1")
-    annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     settings: Mapped[dict] = mapped_column(JSONB, server_default='{}', default=dict)
     source_type: Mapped[SourceType] = mapped_column(
@@ -157,6 +154,7 @@ class Label(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assignments.id", ondelete="CASCADE"), unique=True)
     result: Mapped[Dict[str, Any]] = mapped_column(JSONB)
+    is_validated: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assignment: Mapped["Assignment"] = relationship(back_populates="label")

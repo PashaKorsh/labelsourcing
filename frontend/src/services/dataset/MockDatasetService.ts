@@ -1,5 +1,5 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
+import type { Dataset } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
 
 const TAG_MEDIC = { id: 'tag-medic', name: 'Медик', color: '#eb5757' };
@@ -36,7 +36,7 @@ const MOCK_LIST: Dataset[] = [
     description: 'Небольшое описание набора 4.',
     imageUrl: 'https://picsum.photos/seed/labelsourcing-cat-4/400/240',
     tags: [TAG_MEDIC],
-    userStatus: 'USER_DONE',
+    userStatus: 'IDLE',
   },
 ];
 
@@ -87,7 +87,7 @@ export class MockDatasetService implements DatasetService {
     let result = [...this.datasets];
     if (params?.search) {
       const q = params.search.toLowerCase();
-      result = result.filter(d => (d.title ?? d.description).toLowerCase().includes(q));
+      result = result.filter(d => (d.title ?? d.description ?? '').toLowerCase().includes(q));
     }
     return result;
   }
@@ -106,10 +106,9 @@ export class MockDatasetService implements DatasetService {
     const dataset: Dataset = {
       id: String(Date.now()),
       title: data.title,
-      description: data.description,
+      description: data.description ?? undefined,
       tags: [],
       userStatus: 'NOT_STARTED',
-      annotationLabels: data.annotationLabels,
     };
     this.mineDatasets.push(dataset);
     return dataset;
@@ -123,7 +122,6 @@ export class MockDatasetService implements DatasetService {
       ...target,
       title: data.title ?? target.title,
       description: data.description ?? target.description,
-      annotationLabels: data.annotationLabels ?? target.annotationLabels,
       id,
     };
 

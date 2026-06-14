@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { utilityService } from '../../services';
-import type { DirListing } from '../../types/utility';
+import { utilityService } from '@/services';
+import type { DirListing } from '@/types/utility';
 import styles from './FolderPicker.module.css';
 
 interface Props {

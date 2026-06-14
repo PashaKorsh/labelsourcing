@@ -1,5 +1,5 @@
-import { ContextMenu } from '../../../../components/ContextMenu';
-import type { Role } from '../../../../types/user';
+import { ContextMenu } from '@/components/AppTagSelector/components/ContextMenu';
+import type { Role } from '@/types/user';
 import styles from './RoleMenu.module.css';
 
 const ROLE_LABELS: Record<string, string> = {

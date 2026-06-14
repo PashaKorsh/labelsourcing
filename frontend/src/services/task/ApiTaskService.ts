@@ -1,8 +1,8 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import type { AnnotationTask } from '../../types/task';
+import type { AnnotationTask } from '@/types/task';
 import type { TaskService } from './TaskService';
-import { serializeTaskAnnotations } from '../../utils/annotationSerializer';
-import { API, apiFetch } from '../../config/api';
+import { serializeTaskAnnotations } from '@/utils/annotationSerializer';
+import { API, apiFetch } from '@/config/api';
 
 interface TaskDto {
   id: string;

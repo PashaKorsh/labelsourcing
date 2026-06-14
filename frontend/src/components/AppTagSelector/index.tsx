@@ -1,7 +1,7 @@
-import { ContextMenu } from '../ContextMenu';
-import { RoleBadge } from '../RoleBadge';
-import { AppTagPicker } from '../AppTagPicker';
-import type { AppTag } from '../../types/appTag';
+import { ContextMenu } from './components/ContextMenu';
+import { RoleBadge } from '@/components/RoleBadge';
+import { AppTagPicker } from './components/AppTagPicker';
+import type { AppTag } from '@/types/appTag';
 import styles from './AppTagSelector.module.css';
 
 interface Props {

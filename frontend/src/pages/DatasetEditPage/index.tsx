@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { AppTagSelector } from '../../components/AppTagSelector';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { AppTagSelector } from '@/components/AppTagSelector';
 import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
 import { FolderPicker } from './FolderPicker';
-import { RawSettingsEditor } from '../../components/RawSettingsEditor';
-import { ConfirmModal } from '../../components/ConfirmModal';
-import { ROUTES } from '../../config/routes';
-import { datasetService, taskService, utilityService } from '../../services';
-import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
-import type { AppTag } from '../../types/appTag';
-import type { Tag } from '../../types/annotation';
-import type { SourceType } from '../../types/dataset';
-import type { Utility } from '../../types/utility';
+import { RawSettingsEditor } from './components/RawSettingsEditor';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { ROUTES } from '@/config/routes';
+import { datasetService, taskService, utilityService } from '@/services';
+import { IMAGE_DRAWING_TOOLS } from '@/tools/imageTools';
+import type { AppTag } from '@/types/appTag';
+import type { Tag } from '@/types/annotation';
+import type { SourceType } from '@/types/dataset';
+import type { Utility } from '@/types/utility';
 import styles from './DatasetEditPage.module.css';
 
 const ANNOTATION_TOOLS = IMAGE_DRAWING_TOOLS.filter(t => t.id !== 'cursor');
@@ -27,11 +27,12 @@ const getActiveTools = (s: Record<string, unknown> | null): string[] => {
 
 // Поля settings, которые имеют выделенные поля API и не попадают в settings на бэке
 const API_FIELDS = [
-  'title', 'description', 'tags', 'annotation_labels',
+  'title', 'description', 'tags',
   'required_answers', 'validation_quorum', 'requires_validation', 'default_tasks_limit',
 ] as const;
 
 const SHOW_RAW_SETTINGS = import.meta.env.VITE_DEV_PANEL === 'true';
+const DEFAULT_ANNOTATION_LABEL = { id: 'object', label: 'Object', color: '#f59e0b' };
 
 interface TaskRow {
   id?: string;
@@ -57,7 +58,9 @@ export function DatasetEditPage() {
   const [scanInfo, setScanInfo] = useState<string>('');
 
   // Единый источник правды для всех настроек датасета. Ключи в API_FIELDS + пользовательские поля
-  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(
+    isCreateMode ? { annotation_labels: [DEFAULT_ANNOTATION_LABEL] } : null
+  );
 
   useEffect(() => {
     utilityService.list().then(setUtilities).catch(() => setUtilities([]));
@@ -79,9 +82,8 @@ export function DatasetEditPage() {
       // Собираем все поля датасета в единый объект настроек
       const merged: Record<string, unknown> = { ...(ds.settings ?? {}) };
       if (ds.title) merged.title = ds.title;
-      merged.description = ds.description;
+      if (ds.description) merged.description = ds.description;
       if (ds.tags.length > 0) merged.tags = ds.tags;
-      if ((ds.annotationLabels ?? []).length > 0) merged.annotation_labels = ds.annotationLabels;
       if (ds.requiredAnswers !== undefined) merged.required_answers = ds.requiredAnswers;
       if (ds.validationQuorum !== undefined) merged.validation_quorum = ds.validationQuorum;
       if (ds.requiresValidation) merged.requires_validation = true;
@@ -122,6 +124,7 @@ export function DatasetEditPage() {
   const validationQuorum = typeof settings?.validation_quorum === 'number' ? settings.validation_quorum : '';
   const requiresValidation = settings?.requires_validation === true;
   const defaultTasksLimit = typeof settings?.default_tasks_limit === 'number' ? settings.default_tasks_limit : '';
+  const annotationInstructions = typeof settings?.annotation_instructions === 'string' ? settings.annotation_instructions : '';
 
   const handleUrlChange = (index: number, value: string) =>
     setTaskRows(prev => prev.map((r, i) => i === index ? { ...r, url: value } : r));
@@ -171,7 +174,6 @@ export function DatasetEditPage() {
   };
 
   const handleSave = async () => {
-    if (!description.trim()) return;
     if (sourceType === 'utility' && !utilityId) {
       window.alert('Выберите утилиту-источник');
       return;
@@ -187,12 +189,11 @@ export function DatasetEditPage() {
 
       const commonFields = {
         title: typeof s.title === 'string' ? s.title.trim() || undefined : undefined,
-        description: typeof s.description === 'string' ? s.description.trim() : '',
+        description: typeof s.description === 'string' ? s.description.trim() || null : null,
         tagIds: Array.isArray(s.tags) ? (s.tags as AppTag[]).map(t => t.id) : [],
-        annotationLabels: Array.isArray(s.annotation_labels) ? (s.annotation_labels as Tag[]) : [],
         requiredAnswers: typeof s.required_answers === 'number' ? s.required_answers : undefined,
         validationQuorum: typeof s.validation_quorum === 'number' ? s.validation_quorum : undefined,
-        requiresValidation: s.requires_validation === true ? true : undefined,
+        requiresValidation: s.requires_validation === true,
         defaultTasksLimit: typeof s.default_tasks_limit === 'number' ? s.default_tasks_limit : undefined,
         settings: Object.keys(extraSettings).length > 0 ? extraSettings : undefined,
         sourceType,
@@ -282,6 +283,17 @@ export function DatasetEditPage() {
               placeholder="Описание датасета"
               value={description}
               onChange={e => patchSettings('description', e.target.value || null)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Инструкции для разметчиков</label>
+            <textarea
+              className={styles.textarea}
+              placeholder="Правила разметки, которые увидит пользователь перед стартом"
+              rows={5}
+              value={annotationInstructions}
+              onChange={e => patchSettings('annotation_instructions', e.target.value || null)}
             />
           </div>
 
@@ -517,7 +529,7 @@ export function DatasetEditPage() {
             type="button"
             className={styles.saveButton}
             onClick={handleSave}
-            disabled={submitting || !description.trim()}
+            disabled={submitting || !title.trim()}
           >
             {submitting
               ? (isCreateMode ? 'Создание…' : 'Сохранение…')

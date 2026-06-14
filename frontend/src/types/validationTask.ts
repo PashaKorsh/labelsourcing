@@ -1,4 +1,4 @@
-import type { SerializedShape } from '../utils/annotationSerializer';
+import type { SerializedShape } from '@/utils/annotationSerializer';
 
 export interface ValidationTask {
   id: string;

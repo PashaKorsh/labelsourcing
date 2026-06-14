@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, exists, cast, String, delete, or_
+from sqlalchemy import select, func, exists, cast, String, delete, update, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload, aliased
 import uuid
@@ -57,11 +57,10 @@ def _check_dataset_access(dataset: Dataset, current_user: User) -> None:
             )
 
 
-def _compute_user_done(access: UserDatasetAccess | None, tasks_count: int) -> bool:
+def _compute_user_done(access: UserDatasetAccess | None) -> bool:
     if access is None:
         return False
-    effective_limit = min(access.tasks_limit, tasks_count)
-    return not access.can_label or access.tasks_done >= effective_limit
+    return not access.can_label or access.tasks_done >= access.tasks_limit
 
 
 async def _get_dataset_with_counts(
@@ -82,7 +81,7 @@ async def _get_dataset_with_counts(
                 UserDatasetAccess.dataset_id == dataset_id,
             )
         )).scalar_one_or_none()
-        dataset.user_done = _compute_user_done(access, dataset.tasks_count)
+        dataset.user_done = _compute_user_done(access)
         if access is not None:
             dataset.user_tasks_limit = access.tasks_limit
             dataset.user_tasks_done = access.tasks_done
@@ -96,7 +95,9 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["admin", "moderator"]))
 ):
-    labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
+    settings = dict(dataset_in.settings)
+    if 'annotation_labels' not in settings:
+        settings['annotation_labels'] = DEFAULT_ANNOTATION_LABELS
 
     source_type = SourceType(dataset_in.source_type)
     utility_id = await _validate_utility(db, source_type, dataset_in.utility_id, current_user)
@@ -107,10 +108,9 @@ async def create_dataset(
         description=dataset_in.description,
         required_answers=dataset_in.required_answers,
         default_tasks_limit=dataset_in.default_tasks_limit,
-        annotation_labels=labels_data,
         requires_validation=dataset_in.requires_validation,
         validation_quorum=dataset_in.validation_quorum,
-        settings=dataset_in.settings or {},
+        settings=settings,
         source_type=source_type,
         utility_id=utility_id,
     )
@@ -130,23 +130,41 @@ async def create_dataset(
 def _get_user_status(
         dataset: Dataset,
         access: UserDatasetAccess | None,
-        tasks_count: int,
         has_pending_validation: bool = False,
-        has_pending_own_validation: bool = False,
+        has_pending_annotation: bool = False,
+        has_unvalidated_work: bool = False,
 ) -> str:
-    if dataset.status == DatasetStatus.COMPLETED:
+    """
+    Вычисляет статус пользователя в датасете.
+
+      NOT_STARTED        — нет access-записи (пользователь не начинал)
+      IN_PROGRESS        — лимит не исчерпан и есть задачи (аннотация или валидация)
+      WAITING_VALIDATION — собственная разметка ожидает проверки
+      LIMIT_REACHED      — пользователь исчерпал свою квоту
+      IDLE               — задач нет, но квота не исчерпана (датасет ещё может пополниться)
+      COMPLETED          — датасет закрыт администратором
+    """
+    if dataset.status == DatasetStatus.CLOSED:
         return "COMPLETED"
-    if access is not None:
-        effective_limit = min(access.tasks_limit, tasks_count)
-        if not access.can_label or access.tasks_done >= effective_limit:
-            if dataset.requires_validation and has_pending_validation and access.tasks_done < access.tasks_limit:
-                return "IN_PROGRESS"
-            if dataset.requires_validation and has_pending_own_validation:
-                return "WAITING_VALIDATION"
-            return "USER_DONE"
-        if access.tasks_done > 0:
-            return "IN_PROGRESS"
-    return "NOT_STARTED"
+
+    if access is None:
+        return "NOT_STARTED"
+
+    limit_reached = access.tasks_done >= access.tasks_limit
+
+    if not limit_reached and (
+        (dataset.requires_validation and has_pending_validation) or
+        (access.can_label and has_pending_annotation)
+    ):
+        return "IN_PROGRESS"
+
+    if dataset.requires_validation and has_unvalidated_work:
+        return "WAITING_VALIDATION"
+
+    if limit_reached:
+        return "LIMIT_REACHED"
+
+    return "IDLE"
 
 
 @router.get("/", response_model=list[DatasetResponse])
@@ -162,12 +180,16 @@ async def get_datasets(
 ):
     ValTask = aliased(Task)
     ValAssignment = aliased(Assignment)
-    OwnValTask = aliased(Task)
+    UnvalLabel = aliased(Label)
+    UnvalAnnAssign = aliased(Assignment)
+    UnvalAnnTask = aliased(Task)
+    AnnTask2 = aliased(Task)
+    AnnAssign2 = aliased(Assignment)
 
-    # Подзапрос: PENDING validation-задачи, которые текущий пользователь ещё не сделал
-    # и которые он вообще может выполнить (т.е. аннотировал не он сам).
+    # Подзапрос: есть ли PENDING validation-задачи, которые пользователь ещё не сделал
+    # (аннотировал не он сам)
     pending_val_for_user_sq = (
-        select(func.count())
+        select(ValTask.id)
         .where(ValTask.dataset_id == Dataset.id)
         .where(ValTask.type == TaskType.VALIDATION)
         .where(ValTask.status == TaskStatus.PENDING)
@@ -181,17 +203,42 @@ async def get_datasets(
                 .correlate(ValTask)
             )
         )
+        .limit(1)
         .correlate(Dataset)
         .scalar_subquery()
     )
 
-    # Подзапрос: PENDING validation-задачи по аннотациям самого пользователя (его работа ждёт проверки)
-    own_pending_val_sq = (
-        select(func.count())
-        .where(OwnValTask.dataset_id == Dataset.id)
-        .where(OwnValTask.type == TaskType.VALIDATION)
-        .where(OwnValTask.status == TaskStatus.PENDING)
-        .where(cast(OwnValTask.task_metadata['annotator_id'], String) == f'"{current_user.id}"')
+    # Подзапрос: есть ли у пользователя аннотационные лейблы, ещё не прошедшие валидацию
+    user_has_unvalidated_work_sq = (
+        select(UnvalLabel.id)
+        .join(UnvalAnnAssign, UnvalLabel.assignment_id == UnvalAnnAssign.id)
+        .join(UnvalAnnTask, UnvalAnnAssign.task_id == UnvalAnnTask.id)
+        .where(UnvalAnnTask.dataset_id == Dataset.id)
+        .where(UnvalAnnTask.type == TaskType.ANNOTATION)
+        .where(UnvalAnnAssign.user_id == current_user.id)
+        .where(UnvalAnnAssign.status == AssignmentStatus.DONE)
+        .where(UnvalLabel.is_validated == False)
+        .limit(1)
+        .correlate(Dataset)
+        .scalar_subquery()
+    )
+
+    # Подзапрос: есть ли PENDING annotation-задачи, которые пользователь ещё не выполнил
+    pending_ann_for_user_sq = (
+        select(AnnTask2.id)
+        .where(AnnTask2.dataset_id == Dataset.id)
+        .where(AnnTask2.type == TaskType.ANNOTATION)
+        .where(AnnTask2.status == TaskStatus.PENDING)
+        .where(
+            ~exists(
+                select(AnnAssign2.id)
+                .where(AnnAssign2.task_id == AnnTask2.id)
+                .where(AnnAssign2.user_id == current_user.id)
+                .where(AnnAssign2.status == AssignmentStatus.DONE)
+                .correlate(AnnTask2)
+            )
+        )
+        .limit(1)
         .correlate(Dataset)
         .scalar_subquery()
     )
@@ -200,8 +247,9 @@ async def get_datasets(
         select(
             Dataset,
             func.count(Label.id.distinct()).label("labeled_count"),
-            pending_val_for_user_sq.label("pending_val_count"),
-            own_pending_val_sq.label("own_pending_val_count"),
+            pending_val_for_user_sq.label("pending_val"),
+            user_has_unvalidated_work_sq.label("has_unvalidated_work"),
+            pending_ann_for_user_sq.label("has_pending_ann"),
             UserDatasetAccess
         )
         .outerjoin(Task, Dataset.id == Task.dataset_id)
@@ -245,13 +293,15 @@ async def get_datasets(
     for row in result.all():
         dataset = row[0]
         dataset.labeled_count = row[1]
-        pending_val_count = row[2]
-        own_pending_val_count = row[3]
-        user_access = row[4]
+        # row[2]: UUID или None — есть ли PENDING val-задачи для пользователя
+        # row[3]: UUID или None — есть ли непроверенные лейблы пользователя
+        # row[4]: UUID или None — есть ли PENDING ann-задачи для пользователя
+        user_access = row[5]
         dataset.user_status = _get_user_status(
-            dataset, user_access, dataset.tasks_count,
-            has_pending_validation=pending_val_count > 0,
-            has_pending_own_validation=own_pending_val_count > 0,
+            dataset, user_access,
+            has_pending_validation=bool(row[2]),
+            has_unvalidated_work=bool(row[3]),
+            has_pending_annotation=bool(row[4]),
         )
 
         datasets_with_counts.append(dataset)
@@ -310,8 +360,8 @@ async def _assign_task(
     )).scalar_one_or_none()
 
     if existing:
-        if existing.status in (AssignmentStatus.EXPIRED, AssignmentStatus.REJECTED):
-            task.active_assignments += 1
+        # Единственный возможный случай: устаревший IN_PROGRESS (expires_at истёк, но не был
+        # сдан — active_assignments уже был посчитан при создании, не инкрементируем повторно)
         existing.status = AssignmentStatus.IN_PROGRESS
         existing.expires_at = expires_at
         existing.assigned_at = datetime.utcnow()
@@ -457,27 +507,24 @@ async def get_next_task(
     remaining_count = count - len(result_tasks)
 
     # Annotation-задачи — только если валидации не нашлось
-    if len(result_tasks) == 0 and access.can_label:
-        effective_limit = min(access.tasks_limit, dataset.tasks_count)
+    if len(result_tasks) == 0 and access.can_label and access.tasks_done < access.tasks_limit:
+        ann_task_stmt = (
+            select(Task)
+            .where(Task.dataset_id == dataset_id)
+            .where(Task.type == TaskType.ANNOTATION)
+            .where(Task.status == TaskStatus.PENDING)
+            .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
+            .where(~user_busy_sq)
+            .order_by(Task.created_at)
+            .limit(remaining_count)
+            .with_for_update(of=Task, skip_locked=True)
+        )
 
-        if access.tasks_done < effective_limit:
-            ann_task_stmt = (
-                select(Task)
-                .where(Task.dataset_id == dataset_id)
-                .where(Task.type == TaskType.ANNOTATION)
-                .where(Task.status == TaskStatus.PENDING)
-                .where((live_count_sq + Task.completed_answers) < dataset.required_answers)
-                .where(~user_busy_sq)
-                .order_by(Task.created_at)
-                .limit(remaining_count)
-                .with_for_update(of=Task, skip_locked=True)
-            )
+        annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
 
-            annotation_tasks = (await db.execute(ann_task_stmt)).scalars().all()
-
-            for task in annotation_tasks:
-                await _assign_task(db, task, current_user.id, expires_at)
-                result_tasks.append(task)
+        for task in annotation_tasks:
+            await _assign_task(db, task, current_user.id, expires_at)
+            result_tasks.append(task)
 
     if not result_tasks:
         await db.rollback()
@@ -712,9 +759,7 @@ async def reset_user_progress(
     ensure_can_manage_dataset(dataset, current_user)
 
     # 1. Удаляем все validation-задачи, созданные из разметки этого пользователя.
-    #    Это покрывает все состояния аннотации: DONE (валидация ещё идёт),
-    #    REJECTED (валидация завершена, лейбл уже удалён — per-label запрос не работал).
-    #    DB-уровень CASCADE (tasks→assignments→labels) сам чистит дочерние записи.
+    #    DB CASCADE (tasks→assignments→labels) чистит дочерние записи автоматически.
     await db.execute(
         delete(Task)
         .where(Task.dataset_id == dataset_id)
@@ -743,7 +788,6 @@ async def reset_user_progress(
                 task.status = TaskStatus.PENDING
         elif assignment.status == AssignmentStatus.IN_PROGRESS:
             task.active_assignments = max(0, task.active_assignments - 1)
-        # REJECTED: задача уже откачена в _process_validation_verdict
         await db.delete(assignment)
 
     access = (await db.execute(
@@ -754,6 +798,70 @@ async def reset_user_progress(
     )).scalar_one_or_none()
     if access:
         await db.delete(access)
+
+    await db.commit()
+
+
+@router.delete("/{dataset_id}/users-data", status_code=204)
+async def reset_dataset_users_data(
+        dataset_id: uuid.UUID,
+        db: AsyncSession = Depends(get_db),
+        _: User = Depends(require_roles(["admin"]))
+):
+    """[DEV] Сбросить все пользовательские данные по датасету.
+
+    Датасет возвращается в состояние «как новый»:
+    - Annotation-задачи сохраняются, но их счётчики и статусы обнуляются.
+    - Все validation-задачи удаляются (DB CASCADE → их ассайнменты и лейблы).
+    - Все ассайнменты и лейблы по annotation-задачам удаляются.
+    - Все записи доступа пользователей (UserDatasetAccess) удаляются.
+    """
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+
+    # 1. Удаляем все validation-задачи.
+    #    DB CASCADE (tasks → assignments → labels) чистит дочерние записи автоматически.
+    await db.execute(
+        delete(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.VALIDATION)
+    )
+
+    # 2. Удаляем все ассайнменты по annotation-задачам.
+    #    DB CASCADE (assignments → labels) чистит лейблы автоматически.
+    await db.execute(
+        delete(Assignment)
+        .where(
+            Assignment.task_id.in_(
+                select(Task.id)
+                .where(Task.dataset_id == dataset_id)
+                .where(Task.type == TaskType.ANNOTATION)
+            )
+        )
+    )
+
+    # 3. Сбрасываем счётчики и статусы annotation-задач.
+    await db.execute(
+        update(Task)
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.ANNOTATION)
+        .values(status=TaskStatus.PENDING, completed_answers=0, active_assignments=0)
+    )
+
+    # 4. Удаляем все записи доступа пользователей к датасету.
+    await db.execute(
+        delete(UserDatasetAccess)
+        .where(UserDatasetAccess.dataset_id == dataset_id)
+    )
+
+    # 5. Пересчитываем tasks_count по факту — защита от рассинхрона счётчика.
+    actual_count = (await db.execute(
+        select(func.count())
+        .where(Task.dataset_id == dataset_id)
+        .where(Task.type == TaskType.ANNOTATION)
+    )).scalar_one()
+    dataset.tasks_count = actual_count
 
     await db.commit()
 
@@ -782,16 +890,19 @@ async def update_dataset(
 
     if update_data.title is not None:
         dataset.title = update_data.title
-    if update_data.description is not None:
+    if 'description' in update_data.model_fields_set:
         dataset.description = update_data.description
     if update_data.required_answers is not None:
         dataset.required_answers = update_data.required_answers
     if update_data.default_tasks_limit is not None:
         dataset.default_tasks_limit = update_data.default_tasks_limit
+        await db.execute(
+            update(UserDatasetAccess)
+            .where(UserDatasetAccess.dataset_id == dataset_id)
+            .values(tasks_limit=update_data.default_tasks_limit)
+        )
     if update_data.status is not None:
         dataset.status = update_data.status
-    if update_data.annotation_labels is not None:
-        dataset.annotation_labels = [l.model_dump() for l in update_data.annotation_labels]
     if update_data.requires_validation is not None:
         dataset.requires_validation = update_data.requires_validation
     if update_data.validation_quorum is not None:

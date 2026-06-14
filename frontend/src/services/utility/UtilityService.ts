@@ -1,4 +1,4 @@
-import type { Utility, PairingCode, DirListing, ScanResult } from '../../types/utility';
+import type { Utility, PairingCode, DirListing, ScanResult } from '@/types/utility';
 
 export interface UtilityService {
   list(): Promise<Utility[]>;

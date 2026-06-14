@@ -1,6 +1,6 @@
-import type { Utility, PairingCode, DirListing, ScanResult } from '../../types/utility';
+import type { Utility, PairingCode, DirListing, ScanResult } from '@/types/utility';
 import type { UtilityService } from './UtilityService';
-import { API, apiFetch } from '../../config/api';
+import { API, apiFetch } from '@/config/api';
 
 interface UtilityDto {
   id: string;

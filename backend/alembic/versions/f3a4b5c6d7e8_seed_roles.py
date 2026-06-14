@@ -1,7 +1,7 @@
 """seed admin/moderator roles
 
 Revision ID: f3a4b5c6d7e8
-Revises: e2f3a4b5c6d7
+Revises: a4b5c6d7e8f9
 Create Date: 2026-06-13 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 
 revision: str = 'f3a4b5c6d7e8'
-down_revision: Union[str, None] = 'e2f3a4b5c6d7'
+down_revision: Union[str, None] = 'a4b5c6d7e8f9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

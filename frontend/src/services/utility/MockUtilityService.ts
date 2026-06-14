@@ -1,4 +1,4 @@
-import type { Utility, PairingCode, DirListing, ScanResult } from '../../types/utility';
+import type { Utility, PairingCode, DirListing, ScanResult } from '@/types/utility';
 import type { UtilityService } from './UtilityService';
 
 export class MockUtilityService implements UtilityService {

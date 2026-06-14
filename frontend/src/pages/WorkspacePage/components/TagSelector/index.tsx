@@ -1,4 +1,4 @@
-import type { Tag } from '../../types/annotation';
+import type { Tag } from '@/types/annotation';
 import styles from './TagSelector.module.css';
 
 interface Props {

@@ -1,14 +1,7 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
+import type { Dataset } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
-import { API, apiFetch } from '../../config/api';
-
-interface AnnotationLabelDto {
-  id: string;
-  label: string;
-  color: string;
-  hotkey?: string;
-}
+import { API, apiFetch } from '@/config/api';
 
 interface DatasetDto {
   id: string;
@@ -19,7 +12,6 @@ interface DatasetDto {
   user_status?: string;
   user_tasks_limit?: number | null;
   user_tasks_done?: number | null;
-  annotation_labels?: AnnotationLabelDto[] | null;
   required_answers?: number | null;
   validation_quorum?: number | null;
   requires_validation?: boolean | null;
@@ -47,12 +39,6 @@ function mapDto(dto: DatasetDto): Dataset {
     userTasksLimit: dto.user_tasks_limit ?? undefined,
     userTasksDone: dto.user_tasks_done ?? undefined,
     userStatus: (dto.user_status ?? 'NOT_STARTED') as Dataset['userStatus'],
-    annotationLabels: dto.annotation_labels?.map(l => ({
-      id: l.id,
-      label: l.label,
-      color: l.color,
-      hotkey: l.hotkey,
-    })),
     requiredAnswers: dto.required_answers ?? undefined,
     validationQuorum: dto.validation_quorum ?? undefined,
     requiresValidation: dto.requires_validation ?? undefined,
@@ -104,7 +90,6 @@ export class ApiDatasetService implements DatasetService {
         title: data.title,
         description: data.description,
         tag_ids: data.tagIds,
-        annotation_labels: data.annotationLabels,
         required_answers: data.requiredAnswers,
         validation_quorum: data.validationQuorum,
         requires_validation: data.requiresValidation,
@@ -132,7 +117,6 @@ export class ApiDatasetService implements DatasetService {
       title: data.title,
       description: data.description,
       tag_ids: data.tagIds,
-      annotation_labels: data.annotationLabels,
       required_answers: data.requiredAnswers,
       validation_quorum: data.validationQuorum,
       requires_validation: data.requiresValidation,

@@ -100,6 +100,16 @@ async def test_rescan_picks_new_files(client, user_cookie, paired_utility, sampl
     await client.delete(f"/datasets/{ds_id}", headers=user_cookie)
 
 
+async def test_unbind_utility_deletes_datasets(client, user_cookie, paired_utility):
+    uid = paired_utility["utility_id"]
+    ds_id = await _create_utility_dataset(client, user_cookie, uid)
+    assert (await client.get(f"/datasets/{ds_id}", headers=user_cookie)).status_code == 200
+
+    assert (await client.delete(f"/utility/{uid}", headers=user_cookie)).status_code == 204
+    # датасет, привязанный к утилите, удалён вместе с ней
+    assert (await client.get(f"/datasets/{ds_id}", headers=user_cookie)).status_code == 404
+
+
 async def test_next_proxy_vs_direct(client, user_cookie, paired_utility, sample_root, tmp_path):
     token = paired_utility["token"]
     uid = paired_utility["utility_id"]

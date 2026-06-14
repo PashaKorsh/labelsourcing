@@ -13,7 +13,7 @@ from app.models import (
     AssignmentStatus, TaskStatus, TaskType, DatasetStatus, SourceType, Utility
 )
 from app.api.dependencies import get_current_user, require_roles
-from app.api.helpers import _ensure_validation_tasks
+from app.api.helpers import _ensure_validation_tasks, ensure_can_manage_dataset, is_admin
 from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
 from app.schemas.task import TaskResponse, TaskPublicResponse
 from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
@@ -94,7 +94,7 @@ async def _get_dataset_with_counts(
 async def create_dataset(
         dataset_in: DatasetCreate,
         db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(require_roles(["admin", "moderator"]))
 ):
     labels_data = [l.model_dump() for l in dataset_in.annotation_labels] if dataset_in.annotation_labels else DEFAULT_ANNOTATION_LABELS
 
@@ -154,6 +154,9 @@ async def get_datasets(
         limit: int = 20,
         offset: int = 0,
         search: Optional[str] = None,
+        mine: bool = False,
+        tag_ids: Optional[List[uuid.UUID]] = Query(default=None),
+        status: Optional[str] = None,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
@@ -211,8 +214,7 @@ async def get_datasets(
         )
     )
 
-    is_admin = any(role.name == "admin" for role in current_user.roles)
-    if not is_admin:
+    if not is_admin(current_user):
         user_tag_ids = [t.id for t in current_user.tags]
         if user_tag_ids:
             stmt = stmt.where(
@@ -223,6 +225,12 @@ async def get_datasets(
             )
         else:
             stmt = stmt.where(~Dataset.tags.any())
+
+    if mine:
+        stmt = stmt.where(Dataset.owner_id == current_user.id)
+
+    if tag_ids:
+        stmt = stmt.where(Dataset.tags.any(Tag.id.in_(tag_ids)))
 
     if search:
         stmt = stmt.where(Dataset.title.ilike(f"%{search}%"))
@@ -247,6 +255,10 @@ async def get_datasets(
         )
 
         datasets_with_counts.append(dataset)
+
+    # Фильтр по пользовательскому статусу считается в Python — он не выражается в SQL
+    if status:
+        datasets_with_counts = [d for d in datasets_with_counts if d.user_status == status]
 
     return datasets_with_counts
 
@@ -481,12 +493,13 @@ async def get_next_task(
 async def get_dataset_stats(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
     """Статистика обработки датасета: количество задач по типам/статусам и текущая фаза."""
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
 
     def count_q(task_type: TaskType, task_status: TaskStatus):
         return (
@@ -533,7 +546,7 @@ async def get_dataset_stats(
 async def export_dataset_labels(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
     """Выгрузка всех разметок по датасету (без агрегации).
     Возвращает список annotation-задач с вложенными разметками всех пользователей.
@@ -541,6 +554,7 @@ async def export_dataset_labels(
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
 
     stmt = (
         select(Task, Assignment, Label)
@@ -580,8 +594,13 @@ async def get_dataset_tasks(
         offset: int = 0,
         status: Optional[str] = None,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
+
     stmt = (
         select(Task)
         .where(Task.dataset_id == dataset_id)
@@ -601,9 +620,13 @@ async def get_dataset_tasks(
 async def get_dataset_access(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
-    """Список записей доступа всех пользователей к датасету — только для администраторов"""
+    """Список записей доступа всех пользователей к датасету — владелец или админ"""
+    dataset = await db.get(Dataset, dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
     stmt = select(UserDatasetAccess).where(UserDatasetAccess.dataset_id == dataset_id)
     result = await db.execute(stmt)
     return result.scalars().all()
@@ -615,12 +638,13 @@ async def upsert_user_access(
         user_id: uuid.UUID,
         update_in: UserDatasetAccessUpdate,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
-    """Создать или обновить запись доступа пользователя к датасету — только для администраторов"""
+    """Создать или обновить запись доступа пользователя к датасету — владелец или админ"""
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
 
     stmt = select(UserDatasetAccess).where(
         UserDatasetAccess.user_id == user_id,
@@ -651,11 +675,12 @@ async def upsert_user_access(
 async def delete_dataset(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        _: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
     await db.delete(dataset)
     await db.commit()
 
@@ -678,12 +703,13 @@ async def reset_user_progress(
         dataset_id: uuid.UUID,
         user_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
-        _: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
     """[DEV] Сбросить весь прогресс пользователя по датасету."""
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
 
     # 1. Удаляем все validation-задачи, созданные из разметки этого пользователя.
     #    Это покрывает все состояния аннотации: DONE (валидация ещё идёт),
@@ -737,13 +763,14 @@ async def update_dataset(
         dataset_id: uuid.UUID,
         update_data: DatasetUpdate,
         db: AsyncSession = Depends(get_db),
-        admin_user: User = Depends(require_roles(["admin"]))
+        current_user: User = Depends(get_current_user)
 ):
     stmt = select(Dataset).options(selectinload(Dataset.tags)).where(Dataset.id == dataset_id)
     dataset = (await db.execute(stmt)).scalar_one_or_none()
 
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
 
     enabling_validation = (
         update_data.requires_validation is True and not dataset.requires_validation
@@ -778,7 +805,7 @@ async def update_dataset(
         dataset.utility_id = await _validate_utility(
             db, dataset.source_type,
             update_data.utility_id if update_data.utility_id is not None else dataset.utility_id,
-            admin_user,
+            current_user,
         )
 
     if update_data.tag_ids is not None:

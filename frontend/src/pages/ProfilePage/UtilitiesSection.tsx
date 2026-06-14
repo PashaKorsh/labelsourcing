@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { utilityService } from '../../services';
+import { ConfirmModal } from '../../components/ConfirmModal';
 import type { Utility, PairingCode } from '../../types/utility';
 import styles from './UtilitiesSection.module.css';
 
@@ -8,6 +9,7 @@ export function UtilitiesSection() {
   const [code, setCode] = useState<PairingCode | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmUnbind, setConfirmUnbind] = useState<Utility | null>(null);
 
   const load = useCallback(() => {
     utilityService.list().then(setUtilities).catch(() => setError('Не удалось загрузить утилиты'));
@@ -31,8 +33,15 @@ export function UtilitiesSection() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    await utilityService.delete(id);
+  const handleUnbind = async () => {
+    if (!confirmUnbind) return;
+    const id = confirmUnbind.id;
+    setConfirmUnbind(null);
+    try {
+      await utilityService.delete(id);
+    } catch {
+      setError('Не удалось отвязать утилиту');
+    }
     load();
   };
 
@@ -74,12 +83,22 @@ export function UtilitiesSection() {
               <span className={styles.name}>{u.name}</span>
               {u.publicBaseUrl && <span className={styles.badge}>direct</span>}
               <span className={styles.status}>{u.online ? 'в сети' : 'не в сети'}</span>
-              <button type="button" className={styles.deleteButton} onClick={() => handleDelete(u.id)} title="Отвязать">
+              <button type="button" className={styles.deleteButton} onClick={() => setConfirmUnbind(u)} title="Отвязать">
                 ✕
               </button>
             </li>
           ))}
         </ul>
+      )}
+
+      {confirmUnbind && (
+        <ConfirmModal
+          message={`Отвязать утилиту «${confirmUnbind.name}»? Все датасеты, привязанные к этой утилите, будут удалены вместе со всей разметкой. Действие необратимо.`}
+          confirmLabel="Отвязать и удалить"
+          cancelLabel="Отмена"
+          onConfirm={handleUnbind}
+          onCancel={() => setConfirmUnbind(null)}
+        />
       )}
     </div>
   );

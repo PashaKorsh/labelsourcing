@@ -7,6 +7,7 @@ import { RoleBadge } from '../../components/RoleBadge';
 import { ROUTES, buildRoute } from '../../config/routes';
 import { datasetService } from '../../services';
 import { useAuth } from '../../context/auth';
+import { hasRole, ROLE_ADMIN } from '../../config/permissions';
 import type { Dataset } from '../../types/dataset';
 import styles from './MyDatasetsPage.module.css';
 
@@ -31,8 +32,10 @@ export function MyDatasetsPage() {
   useEffect(() => {
     if (!user) return;
     setLoading(true);
+    // Админ видит все датасеты («Все датасеты»), модератор — только свои («Мои датасеты»)
+    const mine = !hasRole(user.roles, [ROLE_ADMIN]);
     const timer = setTimeout(() => {
-      datasetService.list({ search: search || undefined })
+      datasetService.list({ search: search || undefined, mine })
         .then(setDatasets)
         .catch(err => console.error('[MyDatasetsPage]', err))
         .finally(() => setLoading(false));

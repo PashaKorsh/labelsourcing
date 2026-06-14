@@ -114,10 +114,12 @@ async def delete_utility(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Отвязать утилиту. Датасеты, привязанные к ней, останутся, но потеряют источник."""
+    """Отвязать утилиту. Все датасеты, привязанные к ней, удаляются вместе с разметкой."""
     utility = await db.get(Utility, utility_id)
     if not utility or utility.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Утилита не найдена")
+    # Удаляем связанные датасеты (каскадом уйдут задачи/ассайнменты/разметка)
+    await db.execute(delete(Dataset).where(Dataset.utility_id == utility_id))
     await db.delete(utility)
     await db.commit()
 

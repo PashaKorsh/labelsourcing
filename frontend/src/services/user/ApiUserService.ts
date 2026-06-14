@@ -1,4 +1,4 @@
-import type { UserProfile, UserListItem } from '../../types/user';
+import type { UserProfile, UserListItem, Role } from '../../types/user';
 import type { UserService, UserListParams, UserUpdateInput } from './UserService';
 import { API, apiFetch } from '../../config/api';
 
@@ -52,6 +52,12 @@ export class ApiUserService implements UserService {
     const res = await apiFetch(url);
     const dtos: UserDto[] = await res.json();
     return dtos.map(mapDtoToListItem);
+  }
+
+  async listRoles(): Promise<Role[]> {
+    const res = await apiFetch(API.users.roles());
+    const dtos: { id: string; name: string }[] = await res.json();
+    return dtos.map(r => ({ id: r.id, name: r.name }));
   }
 
   async update(id: string, data: UserUpdateInput): Promise<UserListItem> {

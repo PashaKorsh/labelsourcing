@@ -9,7 +9,8 @@
 }
 
 .modal {
-  background: #fff;
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 16px;
   padding: 24px;
   width: 520px;
@@ -34,8 +35,8 @@
 .currentPath {
   font-family: monospace;
   font-size: 13px;
-  color: #444;
-  background: #f4f4f4;
+  color: var(--text);
+  background: var(--surface-2);
   padding: 6px 10px;
   border-radius: 8px;
   flex: 1;
@@ -44,8 +45,9 @@
 
 .upButton {
   padding: 6px 12px;
-  border: 1px solid #ccc;
-  background: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
@@ -71,6 +73,7 @@
   width: 100%;
   text-align: left;
   background: transparent;
+  color: var(--text);
   border: none;
   padding: 8px 10px;
   border-radius: 8px;
@@ -79,17 +82,17 @@
 }
 
 .dirButton:hover {
-  background: #f0f6ff;
+  background: var(--hover);
 }
 
 .muted {
-  color: #999;
+  color: var(--text-faint);
   font-size: 13px;
   padding: 6px 10px;
 }
 
 .error {
-  color: #e53e3e;
+  color: var(--danger);
   font-size: 13px;
   margin: 0;
 }
@@ -102,8 +105,8 @@
 
 .pickButton {
   padding: 9px 18px;
-  background: #2563eb;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-text);
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -117,8 +120,9 @@
 
 .cancelButton {
   padding: 9px 18px;
-  background: #fff;
-  border: 1px solid #ccc;
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;

@@ -4,7 +4,8 @@
   gap: 16px;
   padding: 12px;
   align-self: stretch;
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 24px;
 }
 
@@ -59,10 +60,10 @@
 .doneBadge {
   font-size: 13px;
   font-weight: 500;
-  color: #16a34a;
+  color: var(--ok-text);
   padding: 6px 12px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
   border-radius: 8px;
   white-space: nowrap;
 }
@@ -70,10 +71,10 @@
 .inProgressBadge {
   font-size: 13px;
   font-weight: 500;
-  color: #2563eb;
+  color: var(--info-text);
   padding: 6px 12px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
   border-radius: 8px;
   white-space: nowrap;
 }
@@ -81,10 +82,10 @@
 .waitingBadge {
   font-size: 13px;
   font-weight: 500;
-  color: #92400e;
+  color: var(--warn-text);
   padding: 6px 12px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
   border-radius: 8px;
   white-space: nowrap;
 }
@@ -99,18 +100,18 @@
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 500;
-  background: rgba(251, 146, 60, 0.1);
-  border: 1px solid rgba(251, 146, 60, 0.4);
+  background: var(--validate-bg);
+  border: 1px solid var(--validate-border);
   border-radius: 8px;
-  color: #ea580c;
+  color: var(--validate-text);
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s, border-color 0.15s;
 }
 
 .validateButton:hover {
-  background: rgba(251, 146, 60, 0.18);
-  border-color: rgba(251, 146, 60, 0.6);
+  background: var(--validate-bg-hover);
+  border-color: var(--validate-border-hover);
 }
 
 .validateButton:disabled {

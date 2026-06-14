@@ -26,3 +26,5 @@ pgdata/
 .vscode/
 .idea/
 *.swp
+
+design/

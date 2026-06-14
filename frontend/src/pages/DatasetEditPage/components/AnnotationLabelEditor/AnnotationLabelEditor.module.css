@@ -14,7 +14,7 @@
   width: 36px;
   height: 36px;
   flex-shrink: 0;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 2px;
   cursor: pointer;
@@ -24,17 +24,19 @@
 .nameInput {
   flex: 1;
   height: 36px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 0 12px;
   font-size: 15px;
   outline: none;
   font-family: inherit;
+  background: var(--bg-elevated);
+  color: var(--text);
   transition: border-color 0.15s;
 }
 
 .nameInput:focus {
-  border-color: #999;
+  border-color: var(--text-faint);
 }
 
 .removeButton {
@@ -42,24 +44,24 @@
   height: 32px;
   flex-shrink: 0;
   background: none;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  color: #999;
+  color: var(--text-faint);
   cursor: pointer;
   font-size: 12px;
   transition: border-color 0.15s, color 0.15s;
 }
 
 .removeButton:hover {
-  border-color: #e05555;
-  color: #e05555;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .addButton {
   align-self: flex-start;
   background: none;
   border: none;
-  color: #555;
+  color: var(--text-muted);
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
@@ -68,5 +70,5 @@
 }
 
 .addButton:hover {
-  color: #111;
+  color: var(--text);
 }

@@ -1,6 +1,6 @@
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg);
   padding: 36px 0;
 }
 
@@ -25,7 +25,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 16px;
 }
 
@@ -38,7 +39,7 @@
 
 .colorCode {
   font-size: 13px;
-  color: #6f6f6f;
+  color: var(--text-muted);
   font-family: monospace;
 }
 
@@ -48,7 +49,8 @@
 
 .editButton {
   padding: 6px 12px;
-  background: #f5f5f5;
+  background: var(--surface-2);
+  color: var(--text);
   border: none;
   border-radius: 8px;
   font-size: 13px;
@@ -58,30 +60,31 @@
 }
 
 .editButton:hover {
-  background: #e8e8e8;
+  background: var(--hover);
 }
 
 .deleteButton {
   padding: 6px 12px;
-  background: #fff0f0;
-  color: #eb5757;
+  background: var(--danger-bg);
+  color: var(--danger);
   border: none;
   border-radius: 8px;
   font-size: 13px;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s;
+  transition: filter 0.15s;
 }
 
 .deleteButton:hover {
-  background: #ffd9d9;
+  filter: brightness(1.05);
 }
 
 .card {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 24px;
   padding: 24px;
   align-self: stretch;
@@ -102,34 +105,36 @@
 .input {
   flex: 1;
   height: 44px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0 16px;
   font-size: 16px;
   outline: none;
   font-family: inherit;
+  background: var(--bg-elevated);
+  color: var(--text);
   transition: border-color 0.15s;
 }
 
 .input:focus {
-  border-color: #999;
+  border-color: var(--text-faint);
 }
 
 .colorPicker {
   width: 44px;
   height: 44px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 4px;
   cursor: pointer;
-  background: white;
+  background: var(--bg-elevated);
 }
 
 .createButton {
   height: 44px;
   padding: 0 20px;
-  background: #1a1a1a;
-  color: white;
+  background: var(--btn-primary);
+  color: var(--btn-primary-text);
   border: none;
   border-radius: 12px;
   font-size: 15px;
@@ -140,5 +145,5 @@
 }
 
 .createButton:hover {
-  background: #333;
+  background: var(--btn-primary-hover);
 }

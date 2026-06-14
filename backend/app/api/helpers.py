@@ -1,7 +1,19 @@
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models import Task, Label, Assignment, Dataset, AssignmentStatus, TaskType
+from app.models import Task, Label, Assignment, Dataset, User, AssignmentStatus, TaskType
+
+
+def is_admin(user: User) -> bool:
+    return any(r.name == "admin" for r in user.roles)
+
+
+def ensure_can_manage_dataset(dataset: Dataset, user: User) -> None:
+    """Управлять датасетом может админ (любым) или владелец-модератор (своим)."""
+    if is_admin(user) or dataset.owner_id == user.id:
+        return
+    raise HTTPException(status_code=403, detail="Нет прав на управление этим датасетом")
 
 
 async def _ensure_validation_tasks(

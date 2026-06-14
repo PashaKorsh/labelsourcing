@@ -1,6 +1,6 @@
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg);
   padding: 36px 0;
 }
 
@@ -25,7 +25,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 20px;
 }
 
@@ -41,13 +42,28 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+}
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .name {
   font-size: 16px;
   margin: 0;
   line-height: 1.2;
+}
+
+.roleBadge {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--badge-text);
+  background: var(--badge-bg);
+  padding: 1px 8px;
+  border-radius: 8px;
 }
 
 .tags {
@@ -58,7 +74,8 @@
 
 .editButton {
   padding: 6px 14px;
-  background: #f5f5f5;
+  background: var(--surface-2);
+  color: var(--text);
   border: none;
   border-radius: 10px;
   font-size: 14px;
@@ -69,5 +86,5 @@
 }
 
 .editButton:hover {
-  background: #e8e8e8;
+  background: var(--hover);
 }

@@ -4,7 +4,9 @@ import type { Tag } from '../../types/annotation';
 
 export interface DatasetListParams {
   search?: string;
-  status?: 'new' | 'started' | 'done';
+  status?: string;       // пользовательский статус: NOT_STARTED | IN_PROGRESS | USER_DONE | COMPLETED | WAITING_VALIDATION
+  mine?: boolean;        // только датасеты текущего пользователя (для «Мои датасеты» модератора)
+  tagIds?: string[];
   limit?: number;
   offset?: number;
 }

@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f0f2f5;
+  background: var(--bg);
   gap: 16px;
 }
 
@@ -14,9 +14,9 @@
   align-items: center;
   gap: 16px;
   padding: 48px 40px;
-  background: #fff;
+  background: var(--bg-elevated);
   border-radius: 16px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 24px var(--shadow);
   min-width: 320px;
 }
 
@@ -24,13 +24,13 @@
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--text);
 }
 
 .subtitle {
   margin: 0;
   font-size: 14px;
-  color: #888;
+  color: var(--text-muted);
 }
 
 .yandexButton {
@@ -60,14 +60,14 @@
   gap: 8px;
   width: 100%;
   padding-top: 12px;
-  border-top: 1px dashed #e0e0e0;
+  border-top: 1px dashed var(--border);
 }
 
 .devLabel {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: #bbb;
+  color: var(--text-faint);
   text-transform: uppercase;
 }
 
@@ -80,21 +80,21 @@
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 500;
-  color: #555;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
 }
 
 .devButton:hover {
-  background: #ebebeb;
-  border-color: #bbb;
+  background: var(--hover);
+  border-color: var(--border-strong);
 }
 
 .devError {
   margin: 0;
   font-size: 12px;
-  color: #e53935;
+  color: var(--danger);
 }

@@ -2,17 +2,22 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { ModeSwitcher } from '../../components/ModeSwitcher';
 import { SearchBar } from '../../components/SearchBar';
-import { RoleBadge } from '../../components/RoleBadge';
-import { UserEditModal } from './components/UserEditModal';
+import { AppTagSelector } from '../../components/AppTagSelector';
+import { RoleMenu, roleLabel } from './components/RoleMenu';
 import { userService } from '../../services';
-import type { UserListItem } from '../../types/user';
+import type { UserListItem, Role } from '../../types/user';
+import type { AppTag } from '../../types/appTag';
 import styles from './UsersPage.module.css';
 
 export function UsersPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
+
+  useEffect(() => {
+    userService.listRoles().then(setRoles).catch(err => console.error('[UsersPage] roles', err));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -24,6 +29,23 @@ export function UsersPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [search]);
+
+  const persist = async (user: UserListItem, patch: { roleNames?: string[]; tags?: AppTag[] }) => {
+    const roleIds = patch.roleNames
+      ? roles.filter(r => patch.roleNames!.includes(r.name)).map(r => r.id)
+      : undefined;
+    // Оптимистичное обновление
+    setUsers(prev => prev.map(u => u.id === user.id ? {
+      ...u,
+      roles: patch.roleNames ?? u.roles,
+      tags: patch.tags ?? u.tags,
+    } : u));
+    try {
+      await userService.update(user.id, { roleIds, tagIds: patch.tags?.map(t => t.id) });
+    } catch (err) {
+      console.error('[UsersPage] update', err);
+    }
+  };
 
   return (
     <main className={styles.page}>
@@ -42,38 +64,27 @@ export function UsersPage() {
                   <img src={user.avatarUrl} alt="" className={styles.avatar} />
                 )}
                 <div className={styles.info}>
-                  <p className={styles.name}>{user.name ?? user.email}</p>
-                  {user.tags.length > 0 && (
-                    <div className={styles.tags}>
-                      {user.tags.map((tag) => (
-                        <RoleBadge key={tag.id} role={tag} />
-                      ))}
-                    </div>
-                  )}
+                  <div className={styles.nameLine}>
+                    <span className={styles.name}>{user.name ?? user.email}</span>
+                    <RoleMenu
+                      allRoles={roles}
+                      assigned={user.roles}
+                      onChange={roleNames => persist(user, { roleNames })}
+                    />
+                    {user.roles.map(r => (
+                      <span key={r} className={styles.roleBadge}>{roleLabel(r)}</span>
+                    ))}
+                  </div>
+                  <AppTagSelector
+                    selectedTags={user.tags}
+                    onTagsChange={tags => persist(user, { tags })}
+                  />
                 </div>
-                <button
-                  type="button"
-                  className={styles.editButton}
-                  onClick={() => setEditingUser(user)}
-                >
-                  Изменить
-                </button>
               </div>
             ))
           )}
         </section>
       </div>
-
-      {editingUser && (
-        <UserEditModal
-          user={editingUser}
-          onClose={() => setEditingUser(null)}
-          onSave={updated => {
-            setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-            setEditingUser(null);
-          }}
-        />
-      )}
     </main>
   );
 }

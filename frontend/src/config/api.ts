@@ -14,6 +14,7 @@ export const API = {
   users: {
     me:     () => `${API_BASE}/api/v1/users/me`,
     list:   () => `${API_BASE}/api/v1/users/`,
+    roles:  () => `${API_BASE}/api/v1/users/roles`,
     update: (id: string) => `${API_BASE}/api/v1/users/${id}`,
   },
   datasets: {

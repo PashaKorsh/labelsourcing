@@ -69,6 +69,8 @@ export class ApiDatasetService implements DatasetService {
     const qs = new URLSearchParams();
     if (params?.search)  qs.set('search', params.search);
     if (params?.status)  qs.set('status', params.status);
+    if (params?.mine)    qs.set('mine', 'true');
+    if (params?.tagIds)  params.tagIds.forEach(id => qs.append('tag_ids', id));
     if (params?.limit  !== undefined) qs.set('limit',  String(params.limit));
     if (params?.offset !== undefined) qs.set('offset', String(params.offset));
     const qsStr = qs.toString();

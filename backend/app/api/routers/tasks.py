@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess, AssignmentStatus, TaskStatus, TaskType
 from app.api.dependencies import get_current_user, require_roles
-from app.api.helpers import _ensure_validation_tasks
+from app.api.helpers import _ensure_validation_tasks, ensure_can_manage_dataset
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
 from app.schemas.label import LabelSubmit, LabelResponse
 
@@ -81,12 +81,13 @@ async def _process_validation_verdict(
 async def create_task(
     task_in: TaskCreate,
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
     """Добавить одну задачу в датасет"""
     dataset = await db.get(Dataset, task_in.dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
     new_task = Task(
         dataset_id=task_in.dataset_id,
         url=task_in.url,
@@ -104,12 +105,13 @@ async def create_task(
 async def create_tasks_batch(
     batch_in: TaskBatchCreate,
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
     """Массовая загрузка задач в датасет"""
     dataset = await db.get(Dataset, batch_in.dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
     new_tasks = [
         Task(dataset_id=batch_in.dataset_id, url=url, type=TaskType.ANNOTATION)
         for url in batch_in.urls
@@ -124,12 +126,16 @@ async def create_tasks_batch(
 async def delete_task(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
     """Удалить задачу"""
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
+
+    dataset_for_check = await db.get(Dataset, task.dataset_id)
+    if dataset_for_check is not None:
+        ensure_can_manage_dataset(dataset_for_check, current_user)
 
     if task.type == TaskType.VALIDATION:
         raise HTTPException(status_code=400, detail="Validation-задачи управляются автоматически и не могут быть удалены напрямую.")

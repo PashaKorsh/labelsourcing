@@ -588,50 +588,111 @@ async def get_dataset_stats(
         "phase": phase,
     }
 
-
-@router.get("/{dataset_id}/export")
-async def export_dataset_labels(
+@router.get("/{dataset_id}/export/coco")
+async def export_dataset_coco(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Выгрузка всех разметок по датасету (без агрегации).
-    Возвращает список annotation-задач с вложенными разметками всех пользователей.
+    """Выгрузка разметок в формате COCO.
+    Без валидации — все завершённые разметки.
+    С валидацией — только прошедшие валидацию разметки.
     """
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
     ensure_can_manage_dataset(dataset, current_user)
 
+    annotation_labels = (dataset.settings or {}).get('annotation_labels', [])
+    label_id_to_cat_id: dict[str, int] = {al['id']: i for i, al in enumerate(annotation_labels)}
+    categories = [{"id": i, "name": al['label']} for i, al in enumerate(annotation_labels)]
+
     stmt = (
-        select(Task, Assignment, Label)
+        select(Task, Label)
         .join(Assignment, Assignment.task_id == Task.id)
         .join(Label, Label.assignment_id == Assignment.id)
         .where(Task.dataset_id == dataset_id)
         .where(Task.type == TaskType.ANNOTATION)
-        .order_by(Task.created_at, Assignment.assigned_at)
+        .where(Assignment.status == AssignmentStatus.DONE)
+        .order_by(Task.created_at)
     )
+    if dataset.requires_validation:
+        stmt = stmt.where(Label.is_validated == True)
+
     rows = (await db.execute(stmt)).all()
 
-    tasks_map: dict[str, dict] = {}
-    for task, assignment, label in rows:
-        task_id_str = str(task.id)
-        if task_id_str not in tasks_map:
-            tasks_map[task_id_str] = {
-                "task_id": task_id_str,
-                "task_url": task.url,
-                "task_status": task.status.value,
-                "labels": [],
-            }
-        tasks_map[task_id_str]["labels"].append({
-            "label_id": str(label.id),
-            "annotator_id": str(assignment.user_id),
-            "assignment_status": assignment.status.value,
-            "result": label.result,
-            "created_at": label.created_at.isoformat(),
-        })
+    images: list[dict] = []
+    annotations: list[dict] = []
+    task_id_to_image_id: dict[str, int] = {}
+    annotation_id = 0
 
-    return list(tasks_map.values())
+    for task, label in rows:
+        task_id_str = str(task.id)
+        if task_id_str not in task_id_to_image_id:
+            image_id = len(images)
+            task_id_to_image_id[task_id_str] = image_id
+            images.append({
+                "id": image_id,
+                "file_name": task.url,
+                "height": 1,
+                "width": 1,
+            })
+        image_id = task_id_to_image_id[task_id_str]
+
+        for shape in (label.result or {}).get('result', []):
+            shape_type = shape.get('shape')
+            if shape_type == 'rectangle':
+                x = shape['left']
+                y = shape['top']
+                w = shape['width']
+                h = shape['height']
+                bbox = [x, y, w, h]
+                area = w * h
+                segmentation: list = []
+            elif shape_type == 'polygon':
+                points = shape.get('points', [])
+                flat = [coord for p in points for coord in (p['left'], p['top'])]
+                segmentation = [flat]
+                if len(points) >= 2:
+                    xs = [p['left'] for p in points]
+                    ys = [p['top'] for p in points]
+                    bbox = [min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)]
+                else:
+                    bbox = []
+                if len(points) >= 3:
+                    n = len(points)
+                    area = abs(sum(
+                        points[j]['left'] * points[(j + 1) % n]['top'] -
+                        points[(j + 1) % n]['left'] * points[j]['top']
+                        for j in range(n)
+                    )) / 2
+                else:
+                    area = 0.0
+            else:
+                continue
+
+            annotations.append({
+                "id": annotation_id,
+                "image_id": image_id,
+                "category_id": label_id_to_cat_id.get(shape.get('tag'), 0),
+                "bbox": bbox,
+                "area": area,
+                "segmentation": segmentation,
+                "iscrowd": 0,
+            })
+            annotation_id += 1
+
+    return {
+        "info": {
+            "name": dataset.title or "",
+            "description": dataset.description or "",
+            "date_created": dataset.created_at.isoformat() if dataset.created_at else "",
+            "requires_validation": dataset.requires_validation,
+        },
+        "images": images,
+        "annotations": annotations,
+        "categories": categories,
+    }
 
 
 @router.get("/{dataset_id}/tasks", response_model=list[TaskResponse])

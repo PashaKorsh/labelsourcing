@@ -139,7 +139,7 @@ export class MockDatasetService implements DatasetService {
     this.mineDatasets = this.mineDatasets.filter(d => d.id !== id);
   }
 
-  async exportLabels(_id: string): Promise<unknown[]> {
-    return [];
+  async exportLabels(_id: string): Promise<unknown> {
+    return {};
   }
 }

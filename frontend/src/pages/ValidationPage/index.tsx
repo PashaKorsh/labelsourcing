@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import { ReadOnlyAnnotationCanvas } from '../../components/ReadOnlyAnnotationCanvas';
-import { validationService } from '../../services';
-import { deserializeAnnotations } from '../../utils/annotationDeserializer';
-import type { ValidationVerdict } from '../../types/validationTask';
-import type { Tag } from '../../types/annotation';
+import { ReadOnlyAnnotationCanvas } from '@/components/ReadOnlyAnnotationCanvas';
+import { validationService } from '@/services';
+import { deserializeAnnotations } from '@/utils/annotationDeserializer';
+import type { ValidationVerdict } from '@/types/validationTask';
+import type { Tag } from '@/types/annotation';
 import styles from './ValidationPage.module.css';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 
 // TODO: вынести в общий конфиг, получать с сервера вместе с задачами
 const TAGS: Tag[] = [

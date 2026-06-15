@@ -1,4 +1,4 @@
-import type { AppTag } from '../../types/appTag';
+import type { AppTag } from '@/types/appTag';
 import styles from './RoleBadge.module.css';
 
 interface RoleBadgeProps {

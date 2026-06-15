@@ -1,0 +1,43 @@
+.gear {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-muted);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.gear:hover {
+  color: var(--text);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.item:hover {
+  background: var(--hover);
+}
+
+.check {
+  width: 14px;
+  color: var(--accent);
+  font-weight: 700;
+}

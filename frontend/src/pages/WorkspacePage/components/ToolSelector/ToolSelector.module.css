@@ -1,0 +1,33 @@
+.container {
+  display: flex;
+  gap: 4px;
+}
+
+.button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.button.active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.icon {
+  font-size: 20px;
+  line-height: 1;
+}

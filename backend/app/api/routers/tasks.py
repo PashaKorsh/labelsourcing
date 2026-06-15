@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Task, User, Assignment, Label, Dataset, UserDatasetAccess, AssignmentStatus, TaskStatus, TaskType
 from app.api.dependencies import get_current_user, require_roles
-from app.api.helpers import _ensure_validation_tasks
+from app.api.helpers import _ensure_validation_tasks, ensure_can_manage_dataset
 from app.schemas.task import TaskCreate, TaskResponse, TaskBatchCreate
 from app.schemas.label import LabelSubmit, LabelResponse
 
@@ -31,11 +31,6 @@ async def _process_validation_verdict(
     approve_count = sum(1 for l in labels if l.result.get('is_correct') is True)
     reject_count = len(labels) - approve_count
 
-    # При равенстве голосов считаем одобренным
-    if reject_count <= approve_count:
-        return
-
-    # Большинство отклонило — откатываем исходную разметку
     meta = validation_task.task_metadata or {}
     annotation_label_id_str = meta.get('annotation_label_id')
     if not annotation_label_id_str:
@@ -45,6 +40,12 @@ async def _process_validation_verdict(
     if not annotation_label:
         return
 
+    # При равенстве голосов считаем одобренным
+    if reject_count < approve_count:
+        annotation_label.is_validated = True
+        return
+
+    # Большинство отклонило — откатываем исходную разметку
     annotation_assignment = await db.get(Assignment, annotation_label.assignment_id)
     if not annotation_assignment:
         return
@@ -58,14 +59,14 @@ async def _process_validation_verdict(
     if not annotation_task:
         return
 
-    # Помечаем исходный ассайнмент как отклонённый и возвращаем задачу в пул
-    annotation_assignment.status = AssignmentStatus.REJECTED
+    # Возвращаем задачу в пул
     annotation_task.completed_answers = max(0, annotation_task.completed_answers - 1)
     if annotation_task.completed_answers < dataset.required_answers:
         annotation_task.status = TaskStatus.PENDING
 
-    # Удаляем отклонённый лейбл
+    # Удаляем лейбл и ассайнмент (явный порядок: сначала child, потом parent)
     await db.delete(annotation_label)
+    await db.delete(annotation_assignment)
 
     # Возвращаем слот в счётчик разметки аннотатора
     access_stmt = select(UserDatasetAccess).where(
@@ -81,12 +82,13 @@ async def _process_validation_verdict(
 async def create_task(
     task_in: TaskCreate,
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
     """Добавить одну задачу в датасет"""
     dataset = await db.get(Dataset, task_in.dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
     new_task = Task(
         dataset_id=task_in.dataset_id,
         url=task_in.url,
@@ -104,12 +106,13 @@ async def create_task(
 async def create_tasks_batch(
     batch_in: TaskBatchCreate,
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
     """Массовая загрузка задач в датасет"""
     dataset = await db.get(Dataset, batch_in.dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
+    ensure_can_manage_dataset(dataset, current_user)
     new_tasks = [
         Task(dataset_id=batch_in.dataset_id, url=url, type=TaskType.ANNOTATION)
         for url in batch_in.urls
@@ -124,12 +127,16 @@ async def create_tasks_batch(
 async def delete_task(
     task_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    admin_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
     """Удалить задачу"""
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
+
+    dataset_for_check = await db.get(Dataset, task.dataset_id)
+    if dataset_for_check is not None:
+        ensure_can_manage_dataset(dataset_for_check, current_user)
 
     if task.type == TaskType.VALIDATION:
         raise HTTPException(status_code=400, detail="Validation-задачи управляются автоматически и не могут быть удалены напрямую.")
@@ -202,7 +209,7 @@ async def submit_label(
     # Ленивая проверка истечения
     if assignment.status == AssignmentStatus.IN_PROGRESS and assignment.expires_at < datetime.utcnow():
         task.active_assignments = max(0, task.active_assignments - 1)
-        assignment.status = AssignmentStatus.EXPIRED
+        await db.delete(assignment)
         await db.commit()
         raise HTTPException(status_code=410, detail="Время на выполнение задания истекло. Получите новую задачу.")
 

@@ -10,7 +10,7 @@ import { DatasetEditPage }     from './pages/DatasetEditPage';
 import { UsersPage }           from './pages/UsersPage';
 import { TagsPage }            from './pages/TagsPage';
 import { ROUTES }              from './config/routes';
-import { ROLE_ADMIN, ROLE_CREATOR } from './config/permissions';
+import { ROLE_ADMIN, ROLE_MODERATOR } from './config/permissions';
 import styles from './App.module.css';
 
 function P({ children, roles }: { children: React.ReactNode; roles?: string[] }) {
@@ -27,9 +27,9 @@ export default function App() {
             <Route path={ROUTES.home}              element={<P><DatasetsListPage /></P>} />
             <Route path={ROUTES.profile}           element={<P><ProfilePage /></P>} />
             <Route path={ROUTES.datasetAnnotation} element={<P><WorkspacePage /></P>} />
-            <Route path={ROUTES.myDatasets}        element={<P roles={[ROLE_ADMIN, ROLE_CREATOR]}><MyDatasetsPage /></P>} />
-            <Route path={ROUTES.datasetNew}        element={<P roles={[ROLE_ADMIN]}><DatasetEditPage /></P>} />
-            <Route path={ROUTES.datasetEdit}       element={<P roles={[ROLE_ADMIN]}><DatasetEditPage /></P>} />
+            <Route path={ROUTES.myDatasets}        element={<P roles={[ROLE_ADMIN, ROLE_MODERATOR]}><MyDatasetsPage /></P>} />
+            <Route path={ROUTES.datasetNew}        element={<P roles={[ROLE_ADMIN, ROLE_MODERATOR]}><DatasetEditPage /></P>} />
+            <Route path={ROUTES.datasetEdit}       element={<P roles={[ROLE_ADMIN, ROLE_MODERATOR]}><DatasetEditPage /></P>} />
             <Route path={ROUTES.users}             element={<P roles={[ROLE_ADMIN]}><UsersPage /></P>} />
             <Route path={ROUTES.tags}              element={<P roles={[ROLE_ADMIN]}><TagsPage /></P>} />
             <Route path="*"                        element={<Navigate to={ROUTES.login} replace />} />

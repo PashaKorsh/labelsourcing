@@ -1,4 +1,4 @@
-import type { UserProfile, UserListItem } from '../../types/user';
+import type { UserProfile, UserListItem, Role } from '../../types/user';
 import type { UserService, UserListParams, UserUpdateInput } from './UserService';
 
 const MOCK_PROFILE: UserProfile = {
@@ -48,6 +48,13 @@ export class MockUserService implements UserService {
 
   async getMe(): Promise<UserProfile> {
     return MOCK_PROFILE;
+  }
+
+  async listRoles(): Promise<Role[]> {
+    return [
+      { id: 'role-admin', name: 'admin' },
+      { id: 'role-moderator', name: 'moderator' },
+    ];
   }
 
   async list(params?: UserListParams): Promise<UserListItem[]> {

@@ -10,7 +10,7 @@ from app.api.dependencies import require_roles
 
 router = APIRouter(prefix="/labels", tags=["Labels"])
 
-ALLOWED_ASSIGNMENT_STATUSES = {"in_progress", "done", "expired", "rejected"}
+ALLOWED_ASSIGNMENT_STATUSES = {"in_progress", "done"}
 
 
 class LabelStatusUpdate(BaseModel):
@@ -24,7 +24,7 @@ async def update_label_status(
         db: AsyncSession = Depends(get_db),
         admin_user: User = Depends(require_roles(["admin", "moderator"]))
 ):
-    """Изменить статус ассайнмента через его label — для валидации (Админ/Модератор)"""
+    """Изменить статус ассайнмента через его label (Админ/Модератор)"""
     stmt = select(Label).where(Label.id == label_id).with_for_update()
     result = await db.execute(stmt)
     label = result.scalar_one_or_none()
@@ -35,14 +35,6 @@ async def update_label_status(
     new_status = status_in.status
     if new_status not in ALLOWED_ASSIGNMENT_STATUSES:
         raise HTTPException(status_code=422, detail=f"Недопустимый статус: {new_status}")
-
-    if new_status == AssignmentStatus.REJECTED:
-        assignment = await db.get(Assignment, label.assignment_id)
-        task = await db.get(Task, assignment.task_id)
-        task.completed_answers = max(0, task.completed_answers - 1)
-
-        if task.status == TaskStatus.COMPLETED:
-            task.status = TaskStatus.PENDING
 
     assignment = await db.get(Assignment, label.assignment_id)
     assignment.status = new_status

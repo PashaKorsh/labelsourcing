@@ -1,4 +1,4 @@
-import type { UserProfile, UserListItem } from '../../types/user';
+import type { UserProfile, UserListItem, Role } from '../../types/user';
 
 export interface UserListParams {
   search?: string;
@@ -14,5 +14,6 @@ export interface UserUpdateInput {
 export interface UserService {
   getMe(): Promise<UserProfile>;
   list(params?: UserListParams): Promise<UserListItem[]>;
+  listRoles(): Promise<Role[]>;
   update(id: string, data: UserUpdateInput): Promise<UserListItem>;
 }

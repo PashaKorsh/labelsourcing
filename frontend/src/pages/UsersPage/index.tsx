@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { SearchBar } from '../../components/SearchBar';
-import { RoleBadge } from '../../components/RoleBadge';
-import { UserEditModal } from './components/UserEditModal';
-import { userService } from '../../services';
-import type { UserListItem } from '../../types/user';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { SearchBar } from '@/components/SearchBar';
+import { AppTagSelector } from '@/components/AppTagSelector';
+import { RoleMenu, roleLabel } from './components/RoleMenu';
+import { UserFilter } from './components/UserFilter';
+import { userService } from '@/services';
+import type { UserListItem, Role } from '@/types/user';
+import type { AppTag } from '@/types/appTag';
 import styles from './UsersPage.module.css';
 
 export function UsersPage() {
   const [users, setUsers] = useState<UserListItem[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [editingUser, setEditingUser] = useState<UserListItem | null>(null);
+  const [filterRoles, setFilterRoles] = useState<string[]>([]);
+  const [filterTags, setFilterTags] = useState<AppTag[]>([]);
+
+  useEffect(() => {
+    userService.listRoles().then(setRoles).catch(err => console.error('[UsersPage] roles', err));
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -25,55 +33,76 @@ export function UsersPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const persist = async (user: UserListItem, patch: { roleNames?: string[]; tags?: AppTag[] }) => {
+    const roleIds = patch.roleNames
+      ? roles.filter(r => patch.roleNames!.includes(r.name)).map(r => r.id)
+      : undefined;
+    setUsers(prev => prev.map(u => u.id === user.id ? {
+      ...u,
+      roles: patch.roleNames ?? u.roles,
+      tags: patch.tags ?? u.tags,
+    } : u));
+    try {
+      await userService.update(user.id, { roleIds, tagIds: patch.tags?.map(t => t.id) });
+    } catch (err) {
+      console.error('[UsersPage] update', err);
+    }
+  };
+
+  const visibleUsers = users.filter(u =>
+    (filterRoles.length === 0 || filterRoles.some(r => u.roles.includes(r))) &&
+    (filterTags.length === 0 || filterTags.some(t => u.tags.some(ut => ut.id === t.id)))
+  );
+
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
-        <SearchBar value={search} onChange={setSearch} />
+        <div className={styles.searchRow}>
+          <div className={styles.searchField}>
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          <UserFilter
+            allRoles={roles}
+            selectedRoles={filterRoles}
+            selectedTags={filterTags}
+            onRolesChange={setFilterRoles}
+            onTagsChange={setFilterTags}
+          />
+        </div>
 
         <section className={styles.list}>
           {loading ? (
             <p>Загрузка…</p>
           ) : (
-            users.map((user) => (
+            visibleUsers.map((user) => (
               <div key={user.id} className={styles.row}>
                 {user.avatarUrl && (
                   <img src={user.avatarUrl} alt="" className={styles.avatar} />
                 )}
                 <div className={styles.info}>
-                  <p className={styles.name}>{user.name ?? user.email}</p>
-                  {user.tags.length > 0 && (
-                    <div className={styles.tags}>
-                      {user.tags.map((tag) => (
-                        <RoleBadge key={tag.id} role={tag} />
-                      ))}
-                    </div>
-                  )}
+                  <div className={styles.nameLine}>
+                    <span className={styles.name}>{user.name ?? user.email}</span>
+                    <RoleMenu
+                      allRoles={roles}
+                      assigned={user.roles}
+                      onChange={roleNames => persist(user, { roleNames })}
+                    />
+                    {user.roles.map(r => (
+                      <span key={r} className={styles.roleBadge}>{roleLabel(r)}</span>
+                    ))}
+                  </div>
+                  <AppTagSelector
+                    selectedTags={user.tags}
+                    onTagsChange={tags => persist(user, { tags })}
+                  />
                 </div>
-                <button
-                  type="button"
-                  className={styles.editButton}
-                  onClick={() => setEditingUser(user)}
-                >
-                  Изменить
-                </button>
               </div>
             ))
           )}
         </section>
       </div>
-
-      {editingUser && (
-        <UserEditModal
-          user={editingUser}
-          onClose={() => setEditingUser(null)}
-          onSave={updated => {
-            setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-            setEditingUser(null);
-          }}
-        />
-      )}
     </main>
   );
 }

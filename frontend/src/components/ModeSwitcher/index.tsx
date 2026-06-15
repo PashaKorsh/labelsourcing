@@ -1,7 +1,7 @@
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import type { AppMode } from '../../types/appMode';
-import { MOCK_DATASET_ID } from '../../services/task/MockTaskService';
-import { ROUTES, buildRoute } from '../../config/routes';
+import type { AppMode } from '@/types/appMode';
+import { MOCK_DATASET_ID } from '@/services/task/MockTaskService';
+import { ROUTES, buildRoute } from '@/config/routes';
 import styles from './ModeSwitcher.module.css';
 
 const MODES: { id: AppMode; label: string }[] = [

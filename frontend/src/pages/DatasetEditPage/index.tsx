@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { AppTagSelector } from '../../components/AppTagSelector';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { AppTagSelector } from '@/components/AppTagSelector';
 import { AnnotationLabelEditor } from './components/AnnotationLabelEditor';
-import { RawSettingsEditor } from '../../components/RawSettingsEditor';
-import { ConfirmModal } from '../../components/ConfirmModal';
-import { ROUTES } from '../../config/routes';
-import { datasetService, taskService } from '../../services';
-import { IMAGE_DRAWING_TOOLS } from '../../tools/imageTools';
-import type { AppTag } from '../../types/appTag';
-import type { Tag } from '../../types/annotation';
+import { FolderPicker } from './FolderPicker';
+import { RawSettingsEditor } from './components/RawSettingsEditor';
+import { ConfirmModal } from '@/components/ConfirmModal';
+import { ROUTES } from '@/config/routes';
+import { datasetService, taskService, utilityService } from '@/services';
+import { IMAGE_DRAWING_TOOLS } from '@/tools/imageTools';
+import type { AppTag } from '@/types/appTag';
+import type { Tag } from '@/types/annotation';
+import type { SourceType } from '@/types/dataset';
+import type { Utility } from '@/types/utility';
 import styles from './DatasetEditPage.module.css';
 
 const ANNOTATION_TOOLS = IMAGE_DRAWING_TOOLS.filter(t => t.id !== 'cursor');
@@ -24,11 +27,12 @@ const getActiveTools = (s: Record<string, unknown> | null): string[] => {
 
 // Поля settings, которые имеют выделенные поля API и не попадают в settings на бэке
 const API_FIELDS = [
-  'title', 'description', 'tags', 'annotation_labels',
+  'title', 'description', 'tags',
   'required_answers', 'validation_quorum', 'requires_validation', 'default_tasks_limit',
 ] as const;
 
 const SHOW_RAW_SETTINGS = import.meta.env.VITE_DEV_PANEL === 'true';
+const DEFAULT_ANNOTATION_LABEL = { id: 'object', label: 'Object', color: '#f59e0b' };
 
 interface TaskRow {
   id?: string;
@@ -46,8 +50,21 @@ export function DatasetEditPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const [sourceType, setSourceType] = useState<SourceType>('url');
+  const [utilityId, setUtilityId] = useState<string>('');
+  const [utilities, setUtilities] = useState<Utility[]>([]);
+  const [utilityFolder, setUtilityFolder] = useState<string>('');
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [scanInfo, setScanInfo] = useState<string>('');
+
   // Единый источник правды для всех настроек датасета. Ключи в API_FIELDS + пользовательские поля
-  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
+  const [settings, setSettings] = useState<Record<string, unknown> | null>(
+    isCreateMode ? { annotation_labels: [DEFAULT_ANNOTATION_LABEL] } : null
+  );
+
+  useEffect(() => {
+    utilityService.list().then(setUtilities).catch(() => setUtilities([]));
+  }, []);
 
   useEffect(() => {
     if (isCreateMode) return;
@@ -58,13 +75,15 @@ export function DatasetEditPage() {
       const rows: TaskRow[] = tasks.map(t => ({ id: t.id, url: t.imageUrl }));
       setTaskRows(rows.length > 0 ? rows : [{ url: '' }]);
       setOriginalTaskRows(rows);
+      setSourceType(ds.sourceType ?? 'url');
+      setUtilityId(ds.utilityId ?? '');
+      setUtilityFolder(ds.utilityFolder ?? '');
 
       // Собираем все поля датасета в единый объект настроек
       const merged: Record<string, unknown> = { ...(ds.settings ?? {}) };
       if (ds.title) merged.title = ds.title;
-      merged.description = ds.description;
+      if (ds.description) merged.description = ds.description;
       if (ds.tags.length > 0) merged.tags = ds.tags;
-      if ((ds.annotationLabels ?? []).length > 0) merged.annotation_labels = ds.annotationLabels;
       if (ds.requiredAnswers !== undefined) merged.required_answers = ds.requiredAnswers;
       if (ds.validationQuorum !== undefined) merged.validation_quorum = ds.validationQuorum;
       if (ds.requiresValidation) merged.requires_validation = true;
@@ -105,6 +124,7 @@ export function DatasetEditPage() {
   const validationQuorum = typeof settings?.validation_quorum === 'number' ? settings.validation_quorum : '';
   const requiresValidation = settings?.requires_validation === true;
   const defaultTasksLimit = typeof settings?.default_tasks_limit === 'number' ? settings.default_tasks_limit : '';
+  const annotationInstructions = typeof settings?.annotation_instructions === 'string' ? settings.annotation_instructions : '';
 
   const handleUrlChange = (index: number, value: string) =>
     setTaskRows(prev => prev.map((r, i) => i === index ? { ...r, url: value } : r));
@@ -113,6 +133,35 @@ export function DatasetEditPage() {
 
   const removeRow = (index: number) =>
     setTaskRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== index) : [{ url: '' }]);
+
+  const handleFolderPicked = async (path: string) => {
+    setShowFolderPicker(false);
+    setUtilityFolder(path);
+    // При создании датасета ещё нет ID — папку просканируем после создания, в handleSave
+    if (!datasetId) {
+      setScanInfo('Папка выбрана — будет просканирована при создании датасета.');
+      return;
+    }
+    setScanInfo('Сканирование…');
+    try {
+      const res = await utilityService.scan(utilityId, datasetId, path);
+      setUtilityFolder(res.folder);
+      setScanInfo(`Папка привязана: добавлено ${res.added}, всего задач ${res.total}`);
+    } catch (e) {
+      setScanInfo(`Ошибка сканирования: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+
+  const handleRescan = async () => {
+    if (!datasetId) return;
+    setScanInfo('Пересканирование…');
+    try {
+      const res = await utilityService.rescan(utilityId, datasetId);
+      setScanInfo(`Готово: добавлено ${res.added}, всего задач ${res.total}`);
+    } catch (e) {
+      setScanInfo(`Ошибка: ${e instanceof Error ? e.message : e}`);
+    }
+  };
 
   const handleDelete = async () => {
     if (!datasetId) return;
@@ -125,7 +174,10 @@ export function DatasetEditPage() {
   };
 
   const handleSave = async () => {
-    if (!description.trim()) return;
+    if (sourceType === 'utility' && !utilityId) {
+      window.alert('Выберите утилиту-источник');
+      return;
+    }
     setSubmitting(true);
     try {
       const s = settings ?? {};
@@ -137,42 +189,52 @@ export function DatasetEditPage() {
 
       const commonFields = {
         title: typeof s.title === 'string' ? s.title.trim() || undefined : undefined,
-        description: typeof s.description === 'string' ? s.description.trim() : '',
+        description: typeof s.description === 'string' ? s.description.trim() || null : null,
         tagIds: Array.isArray(s.tags) ? (s.tags as AppTag[]).map(t => t.id) : [],
-        annotationLabels: Array.isArray(s.annotation_labels) ? (s.annotation_labels as Tag[]) : [],
         requiredAnswers: typeof s.required_answers === 'number' ? s.required_answers : undefined,
         validationQuorum: typeof s.validation_quorum === 'number' ? s.validation_quorum : undefined,
-        requiresValidation: s.requires_validation === true ? true : undefined,
+        requiresValidation: s.requires_validation === true,
         defaultTasksLimit: typeof s.default_tasks_limit === 'number' ? s.default_tasks_limit : undefined,
         settings: Object.keys(extraSettings).length > 0 ? extraSettings : undefined,
+        sourceType,
+        utilityId: sourceType === 'utility' ? utilityId : undefined,
       };
 
-      const urlsToCreate = taskRows.filter(r => !r.id && r.url.trim()).map(r => r.url.trim());
+      // Задачи utility-датасета создаёт сама утилита (add-folder), здесь только URL-источник
+      const urlsToCreate = sourceType === 'url'
+        ? taskRows.filter(r => !r.id && r.url.trim()).map(r => r.url.trim())
+        : [];
 
       if (isCreateMode) {
         const created = await datasetService.create(commonFields);
         if (urlsToCreate.length > 0) {
           await taskService.createBatch(created.id, urlsToCreate);
         }
+        // Папку, выбранную на странице создания, сканируем сразу после создания датасета
+        if (sourceType === 'utility' && utilityFolder) {
+          await utilityService.scan(utilityId, created.id, utilityFolder);
+        }
       } else {
         await datasetService.update(datasetId!, { ...commonFields, settings: commonFields.settings ?? null });
 
-        const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
-        const deletedIds = originalTaskRows
-          .filter(r => r.id && !currentIds.has(r.id))
-          .map(r => r.id!);
-        await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
+        if (sourceType === 'url') {
+          const currentIds = new Set(taskRows.filter(r => r.id).map(r => r.id!));
+          const deletedIds = originalTaskRows
+            .filter(r => r.id && !currentIds.has(r.id))
+            .map(r => r.id!);
+          await Promise.all(deletedIds.map(id => taskService.deleteTask(id)));
 
-        for (const row of taskRows) {
-          if (!row.url.trim() || !row.id) continue;
-          const origUrl = originalTaskRows.find(r => r.id === row.id)?.url;
-          if (origUrl !== undefined && origUrl !== row.url.trim()) {
-            await taskService.deleteTask(row.id);
-            urlsToCreate.push(row.url.trim());
+          for (const row of taskRows) {
+            if (!row.url.trim() || !row.id) continue;
+            const origUrl = originalTaskRows.find(r => r.id === row.id)?.url;
+            if (origUrl !== undefined && origUrl !== row.url.trim()) {
+              await taskService.deleteTask(row.id);
+              urlsToCreate.push(row.url.trim());
+            }
           }
-        }
-        if (urlsToCreate.length > 0) {
-          await taskService.createBatch(datasetId!, urlsToCreate);
+          if (urlsToCreate.length > 0) {
+            await taskService.createBatch(datasetId!, urlsToCreate);
+          }
         }
       }
 
@@ -221,6 +283,17 @@ export function DatasetEditPage() {
               placeholder="Описание датасета"
               value={description}
               onChange={e => patchSettings('description', e.target.value || null)}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Инструкции для разметчиков</label>
+            <textarea
+              className={styles.textarea}
+              placeholder="Правила разметки, которые увидит пользователь перед стартом"
+              rows={5}
+              value={annotationInstructions}
+              onChange={e => patchSettings('annotation_instructions', e.target.value || null)}
             />
           </div>
 
@@ -309,31 +382,128 @@ export function DatasetEditPage() {
         </div>
 
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>Изображения</h2>
-          <div className={styles.field}>
-            {taskRows.map((row, i) => (
-              <div key={i} className={styles.urlInputRow}>
+          <h2 className={styles.cardTitle}>Источник данных</h2>
+          <label className={styles.checkboxRow}>
+            <input
+              type="radio"
+              name="sourceType"
+              checked={sourceType === 'url'}
+              disabled={!isCreateMode}
+              onChange={() => setSourceType('url')}
+            />
+            Ссылки на изображения (URL)
+          </label>
+          <label className={styles.checkboxRow}>
+            <input
+              type="radio"
+              name="sourceType"
+              checked={sourceType === 'utility'}
+              disabled={!isCreateMode}
+              onChange={() => setSourceType('utility')}
+            />
+            Утилита — раздача с вашего компьютера
+          </label>
+
+          {sourceType === 'url' && (
+            <>
+              <label className={styles.checkboxRow}>
                 <input
-                  type="url"
-                  className={styles.input}
-                  placeholder="https://example.com/image.jpg"
-                  value={row.url}
-                  onChange={e => handleUrlChange(i, e.target.value)}
+                  type="checkbox"
+                  checked={settings?.use_proxy !== false}
+                  onChange={e => setSettings(prev => {
+                    const next = { ...(prev ?? {}) };
+                    if (e.target.checked) {
+                      delete next.use_proxy;
+                    } else {
+                      next.use_proxy = false;
+                    }
+                    return Object.keys(next).length > 0 ? next : null;
+                  })}
                 />
-                <button
-                  type="button"
-                  className={styles.removeUrlButton}
-                  onClick={() => removeRow(i)}
-                  title="Удалить"
-                >
-                  ✕
+                Загружать изображения через прокси (скрывает оригинальные URL)
+              </label>
+              <div className={styles.field}>
+                {taskRows.map((row, i) => (
+                  <div key={i} className={styles.urlInputRow}>
+                    <input
+                      type="url"
+                      className={styles.input}
+                      placeholder="https://example.com/image.jpg"
+                      value={row.url}
+                      onChange={e => handleUrlChange(i, e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className={styles.removeUrlButton}
+                      onClick={() => removeRow(i)}
+                      title="Удалить"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className={styles.addUrlButton} onClick={addRow}>
+                  + Добавить ещё
                 </button>
               </div>
-            ))}
-            <button type="button" className={styles.addUrlButton} onClick={addRow}>
-              + Добавить ещё
-            </button>
-          </div>
+            </>
+          )}
+
+          {sourceType === 'utility' && (
+            <>
+              <div className={styles.field}>
+                <label className={styles.label}>Утилита</label>
+                <select className={styles.input} value={utilityId} onChange={e => setUtilityId(e.target.value)}>
+                  <option value="">— выберите утилиту —</option>
+                  {utilities.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}{u.online ? ' (в сети)' : ''}</option>
+                  ))}
+                </select>
+                {utilities.length === 0 && (
+                  <p className={styles.hint}>Нет привязанных утилит — привяжите в профиле.</p>
+                )}
+              </div>
+              {utilities.find(u => u.id === utilityId)?.publicBaseUrl && (
+                <label className={styles.checkboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={settings?.use_proxy !== false}
+                    onChange={e => setSettings(prev => {
+                      const next = { ...(prev ?? {}) };
+                      if (e.target.checked) delete next.use_proxy;
+                      else next.use_proxy = false;
+                      return Object.keys(next).length > 0 ? next : null;
+                    })}
+                  />
+                  Раздавать через прокси (выключите — напрямую с вашего сервера)
+                </label>
+              )}
+              <div className={styles.field}>
+                {utilityFolder && (
+                  <p className={styles.hint}>Папка: <code>{utilityFolder}</code></p>
+                )}
+                <div className={styles.urlInputRow}>
+                  <button
+                    type="button"
+                    className={styles.addUrlButton}
+                    onClick={() => setShowFolderPicker(true)}
+                    disabled={!utilityId}
+                  >
+                    {utilityFolder ? 'Изменить папку' : 'Выбрать папку'}
+                  </button>
+                  {!isCreateMode && utilityFolder && (
+                    <button type="button" className={styles.addUrlButton} onClick={handleRescan}>
+                      Пересканировать
+                    </button>
+                  )}
+                </div>
+                {!utilityId && (
+                  <p className={styles.hint}>Сначала выберите утилиту выше.</p>
+                )}
+                {scanInfo && <p className={styles.hint}>{scanInfo}</p>}
+              </div>
+            </>
+          )}
         </div>
 
         {SHOW_RAW_SETTINGS && (
@@ -352,7 +522,7 @@ export function DatasetEditPage() {
             type="button"
             className={styles.saveButton}
             onClick={handleSave}
-            disabled={submitting || !description.trim()}
+            disabled={submitting || !title.trim()}
           >
             {submitting
               ? (isCreateMode ? 'Создание…' : 'Сохранение…')
@@ -378,6 +548,14 @@ export function DatasetEditPage() {
           cancelLabel="Отмена"
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {showFolderPicker && utilityId && (
+        <FolderPicker
+          utilityId={utilityId}
+          onPick={handleFolderPicked}
+          onCancel={() => setShowFolderPicker(false)}
         />
       )}
     </main>

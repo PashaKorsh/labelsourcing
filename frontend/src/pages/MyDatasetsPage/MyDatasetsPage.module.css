@@ -1,6 +1,6 @@
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg);
   padding: 36px 0;
 }
 
@@ -11,6 +11,17 @@
   flex-direction: column;
   gap: 8px;
   align-items: center;
+}
+
+.searchRow {
+  display: flex;
+  align-self: stretch;
+  gap: 8px;
+  align-items: center;
+}
+
+.searchField {
+  flex: 1;
 }
 
 .list {
@@ -25,7 +36,8 @@
   align-items: center;
   gap: 16px;
   padding: 12px;
-  background: white;
+  background: var(--bg-elevated);
+  color: var(--text);
   border-radius: 24px;
 }
 
@@ -59,19 +71,19 @@
 .exportButton {
   padding: 8px 14px;
   background: none;
-  border: 1px solid #d0d0d0;
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
-  color: #555;
+  color: var(--text-muted);
   transition: border-color 0.15s, color 0.15s;
   white-space: nowrap;
 }
 
 .exportButton:hover:not(:disabled) {
-  border-color: #888;
-  color: #111;
+  border-color: var(--text-muted);
+  color: var(--text);
 }
 
 .exportButton:disabled {
@@ -81,7 +93,8 @@
 
 .editButton {
   padding: 8px 16px;
-  background: #f5f5f5;
+  background: var(--surface-2);
+  color: var(--text);
   border: none;
   border-radius: 12px;
   font-size: 14px;
@@ -91,23 +104,23 @@
 }
 
 .editButton:hover {
-  background: #e8e8e8;
+  background: var(--hover);
 }
 
 .createButton {
   align-self: stretch;
   padding: 16px;
-  background: white;
-  border: 2px dashed #d0d0d0;
+  background: var(--bg-elevated);
+  border: 2px dashed var(--border-strong);
   border-radius: 24px;
   font-size: 16px;
-  color: #6f6f6f;
+  color: var(--text-muted);
   cursor: pointer;
   font-family: inherit;
   transition: border-color 0.15s, color 0.15s;
 }
 
 .createButton:hover {
-  border-color: #aaa;
-  color: #333;
+  border-color: var(--text-faint);
+  color: var(--text);
 }

@@ -2,90 +2,15 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a1a;
-  color: #e0e0e0;
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
 }
 
-/* ── Header ──────────────────────────────────────── */
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: 48px;
-  background: #141414;
-  border-bottom: 1px solid #2a2a2a;
-  flex-shrink: 0;
-  gap: 16px;
-}
-
-.headerTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e0e0e0;
-  margin: 0;
-  white-space: nowrap;
-}
-
-/* ── Task navigation ─────────────────────────────── */
-
-.taskNav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.navButton {
-  padding: 4px 12px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
-  color: #ccc;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-  white-space: nowrap;
-}
-
-.navButton:hover:not(:disabled) {
-  background: #383838;
-  color: #fff;
-}
-
-.navButton:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.taskCounter {
+.topbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 13px;
-  color: #ddd;
-  min-width: 160px;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.taskIndex {
-  font-size: 10px;
-  color: #888;
-  margin-top: 1px;
-}
-
-.validationBadge {
-  display: inline-block;
-  font-size: 10px;
-  padding: 1px 6px;
-  background: rgba(251, 146, 60, 0.15);
-  border: 1px solid rgba(251, 146, 60, 0.35);
-  border-radius: 3px;
-  color: #fdba74;
-  margin-left: 6px;
-  vertical-align: middle;
+  gap: 8px;
+  padding: 16px 16px 12px;
+  flex-shrink: 0;
 }

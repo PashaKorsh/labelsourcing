@@ -1,5 +1,5 @@
 import { DatasetCard } from '../DatasetCard';
-import type { Dataset } from '../../../../types/dataset';
+import type { Dataset } from '@/types/dataset';
 import styles from './TaskList.module.css';
 
 interface TaskListProps {

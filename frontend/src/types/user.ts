@@ -1,5 +1,10 @@
 import type { AppTag } from './appTag';
 
+export interface Role {
+  id: string;
+  name: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;

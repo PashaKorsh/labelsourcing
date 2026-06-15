@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { AnnotationTask } from '../../types/task';
-import type { Tag } from '../../types/annotation';
-import { taskService, datasetService } from '../../services';
-import { useDatasetId } from '../../hooks/useRouteParams';
-import { useIsExpired } from '../../hooks/useIsExpired';
+import type { AnnotationTask } from '@/types/task';
+import type { Tag } from '@/types/annotation';
+import { taskService, datasetService } from '@/services';
+import { useDatasetId } from '@/hooks/useRouteParams';
+import { useIsExpired } from '@/hooks/useIsExpired';
 
 const TASK_BATCH_SIZE = 3;
 
@@ -18,6 +18,7 @@ export function useWorkspace() {
   const [isSaved, setIsSaved] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [allowedTools, setAllowedTools] = useState<string[] | undefined>(undefined);
+  const [annotationInstructions, setAnnotationInstructions] = useState<string | null>(null);
 
   const task = tasks[0] ?? null;
   const isExpired = useIsExpired(task?.expiresAt);
@@ -36,6 +37,7 @@ export function useWorkspace() {
     setIsSaved(false);
     setTasksLimit(null);
     setTaskOffset(0);
+    setAnnotationInstructions(null);
     taskService.clearCache();
 
     taskService.loadNextTask(datasetId, TASK_BATCH_SIZE)
@@ -50,9 +52,16 @@ export function useWorkspace() {
         if (Array.isArray(tools) && tools.length > 0) {
           setAllowedTools(tools as string[]);
         }
-        if (ds.annotationLabels?.length) {
+        const instr = ds.settings?.annotation_instructions;
+        if (typeof instr === 'string' && instr.trim()) {
+          setAnnotationInstructions(instr);
+        }
+        const annotationLabels = Array.isArray(ds.settings?.annotation_labels)
+          ? (ds.settings.annotation_labels as typeof tags)
+          : [];
+        if (annotationLabels.length) {
           const HOTKEYS = '1234567890';
-          const withHotkeys = ds.annotationLabels.map((l, i) => ({
+          const withHotkeys = annotationLabels.map((l, i) => ({
             ...l,
             hotkey: i < HOTKEYS.length ? HOTKEYS[i] : undefined,
           }));
@@ -116,6 +125,7 @@ export function useWorkspace() {
     tasksLimit,
     allowedTools,
     tags,
+    annotationInstructions,
     isExpired,
     canGoNext,
     isSaved,

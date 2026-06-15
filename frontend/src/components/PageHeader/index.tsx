@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../config/routes';
 import { useAuth } from '../../context/auth';
 import { NAV_ITEMS, hasRole } from '../../config/permissions';
+import { ThemeToggle } from '../ThemeToggle';
 import styles from './PageHeader.module.css';
 import profileLogo from '/src/assets/profile-image-stock-white-theme.png';
 
@@ -24,7 +25,14 @@ export function PageHeader() {
     img.src = user.avatarUrl;
   }, [user?.avatarUrl]);
 
-  const visibleItems = NAV_ITEMS.filter(item => hasRole(user?.roles ?? [], item.roles));
+  const seenPaths = new Set<string>();
+  const visibleItems = NAV_ITEMS
+    .filter(item => hasRole(user?.roles ?? [], item.roles))
+    .filter(item => {
+      if (seenPaths.has(item.path)) return false;
+      seenPaths.add(item.path);
+      return true;
+    });
 
   return (
     <nav className={styles.nav}>
@@ -46,6 +54,7 @@ export function PageHeader() {
       >
         <img src={avatarSrc} alt="" className={styles.avatarImage} />
       </button>
+      <ThemeToggle />
     </nav>
   );
 }

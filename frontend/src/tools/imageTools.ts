@@ -1,4 +1,4 @@
-import type { DrawingToolDef } from '../types/tools';
+import type { DrawingToolDef } from '@/types/tools';
 
 // id 'cursor' — не инструмент Annotorious, обрабатывается отдельно (режим пана).
 // Остальные id должны совпадать с именем инструмента в Annotorious.

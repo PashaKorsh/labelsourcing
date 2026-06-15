@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { SearchBar } from '../../components/SearchBar';
-import { RoleBadge } from '../../components/RoleBadge';
-import { ROUTES, buildRoute } from '../../config/routes';
-import { datasetService } from '../../services';
-import { useAuth } from '../../context/auth';
-import type { Dataset } from '../../types/dataset';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { SearchBar } from '@/components/SearchBar';
+import { RoleBadge } from '@/components/RoleBadge';
+import { DatasetFilter } from '@/components/DatasetFilter';
+import { ROUTES, buildRoute } from '@/config/routes';
+import { datasetService } from '@/services';
+import { useAuth } from '@/context/auth';
+import { hasRole, ROLE_ADMIN } from '@/config/permissions';
+import type { Dataset } from '@/types/dataset';
+import type { AppTag } from '@/types/appTag';
 import styles from './MyDatasetsPage.module.css';
 
 function triggerJsonDownload(data: unknown, filename: string) {
@@ -26,19 +29,27 @@ export function MyDatasetsPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterTags, setFilterTags] = useState<AppTag[]>([]);
+  const [filterStatus, setFilterStatus] = useState('');
   const [exportingIds, setExportingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
     setLoading(true);
+    const mine = !hasRole(user.roles, [ROLE_ADMIN]);
     const timer = setTimeout(() => {
-      datasetService.list({ search: search || undefined })
+      datasetService.list({
+        search: search || undefined,
+        mine,
+        tagIds: filterTags.length > 0 ? filterTags.map(t => t.id) : undefined,
+        status: filterStatus || undefined,
+      })
         .then(setDatasets)
         .catch(err => console.error('[MyDatasetsPage]', err))
         .finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [user, search]);
+  }, [user, search, filterTags, filterStatus]);
 
   const handleExport = useCallback(async (dataset: Dataset) => {
     if (exportingIds.has(dataset.id)) return;
@@ -63,7 +74,17 @@ export function MyDatasetsPage() {
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
-        <SearchBar value={search} onChange={setSearch} />
+        <div className={styles.searchRow}>
+          <div className={styles.searchField}>
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          <DatasetFilter
+            selectedTags={filterTags}
+            status={filterStatus}
+            onTagsChange={setFilterTags}
+            onStatusChange={setFilterStatus}
+          />
+        </div>
 
         <section className={styles.list}>
           {loading ? (

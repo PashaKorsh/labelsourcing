@@ -1,14 +1,7 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
+import type { Dataset } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 import type { DatasetService, DatasetListParams, DatasetCreateInput, DatasetUpdateInput } from './DatasetService';
-import { API, apiFetch } from '../../config/api';
-
-interface AnnotationLabelDto {
-  id: string;
-  label: string;
-  color: string;
-  hotkey?: string;
-}
+import { API, apiFetch } from '@/config/api';
 
 interface DatasetDto {
   id: string;
@@ -19,12 +12,14 @@ interface DatasetDto {
   user_status?: string;
   user_tasks_limit?: number | null;
   user_tasks_done?: number | null;
-  annotation_labels?: AnnotationLabelDto[] | null;
   required_answers?: number | null;
   validation_quorum?: number | null;
   requires_validation?: boolean | null;
   default_tasks_limit?: number | null;
   settings?: Record<string, unknown> | null;
+  source_type?: string | null;
+  utility_id?: string | null;
+  utility_folder?: string | null;
 }
 
 interface TaskDto {
@@ -44,17 +39,14 @@ function mapDto(dto: DatasetDto): Dataset {
     userTasksLimit: dto.user_tasks_limit ?? undefined,
     userTasksDone: dto.user_tasks_done ?? undefined,
     userStatus: (dto.user_status ?? 'NOT_STARTED') as Dataset['userStatus'],
-    annotationLabels: dto.annotation_labels?.map(l => ({
-      id: l.id,
-      label: l.label,
-      color: l.color,
-      hotkey: l.hotkey,
-    })),
     requiredAnswers: dto.required_answers ?? undefined,
     validationQuorum: dto.validation_quorum ?? undefined,
     requiresValidation: dto.requires_validation ?? undefined,
     defaultTasksLimit: dto.default_tasks_limit ?? undefined,
     settings: dto.settings ?? undefined,
+    sourceType: (dto.source_type ?? 'url') as Dataset['sourceType'],
+    utilityId: dto.utility_id ?? undefined,
+    utilityFolder: dto.utility_folder ?? undefined,
   };
 }
 
@@ -63,6 +55,8 @@ export class ApiDatasetService implements DatasetService {
     const qs = new URLSearchParams();
     if (params?.search)  qs.set('search', params.search);
     if (params?.status)  qs.set('status', params.status);
+    if (params?.mine)    qs.set('mine', 'true');
+    if (params?.tagIds)  params.tagIds.forEach(id => qs.append('tag_ids', id));
     if (params?.limit  !== undefined) qs.set('limit',  String(params.limit));
     if (params?.offset !== undefined) qs.set('offset', String(params.offset));
     const qsStr = qs.toString();
@@ -96,12 +90,13 @@ export class ApiDatasetService implements DatasetService {
         title: data.title,
         description: data.description,
         tag_ids: data.tagIds,
-        annotation_labels: data.annotationLabels,
         required_answers: data.requiredAnswers,
         validation_quorum: data.validationQuorum,
         requires_validation: data.requiresValidation,
         default_tasks_limit: data.defaultTasksLimit,
         settings: data.settings,
+        source_type: data.sourceType,
+        utility_id: data.utilityId,
       }),
     });
     const dto: DatasetDto = await res.json();
@@ -122,7 +117,6 @@ export class ApiDatasetService implements DatasetService {
       title: data.title,
       description: data.description,
       tag_ids: data.tagIds,
-      annotation_labels: data.annotationLabels,
       required_answers: data.requiredAnswers,
       validation_quorum: data.validationQuorum,
       requires_validation: data.requiresValidation,
@@ -132,6 +126,8 @@ export class ApiDatasetService implements DatasetService {
     if (data.settings !== undefined) {
       body.settings = data.settings ?? {};
     }
+    if (data.sourceType !== undefined) body.source_type = data.sourceType;
+    if (data.utilityId !== undefined) body.utility_id = data.utilityId;
     const res = await apiFetch(API.datasets.update(id), {
       method: 'PATCH',
       body: JSON.stringify(body),

@@ -16,8 +16,6 @@ class Base(DeclarativeBase):
 class AssignmentStatus(str, enum.Enum):
     IN_PROGRESS = "in_progress"
     DONE = "done"
-    EXPIRED = "expired"
-    REJECTED = "rejected"
 
 
 class TaskStatus(str, enum.Enum):
@@ -32,7 +30,12 @@ class TaskType(str, enum.Enum):
 
 class DatasetStatus(str, enum.Enum):
     ACTIVE = "active"
-    COMPLETED = "completed"
+    CLOSED = "closed"
+
+
+class SourceType(str, enum.Enum):
+    URL = "url"          # задачи — прямые ссылки на изображения
+    UTILITY = "utility"  # изображения раздаёт локальная утилита модератора
 
 
 class User(Base):
@@ -50,6 +53,7 @@ class User(Base):
     assignments: Mapped[List["Assignment"]] = relationship(back_populates="user")
     tags: Mapped[List["Tag"]] = relationship(secondary="user_tags", back_populates="users")
     dataset_accesses: Mapped[List["UserDatasetAccess"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    utilities: Mapped[List["Utility"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
 
 
 class Role(Base):
@@ -82,14 +86,24 @@ class Dataset(Base):
     tasks_count: Mapped[int] = mapped_column(Integer, server_default="0")
     requires_validation: Mapped[bool] = mapped_column(Boolean, server_default="false")
     validation_quorum: Mapped[int] = mapped_column(Integer, server_default="1")
-    annotation_labels: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column("annotation_labels", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     settings: Mapped[dict] = mapped_column(JSONB, server_default='{}', default=dict)
+    source_type: Mapped[SourceType] = mapped_column(
+        SAEnum(SourceType, name="source_type", values_callable=lambda x: [e.value for e in x]),
+        server_default=SourceType.URL.value, default=SourceType.URL,
+    )
+    # Для source_type=utility — какая утилита раздаёт изображения этого датасета
+    utility_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("utilities.id", ondelete="SET NULL"), nullable=True
+    )
+    # Абсолютный путь к папке на машине модератора (выбирается в вебе из разрешённых корней)
+    utility_folder: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     owner: Mapped["User"] = relationship(back_populates="datasets")
     tasks: Mapped[List["Task"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
     tags: Mapped[List["Tag"]] = relationship(secondary="dataset_tags", back_populates="datasets")
     user_accesses: Mapped[List["UserDatasetAccess"]] = relationship(back_populates="dataset", cascade="all, delete-orphan")
+    utility: Mapped[Optional["Utility"]] = relationship(back_populates="datasets")
 
 
 class Task(Base):
@@ -140,6 +154,7 @@ class Label(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("assignments.id", ondelete="CASCADE"), unique=True)
     result: Mapped[Dict[str, Any]] = mapped_column(JSONB)
+    is_validated: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     assignment: Mapped["Assignment"] = relationship(back_populates="label")
@@ -170,6 +185,36 @@ class DatasetTag(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dataset_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"))
     tag_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"))
+
+
+class Utility(Base):
+    """Локальная утилита модератора, раздающая изображения. Привязана к пользователю."""
+    __tablename__ = "utilities"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    # bcrypt-хеш долгоживущего токена утилиты (сам токен хранится только на стороне утилиты)
+    token_hash: Mapped[str] = mapped_column(Text)
+    # Публичный HTTPS-адрес утилиты для direct-режима (если у модератора белый IP). None → только через прокси.
+    public_base_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    owner: Mapped["User"] = relationship(back_populates="utilities")
+    datasets: Mapped[List["Dataset"]] = relationship(back_populates="utility")
+
+
+class UtilityPairingCode(Base):
+    """Одноразовый код привязки. Юзер генерирует в вебе, вводит в утилиту. Удаляется при обмене на токен."""
+    __tablename__ = "utility_pairing_codes"
+
+    code: Mapped[str] = mapped_column(Text, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship()
 
 
 class UserDatasetAccess(Base):

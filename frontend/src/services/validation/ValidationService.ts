@@ -1,4 +1,4 @@
-import type { ValidationTask, ValidationVerdict, ValidationResult } from '../../types/validationTask';
+import type { ValidationTask, ValidationVerdict, ValidationResult } from '@/types/validationTask';
 
 export interface ValidationService {
   getTasks(): readonly ValidationTask[];

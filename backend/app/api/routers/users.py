@@ -8,9 +8,19 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import User, Role, Tag
 from app.api.dependencies import get_current_user, require_roles
-from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.user import UserResponse, UserUpdate, RoleResponse
 
 router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@router.get("/roles", response_model=list[RoleResponse])
+async def get_roles(
+        db: AsyncSession = Depends(get_db),
+        admin_user: User = Depends(require_roles(["admin"]))
+):
+    """Список всех ролей — для назначения пользователям (только Админ)"""
+    result = await db.execute(select(Role).order_by(Role.name))
+    return result.scalars().all()
 
 
 @router.get("/me", response_model=UserResponse)

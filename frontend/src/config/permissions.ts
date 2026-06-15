@@ -1,7 +1,7 @@
 import { ROUTES } from './routes';
 
-export const ROLE_ADMIN   = 'admin';
-export const ROLE_CREATOR = 'creator';
+export const ROLE_ADMIN     = 'admin';
+export const ROLE_MODERATOR  = 'moderator';
 
 /** Проверяет, есть ли хотя бы одна из требуемых ролей у пользователя.
  *  Пустой массив requiredRoles означает «доступно всем авторизованным». */
@@ -19,7 +19,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Датасеты',     path: ROUTES.home,       roles: [] },
   { label: 'Все датасеты', path: ROUTES.myDatasets,  roles: [ROLE_ADMIN] },
-  { label: 'Мои датасеты', path: ROUTES.myDatasets,  roles: [ROLE_CREATOR] },
+  { label: 'Мои датасеты', path: ROUTES.myDatasets,  roles: [ROLE_MODERATOR] },
   { label: 'Пользователи', path: ROUTES.users,       roles: [ROLE_ADMIN] },
   { label: 'Теги',         path: ROUTES.tags,        roles: [ROLE_ADMIN] },
 ];

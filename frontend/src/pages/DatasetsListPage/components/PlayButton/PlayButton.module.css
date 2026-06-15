@@ -1,0 +1,11 @@
+.button {
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}

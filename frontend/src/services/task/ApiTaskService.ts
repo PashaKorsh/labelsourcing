@@ -1,12 +1,13 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import type { AnnotationTask } from '../../types/task';
+import type { AnnotationTask } from '@/types/task';
 import type { TaskService } from './TaskService';
-import { serializeTaskAnnotations } from '../../utils/annotationSerializer';
-import { API, apiFetch } from '../../config/api';
+import { serializeTaskAnnotations } from '@/utils/annotationSerializer';
+import { API, apiFetch } from '@/config/api';
 
 interface TaskDto {
   id: string;
   dataset_id: string;
+  url?: string;
   type?: string;
   task_metadata?: Record<string, unknown>;
   expires_at?: string;
@@ -33,7 +34,7 @@ export class ApiTaskService implements TaskService {
       const mapped: AnnotationTask = {
         id: dto.id,
         datasetId: dto.dataset_id,
-        imageUrl: API.proxy.image(dto.id),
+        imageUrl: dto.url ?? API.proxy.image(dto.id),
         type: dto.type as AnnotationTask['type'],
         metadata: dto.task_metadata,
         expiresAt: dto.expires_at,

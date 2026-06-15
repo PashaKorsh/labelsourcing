@@ -1,36 +1,39 @@
-import type { Dataset } from '../../types/dataset';
-import type { AnnotationTask } from '../../types/task';
-import type { Tag } from '../../types/annotation';
+import type { Dataset, SourceType } from '@/types/dataset';
+import type { AnnotationTask } from '@/types/task';
 
 export interface DatasetListParams {
   search?: string;
-  status?: 'new' | 'started' | 'done';
+  status?: string;       // пользовательский статус: NOT_STARTED | IN_PROGRESS | USER_DONE | COMPLETED | WAITING_VALIDATION
+  mine?: boolean;        // только датасеты текущего пользователя (для «Мои датасеты» модератора)
+  tagIds?: string[];
   limit?: number;
   offset?: number;
 }
 
 export interface DatasetCreateInput {
   title?: string;
-  description: string;
+  description?: string | null;
   tagIds?: string[];
-  annotationLabels?: Tag[];
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;
   defaultTasksLimit?: number;
   settings?: Record<string, unknown>;
+  sourceType?: SourceType;
+  utilityId?: string;
 }
 
 export interface DatasetUpdateInput {
   title?: string;
-  description?: string;
+  description?: string | null;
   tagIds?: string[];
-  annotationLabels?: Tag[];
   requiredAnswers?: number;
   validationQuorum?: number;
   requiresValidation?: boolean;
   defaultTasksLimit?: number;
   settings?: Record<string, unknown> | null;
+  sourceType?: SourceType;
+  utilityId?: string;
 }
 
 export interface DatasetService {

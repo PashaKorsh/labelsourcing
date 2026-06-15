@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { PageHeader } from '../../components/PageHeader';
-import { ModeSwitcher } from '../../components/ModeSwitcher';
-import { RoleBadge } from '../../components/RoleBadge';
-import { tagService } from '../../services';
-import type { AppTag } from '../../types/appTag';
+import { PageHeader } from '@/components/PageHeader';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
+import { SearchBar } from '@/components/SearchBar';
+import { RoleBadge } from '@/components/RoleBadge';
+import { TagFilter } from './components/TagFilter';
+import { tagService } from '@/services';
+import type { AppTag } from '@/types/appTag';
 import styles from './TagsPage.module.css';
 
 export function TagsPage() {
   const [tags, setTags] = useState<AppTag[]>([]);
+  const [search, setSearch] = useState('');
+  const [filterColors, setFilterColors] = useState<string[]>([]);
   const [newName, setNewName] = useState('');
   const [newColor, setNewColor] = useState('#6b7280');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -15,8 +19,11 @@ export function TagsPage() {
   const [editColor, setEditColor] = useState('');
 
   useEffect(() => {
-    tagService.list().then(setTags).catch(console.error);
-  }, []);
+    const timer = setTimeout(() => {
+      tagService.list({ search: search || undefined }).then(setTags).catch(console.error);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -55,14 +62,25 @@ export function TagsPage() {
     }
   };
 
+  const distinctColors = [...new Set(tags.map(t => t.color ?? '#d9d9d9'))];
+  const visibleTags = filterColors.length === 0
+    ? tags
+    : tags.filter(t => filterColors.includes(t.color ?? '#d9d9d9'));
+
   return (
     <main className={styles.page}>
       <div className={styles.content}>
         <ModeSwitcher />
         <PageHeader />
+        <div className={styles.searchRow}>
+          <div className={styles.searchField}>
+            <SearchBar value={search} onChange={setSearch} />
+          </div>
+          <TagFilter colors={distinctColors} selected={filterColors} onChange={setFilterColors} />
+        </div>
 
         <section className={styles.list}>
-          {tags.map((tag) => (
+          {visibleTags.map((tag) => (
             <div key={tag.id} className={styles.row}>
               {editingId === tag.id ? (
                 <>

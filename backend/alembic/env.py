@@ -52,7 +52,14 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    # transaction_per_migration: каждая ревизия — отдельная транзакция.
+    # Иначе при полном прогоне истории ALTER TYPE ... ADD VALUE и использование
+    # нового значения enum попадают в одну транзакцию (Postgres это запрещает).
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        transaction_per_migration=True,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

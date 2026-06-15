@@ -1,5 +1,5 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
-import type { AnnotationTask } from '../../types/task';
+import type { AnnotationTask } from '@/types/task';
 
 export interface TaskService {
   /**

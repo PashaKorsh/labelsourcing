@@ -43,5 +43,5 @@ export interface DatasetService {
   create(data: DatasetCreateInput): Promise<Dataset>;
   update(id: string, data: DatasetUpdateInput): Promise<Dataset>;
   delete(id: string): Promise<void>;
-  exportLabels(id: string): Promise<unknown[]>;
+  exportLabels(id: string): Promise<unknown>;
 }

@@ -107,7 +107,7 @@ export class ApiDatasetService implements DatasetService {
     await apiFetch(API.datasets.delete(id), { method: 'DELETE' });
   }
 
-  async exportLabels(id: string): Promise<unknown[]> {
+  async exportLabels(id: string): Promise<unknown> {
     const res = await apiFetch(API.datasets.export(id));
     return res.json();
   }

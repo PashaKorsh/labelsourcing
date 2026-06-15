@@ -27,7 +27,7 @@ export const API = {
     next:   (id: string, count = 1) =>
       `${API_BASE}/api/v1/datasets/${id}/next?count=${count}`,
     stats:  (id: string) => `${API_BASE}/api/v1/datasets/${id}/stats`,
-    export: (id: string) => `${API_BASE}/api/v1/datasets/${id}/export`,
+    export: (id: string) => `${API_BASE}/api/v1/datasets/${id}/export/coco`,
   },
   tasks: {
     create:    () => `${API_BASE}/api/v1/tasks/`,

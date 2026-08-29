@@ -172,14 +172,22 @@ async def delete_task(
     await db.commit()
 
 
-@router.put("/{task_id}/labels", response_model=LabelResponse)
+@router.put(
+    "/{task_id}/labels",
+    response_model=LabelResponse,
+    responses={
+        400: {"description": "Нет активного ассайнмента или инструмент не разрешён"},
+        409: {"description": "Разметка уже отправлена (повторная отправка запрещена)"},
+        410: {"description": "Время на выполнение задания истекло"},
+    },
+)
 async def submit_label(
         task_id: uuid.UUID,
         label_in: LabelSubmit,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Сохранить или перезаписать разметку / вердикт валидации для активного ассайнмента."""
+    """Принять разметку или вердикт валидации для активного ассайнмента (однократно, без перезаписи)."""
     stmt = select(Assignment).where(
         Assignment.task_id == task_id,
         Assignment.user_id == current_user.id,

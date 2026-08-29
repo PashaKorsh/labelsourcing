@@ -69,6 +69,7 @@ async def login_for_access_token(
         form_data: OAuth2PasswordRequestForm = Depends(),
         db: AsyncSession = Depends(get_db)
 ):
+    """Вход по email и паролю (form-data). Ставит cookie access/refresh. На текущем фронтенде не используется — вход через Яндекс."""
     stmt = select(User).where(User.email == form_data.username)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -86,6 +87,7 @@ async def login_for_access_token(
 
 @router.post("/logout")
 async def logout(response: Response):
+    """Выход: удаляет cookie access/refresh."""
     response.delete_cookie(key="access_token", httponly=True, secure=True, samesite="lax")
     response.delete_cookie(key="refresh_token", httponly=True, secure=True, samesite="lax")
     return {"ok": True}
@@ -96,6 +98,7 @@ async def yandex_login(
         success_url: str = Query(default="/"),
         error_url: str = Query(default="/login"),
 ):
+    """Начало Яндекс OAuth: редирект на страницу авторизации. success_url/error_url — куда вернуть после."""
     state = _encode_state({"success_url": success_url, "error_url": error_url})
     params = urlencode({
         "response_type": "code",
@@ -113,6 +116,7 @@ async def yandex_callback(
         state: str = Query(...),
         db: AsyncSession = Depends(get_db),
 ):
+    """Callback Яндекс OAuth: обменивает code на токен, создаёт/обновляет пользователя, ставит cookie и редиректит на success_url."""
     try:
         state_data = _decode_state(state)
         success_url: str = state_data["success_url"]
@@ -191,6 +195,7 @@ async def dev_login(
         user: str = Query(...),
         db: AsyncSession = Depends(get_db),
 ):
+    """DEV-вход без OAuth (только при DEV_MODE=true). user: admin | annotator-1 | annotator-2 — создаёт/логинит преднастроенного пользователя."""
     if not settings.DEV_MODE:
         raise HTTPException(status_code=403, detail="Доступно только в DEV_MODE")
 
@@ -237,6 +242,7 @@ async def refresh_token(
         response: Response,
         current_user: User = Depends(get_user_from_refresh_token)
 ):
+    """Обновляет пару токенов access/refresh по refresh-cookie."""
     _set_auth_cookies(response, current_user.id)
 
     return {"ok": True, "message": "Tokens refreshed successfully"}

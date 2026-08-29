@@ -14,7 +14,7 @@ from app.models import (
 )
 from app.api.dependencies import get_current_user, require_roles
 from app.api.helpers import _ensure_validation_tasks, ensure_can_manage_dataset, is_admin
-from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate
+from app.schemas.dataset import DatasetCreate, DatasetResponse, DatasetUpdate, DatasetStatsResponse
 from app.schemas.task import TaskResponse, TaskPublicResponse
 from app.schemas.access import UserDatasetAccessResponse, UserDatasetAccessUpdate
 
@@ -95,6 +95,7 @@ async def create_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(require_roles(["admin", "moderator"]))
 ):
+    """Создать датасет (admin/moderator). Метки по умолчанию кладутся в settings.annotation_labels; для source_type=utility нужна утилита текущего пользователя."""
     settings = dict(dataset_in.settings)
     if 'annotation_labels' not in settings:
         settings['annotation_labels'] = DEFAULT_ANNOTATION_LABELS
@@ -178,6 +179,13 @@ async def get_datasets(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """Список доступных датасетов с прогрессом и статусом текущего пользователя.
+
+    Фильтры (query): search — по названию; mine — только свои (admin/moderator);
+    tag_ids — по тегам; status — по вычисляемому статусу пользователя
+    (NOT_STARTED / IN_PROGRESS / WAITING_VALIDATION / LIMIT_REACHED / IDLE / COMPLETED).
+    Доступ к датасету ограничен тегами.
+    """
     ValTask = aliased(Task)
     ValAssignment = aliased(Assignment)
     UnvalLabel = aliased(Label)
@@ -401,10 +409,14 @@ def _build_task_responses(
     ]
 
 
-@router.get("/{dataset_id}/next", response_model=list[TaskPublicResponse])
+@router.get(
+    "/{dataset_id}/next",
+    response_model=list[TaskPublicResponse],
+    responses={404: {"description": "Датасет не найден"}},
+)
 async def get_next_task(
         dataset_id: uuid.UUID,
-        count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST),
+        count: int = Query(default=1, ge=1, le=MAX_TASKS_PER_REQUEST, description="Сколько задач забронировать (1..10)"),
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
@@ -525,7 +537,7 @@ async def get_next_task(
     return _build_task_responses(result_tasks, use_proxy, direct_base)
 
 
-@router.get("/{dataset_id}/stats")
+@router.get("/{dataset_id}/stats", response_model=DatasetStatsResponse)
 async def get_dataset_stats(
         dataset_id: uuid.UUID,
         db: AsyncSession = Depends(get_db),
@@ -693,6 +705,7 @@ async def get_dataset_tasks(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """Список annotation-задач датасета (admin/moderator-владелец). Только type=annotation."""
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
@@ -774,6 +787,7 @@ async def delete_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """Удалить датасет со всеми задачами, ассайнментами и разметкой (admin/moderator-владелец)."""
     dataset = await db.get(Dataset, dataset_id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
@@ -788,6 +802,7 @@ async def get_dataset_detail(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """Датасет с прогрессом текущего пользователя (персональный лимит и сколько выполнено)."""
     dataset = await _get_dataset_with_counts(db, dataset_id, user_id=current_user.id)
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
@@ -917,6 +932,7 @@ async def update_dataset(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """Частичное обновление датасета (admin/moderator-владелец). Включение валидации и снижение required_answers достраивают validation-задачи (см. BACKEND.md, раздел 6.4)."""
     stmt = select(Dataset).options(selectinload(Dataset.tags)).where(Dataset.id == dataset_id)
     dataset = (await db.execute(stmt)).scalar_one_or_none()
 

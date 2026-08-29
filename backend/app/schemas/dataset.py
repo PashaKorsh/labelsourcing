@@ -52,3 +52,13 @@ class DatasetUpdate(BaseModel):
     settings: Optional[dict] = None
     source_type: Optional[str] = None
     utility_id: Optional[uuid.UUID] = None
+
+
+class DatasetStatsResponse(BaseModel):
+    annotation_tasks_total: int
+    annotation_tasks_pending: int
+    annotation_tasks_completed: int
+    validation_tasks_total: int
+    validation_tasks_pending: int
+    validation_tasks_completed: int
+    phase: str

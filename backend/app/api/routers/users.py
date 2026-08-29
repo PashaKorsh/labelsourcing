@@ -69,7 +69,6 @@ async def update_user_access(
         admin_user: User = Depends(require_roles(["admin"]))
 ):
     """Изменить роли и теги пользователя (только Админ)"""
-    # Ищем юзера
     stmt = select(User).options(selectinload(User.roles), selectinload(User.tags)).where(User.id == user_id)
     result = await db.execute(stmt)
     target_user = result.scalar_one_or_none()
@@ -77,12 +76,10 @@ async def update_user_access(
     if not target_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    # Обновляем роли, если они переданы
     if update_data.role_ids is not None:
         roles_result = await db.execute(select(Role).where(Role.id.in_(update_data.role_ids)))
         target_user.roles = list(roles_result.scalars().all())
 
-    # Обновляем теги, если они переданы
     if update_data.tag_ids is not None:
         tags_result = await db.execute(select(Tag).where(Tag.id.in_(update_data.tag_ids)))
         target_user.tags = list(tags_result.scalars().all())

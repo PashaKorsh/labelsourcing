@@ -3,7 +3,6 @@ export interface HotkeyHint {
   description: string;
 }
 
-// Подсказки, общие для всех рисующих инструментов
 const DRAWING_HINTS: HotkeyHint[] = [
   { key: 'A / Del', description: 'Удалить объект' },
   { key: 'Z',       description: 'Отмена' },
@@ -12,7 +11,6 @@ const DRAWING_HINTS: HotkeyHint[] = [
   { key: 'G',       description: 'Отправить' },
 ];
 
-// Подсказки, специфичные для конкретного инструмента (по tool id)
 const EXTRA_HINTS: Record<string, HotkeyHint[]> = {
   cursor: [
     { key: 'ЛКМ + drag', description: 'Переместить холст' },

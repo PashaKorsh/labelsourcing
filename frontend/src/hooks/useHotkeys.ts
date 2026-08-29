@@ -14,9 +14,7 @@ function eventToHotkey(e: KeyboardEvent): string {
   return parts.join('+');
 }
 
-// Регистрирует глобальные горячие клавиши на время жизни компонента.
-// map можно передавать новый на каждый рендер — внутри используется ref,
-// поэтому слушатель перерегистрируется только при монтировании.
+// map можно передавать новый на каждый рендер — внутри ref, слушатель ставится один раз
 export function useHotkeys(map: HotkeyMap): void {
   const mapRef = useRef(map);
   useEffect(() => { mapRef.current = map; });

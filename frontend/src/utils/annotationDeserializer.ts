@@ -1,9 +1,7 @@
 import type { ImageAnnotation } from '@annotorious/annotorious';
 import type { SerializedShape } from './annotationSerializer';
 
-// Восстанавливает аннотации из сериализованного JSON обратно в формат Annotorious.
-// imageW / imageH — натуральные размеры изображения, используются для
-// денормализации координат из диапазона [0, 1] обратно в пиксели.
+// imageW/imageH — натуральные размеры для денормализации координат из [0, 1] в пиксели
 export function deserializeAnnotations(
   shapes: SerializedShape[],
   imageW: number,

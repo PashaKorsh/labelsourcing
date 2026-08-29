@@ -8,14 +8,16 @@ from app.models import Base
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # async with engine.begin() as conn:
-    #     await conn.run_sync(Base.metadata.create_all)
     yield
 
 
 app = FastAPI(
     title="Labelsourcing API",
-    description="API для краудсорсинговой платформы разметки данных",
+    description=(
+        "API краудсорсинговой платформы разметки данных.\n\n"
+        "Здесь — контракт запросов и ответов. Бизнес-логику, инварианты и жизненные "
+        "циклы задач см. в `backend/BACKEND.md`."
+    ),
     version="0.1.0",
     lifespan=lifespan,
     root_path="/api/v1",
@@ -41,4 +43,5 @@ app.include_router(utility.router)
 
 @app.get("/health", tags=["System"])
 async def health_check():
+    """Проверка живости сервиса."""
     return {"status": "ok", "service": "labelsourcing-backend"}

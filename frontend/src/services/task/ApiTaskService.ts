@@ -18,10 +18,7 @@ export class ApiTaskService implements TaskService {
   private readonly annotationsMap = new Map<string, ImageAnnotation[]>();
   private readonly imageSizeMap = new Map<string, { w: number; h: number }>();
 
-  // Запрашивает задачи у бэкенда и добавляет в кэш только те, которых там нет.
-  // При восстановлении сессии бэк вернёт уже взятые in_progress задачи —
-  // дедупликация предотвращает дубликаты в массиве.
-  // Возвращает первую новую задачу или null, если всё уже в кэше / задач нет.
+  // Дедупликация по id: при восстановлении сессии бэк вернёт уже взятые задачи
   async loadNextTask(datasetId: string, count = 1): Promise<AnnotationTask | null> {
     const res = await apiFetch(API.datasets.next(datasetId, count));
     const dtos: TaskDto[] = await res.json();
@@ -43,8 +40,7 @@ export class ApiTaskService implements TaskService {
       const existingIdx = existingById.get(dto.id);
       if (existingIdx !== undefined) {
         const existingTask = this.tasks[existingIdx];
-        // Если expiresAt изменился — это новое назначение (реджект/истечение), а не восстановление сессии.
-        // Сбрасываем сохранённую разметку, чтобы пользователь начал с чистого листа.
+        // Изменился expiresAt — новое назначение (реджект/истечение): сбрасываем старую разметку
         if (existingTask.expiresAt !== dto.expires_at) {
           this.annotationsMap.delete(dto.id);
         }
@@ -68,9 +64,6 @@ export class ApiTaskService implements TaskService {
     return this.annotationsMap.get(taskId) ?? [];
   }
 
-  // Сохраняет аннотации локально и отправляет разметку на сервер.
-  // dataset_id берётся из кэшированной задачи — он нужен бэкенду, т.к. одна задача
-  // может использоваться в нескольких датасетах с разной разметкой.
   async saveAnnotations(
     taskId: string,
     annotations: ImageAnnotation[],

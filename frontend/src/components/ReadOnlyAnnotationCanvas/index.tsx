@@ -10,9 +10,7 @@ import { buildTagStyler } from '../AnnotationCanvas/buildTagStyler';
 import '@annotorious/react/annotorious-react.css';
 import styles from './ReadOnlyAnnotationCanvas.module.css';
 
-// ─── Контекстное меню (только просмотр тега) ──────────────────────────────────
-// Рендерится через portal в document.body, чтобы не попасть под CSS-трансформации канваса.
-
+// Портал в document.body, чтобы не попасть под CSS-трансформации канваса.
 interface PortalTagMenuProps {
   state: { x: number; y: number; annotation: ImageAnnotation };
   tags: Tag[];
@@ -48,10 +46,6 @@ function PortalTagMenu({ state, tags, onClose }: PortalTagMenuProps) {
     document.body,
   );
 }
-
-// ─── Контроллер ───────────────────────────────────────────────────────────────
-// Живёт внутри <Annotorious>. Устанавливает аннотации, отслеживает hover
-// и пробрасывает его наружу для контекстного меню.
 
 function ReadOnlyController({
   initialAnnotations,
@@ -92,7 +86,6 @@ function ReadOnlyController({
   const hovered = useHover<ImageAnnotation>();
   useEffect(() => { onHoverRef.current(hovered ?? null); }, [hovered]);
 
-  // ЛКМ по аннотации — selection.event содержит координаты клика
   const selection = useSelection<ImageAnnotation>();
   useEffect(() => {
     if (selection.selected.length === 0 || !selection.event) return;

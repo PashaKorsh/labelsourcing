@@ -19,13 +19,12 @@ import styles from './DatasetEditPage.module.css';
 const ANNOTATION_TOOLS = IMAGE_DRAWING_TOOLS.filter(t => t.id !== 'cursor');
 const ALL_TOOL_IDS = ANNOTATION_TOOLS.map(t => t.id);
 
-// Список разрешённых инструментов из настроек; если не задан — все разрешены
 const getActiveTools = (s: Record<string, unknown> | null): string[] => {
   const tools = s?.allowed_tools;
   return Array.isArray(tools) ? (tools as string[]) : [...ALL_TOOL_IDS];
 };
 
-// Поля settings, которые имеют выделенные поля API и не попадают в settings на бэке
+// Эти поля идут отдельными полями API, а не внутрь settings на бэке
 const API_FIELDS = [
   'title', 'description', 'tags',
   'required_answers', 'validation_quorum', 'requires_validation', 'default_tasks_limit',
@@ -57,7 +56,7 @@ export function DatasetEditPage() {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [scanInfo, setScanInfo] = useState<string>('');
 
-  // Единый источник правды для всех настроек датасета. Ключи в API_FIELDS + пользовательские поля
+  // Единый источник правды для всех полей датасета (API_FIELDS + пользовательские)
   const [settings, setSettings] = useState<Record<string, unknown> | null>(
     isCreateMode ? { annotation_labels: [DEFAULT_ANNOTATION_LABEL] } : null
   );
@@ -79,7 +78,6 @@ export function DatasetEditPage() {
       setUtilityId(ds.utilityId ?? '');
       setUtilityFolder(ds.utilityFolder ?? '');
 
-      // Собираем все поля датасета в единый объект настроек
       const merged: Record<string, unknown> = { ...(ds.settings ?? {}) };
       if (ds.title) merged.title = ds.title;
       if (ds.description) merged.description = ds.description;
@@ -115,7 +113,6 @@ export function DatasetEditPage() {
     if (next.length > 0) patchSettings('allowed_tools', next);
   };
 
-  // Значения для UI-полей — производные от settings
   const title = typeof settings?.title === 'string' ? settings.title : '';
   const description = typeof settings?.description === 'string' ? settings.description : '';
   const selectedTags = Array.isArray(settings?.tags) ? (settings.tags as AppTag[]) : [];

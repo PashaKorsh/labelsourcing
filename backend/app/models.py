@@ -34,8 +34,8 @@ class DatasetStatus(str, enum.Enum):
 
 
 class SourceType(str, enum.Enum):
-    URL = "url"          # задачи — прямые ссылки на изображения
-    UTILITY = "utility"  # изображения раздаёт локальная утилита модератора
+    URL = "url"
+    UTILITY = "utility"
 
 
 class User(Base):
@@ -92,11 +92,9 @@ class Dataset(Base):
         SAEnum(SourceType, name="source_type", values_callable=lambda x: [e.value for e in x]),
         server_default=SourceType.URL.value, default=SourceType.URL,
     )
-    # Для source_type=utility — какая утилита раздаёт изображения этого датасета
     utility_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("utilities.id", ondelete="SET NULL"), nullable=True
     )
-    # Абсолютный путь к папке на машине модератора (выбирается в вебе из разрешённых корней)
     utility_folder: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     owner: Mapped["User"] = relationship(back_populates="datasets")
@@ -194,9 +192,7 @@ class Utility(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(Text)
-    # bcrypt-хеш долгоживущего токена утилиты (сам токен хранится только на стороне утилиты)
     token_hash: Mapped[str] = mapped_column(Text)
-    # Публичный HTTPS-адрес утилиты для direct-режима (если у модератора белый IP). None → только через прокси.
     public_base_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

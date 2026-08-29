@@ -1,7 +1,5 @@
-// Базовый URL бэкенда. Задаётся через VITE_API_URL в .env, по умолчанию — текущий origin.
 export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
-// Все маршруты бэкенда в одном месте.
 export const API = {
   auth: {
     login:          () => `${API_BASE}/api/v1/auth/login`,
@@ -78,8 +76,6 @@ async function tryRefresh(): Promise<boolean> {
   return pendingRefresh;
 }
 
-// Обёртка fetch с автоматической подстановкой cookie и обработкой 401.
-// При 401 пытается обновить токены через refresh, затем повторяет запрос.
 export async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
   const doFetch = () => fetch(url, {
     ...options,

@@ -39,6 +39,7 @@ async def create_tag(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(require_roles(["admin"]))
 ):
+    """Создать тег (admin). Имя уникально."""
     try:
         new_tag = Tag(name=tag_in.name, color=tag_in.color)
         db.add(new_tag)
@@ -60,6 +61,7 @@ async def update_tag(
     db: AsyncSession = Depends(get_db),
     admin_user: User = Depends(require_roles(["admin"]))
 ):
+    """Обновить имя и/или цвет тега (admin)."""
     tag = await db.get(Tag, tag_id)
     if not tag:
         raise HTTPException(status_code=404, detail="Тег не найден")

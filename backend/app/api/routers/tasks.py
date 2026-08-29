@@ -40,12 +40,13 @@ async def _process_validation_verdict(
     if not annotation_label:
         return
 
-    # При равенстве голосов считаем одобренным
-    if reject_count < approve_count:
+    # Одобряем только при большинстве голосов «за» (строго больше, чем «против»).
+    # При равенстве голосов разметка считается отклонённой.
+    if approve_count > reject_count:
         annotation_label.is_validated = True
         return
 
-    # Большинство отклонило — откатываем исходную разметку
+    # Большинство «против» (или равенство голосов) — откатываем исходную разметку
     annotation_assignment = await db.get(Assignment, annotation_label.assignment_id)
     if not annotation_assignment:
         return

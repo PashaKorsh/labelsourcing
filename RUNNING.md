@@ -36,6 +36,8 @@
 
 ### `backend/.env`
 
+Готовый шаблон — [`backend/.env.example`](backend/.env.example): скопируй в `backend/.env` и заполни.
+
 ```dotenv
 DATABASE_URL=postgresql+asyncpg://test:test@db:5432/testdb
 SECRET_KEY=<любая-длинная-строка>
@@ -92,7 +94,8 @@ cd frontend
 npm install
 npm run dev
 ```
-- Против реального бэкенда: задай `VITE_API_URL` (например, `http://localhost`) в `frontend/.env`.
+Скопируй [`frontend/.env.example`](frontend/.env.example) в `frontend/.env` и при необходимости поправь:
+- Против реального бэкенда: задай `VITE_API_URL` (например, `http://localhost`).
 - Без бэкенда: `VITE_API_MODE=mock` — подставятся mock-реализации сервисов.
 
 Внимание: этот способ давно не проверялся и может подтормаживать или вести себя неожиданно
@@ -132,6 +135,31 @@ python labelsourcing_utility.py start --root "C:\datasets"
 1. Собирает и пушит образы `labelsourcing-backend` и `labelsourcing-frontend` в Yandex Container Registry.
 2. Поднимает VM, копирует `docker-compose.prod.yml` и `nginx/`, прогоняет `alembic upgrade head`,
    перезапускает стек.
+
+### Секреты GitHub Actions
+
+Деплой берёт все значения из GitHub Secrets репозитория (Settings → Secrets and variables → Actions).
+Нужны все перечисленные ниже — иначе workflow упадёт.
+
+| Секрет | Назначение |
+|---|---|
+| `YC_SA_JSON_CREDENTIALS` | JSON-ключ сервисного аккаунта Yandex Cloud (логин в CR, старт ВМ) |
+| `YC_REGISTRY_ID` | ID Container Registry, куда пушатся образы |
+| `YC_FOLDER_ID` | ID каталога Yandex Cloud |
+| `YC_INSTANCE_ID` | ID виртуальной машины (старт/стоп) |
+| `SSH_HOST` | Адрес сервера для деплоя |
+| `SSH_USER` | Пользователь SSH |
+| `SSH_PRIVATE_KEY` | Приватный SSH-ключ |
+| `DEPLOY_PATH` | Путь на сервере, куда кладётся `docker-compose.prod.yml` и запускается стек |
+| `POSTGRES_USER` | Пользователь БД |
+| `POSTGRES_PASSWORD` | Пароль БД |
+| `POSTGRES_DB` | Имя базы |
+| `SECRET_KEY` | Ключ подписи JWT бэкенда |
+| `YANDEX_CLIENT_ID` | Яндекс OAuth |
+| `YANDEX_CLIENT_SECRET` | Яндекс OAuth |
+| `YANDEX_REDIRECT_URI` | Callback OAuth (публичный адрес, напр. `https://<домен>/api/v1/auth/yandex/callback`) |
+
+Ручной запуск и остановка ВМ — через `workflow_dispatch` (вкладка Actions, выбор `deploy` или `stop-vm`).
 
 Чем `docker-compose.prod.yml` отличается от локального:
 - образы тянутся из реестра, а не собираются на месте; БД — на volume `pgdata`;

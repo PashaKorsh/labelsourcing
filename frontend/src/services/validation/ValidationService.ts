@@ -5,6 +5,5 @@ export interface ValidationService {
   setVerdict(taskId: string, verdict: ValidationVerdict): void;
   getVerdict(taskId: string): ValidationVerdict | null;
   getResults(): ValidationResult[];
-  /** Отправляет результаты валидации на сервер. */
   submit(): Promise<void>;
 }

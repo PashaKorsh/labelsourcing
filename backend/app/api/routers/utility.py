@@ -31,8 +31,6 @@ def _generate_code() -> str:
     return f"{raw[:4]}-{raw[4:]}"
 
 
-# ── Утилита-аутентификация (Bearer-токен утилиты) ──
-
 async def get_current_utility(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -70,15 +68,12 @@ async def _create_tasks_from_paths(db: AsyncSession, dataset: Dataset, paths: li
     return added, len(existing_urls)
 
 
-# ── Веб: управление привязкой (авторизация обычным пользователем) ──
-
 @router.post("/pairing-code", response_model=PairingCodeResponse)
 async def create_pairing_code(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Сгенерировать одноразовый код привязки утилиты к текущему пользователю."""
-    # Чистим протухшие коды заодно
     await db.execute(delete(UtilityPairingCode).where(UtilityPairingCode.expires_at < datetime.utcnow()))
 
     code = _generate_code()
@@ -118,13 +113,11 @@ async def delete_utility(
     utility = await db.get(Utility, utility_id)
     if not utility or utility.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="Утилита не найдена")
-    # Удаляем связанные датасеты (каскадом уйдут задачи/ассайнменты/разметка)
+    # Датасеты уходят каскадом вместе с задачами/ассайнментами/разметкой
     await db.execute(delete(Dataset).where(Dataset.utility_id == utility_id))
     await db.delete(utility)
     await db.commit()
 
-
-# ── Утилита: обмен кода на токен ──
 
 @router.post("/pair", response_model=UtilityPairResponse)
 async def pair_utility(
@@ -148,12 +141,10 @@ async def pair_utility(
     token, token_hash = create_utility_token(utility.id)
     utility.token_hash = token_hash
 
-    await db.delete(pairing)  # код одноразовый
+    await db.delete(pairing)
     await db.commit()
     return UtilityPairResponse(utility_id=utility.id, token=token)
 
-
-# ── Утилита: heartbeat и пуш задач (авторизация токеном утилиты) ──
 
 @router.post("/heartbeat", response_model=UtilityResponse)
 async def utility_heartbeat(
@@ -189,8 +180,6 @@ async def push_tasks(
     await db.commit()
     return UtilityTasksPushResponse(added=added, total=total)
 
-
-# ── Веб: файловый браузер и сканирование (через WS-команды к утилите) ──
 
 @router.get("/{utility_id}/dirs", response_model=DirListing)
 async def list_dirs(
@@ -263,8 +252,6 @@ async def _do_scan(db: AsyncSession, dataset: Dataset, utility_id: uuid.UUID, pa
     await db.commit()
     return ScanResponse(folder=folder, added=added, total=total)
 
-
-# ── Утилита: WebSocket-туннель для отдачи файлов ──
 
 @router.websocket("/connect")
 async def utility_connect(websocket: WebSocket):

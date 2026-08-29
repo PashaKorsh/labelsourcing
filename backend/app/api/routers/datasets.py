@@ -186,8 +186,7 @@ async def get_datasets(
     AnnTask2 = aliased(Task)
     AnnAssign2 = aliased(Assignment)
 
-    # Подзапрос: есть ли PENDING validation-задачи, которые пользователь ещё не сделал
-    # (аннотировал не он сам)
+    # Есть ли pending validation-задачи, которые пользователь ещё не делал (и не он автор)
     pending_val_for_user_sq = (
         select(ValTask.id)
         .where(ValTask.dataset_id == Dataset.id)
@@ -208,7 +207,7 @@ async def get_datasets(
         .scalar_subquery()
     )
 
-    # Подзапрос: есть ли у пользователя аннотационные лейблы, ещё не прошедшие валидацию
+    # Есть ли аннотационные лейблы пользователя, ещё не прошедшие валидацию
     user_has_unvalidated_work_sq = (
         select(UnvalLabel.id)
         .join(UnvalAnnAssign, UnvalLabel.assignment_id == UnvalAnnAssign.id)
@@ -223,7 +222,7 @@ async def get_datasets(
         .scalar_subquery()
     )
 
-    # Подзапрос: есть ли PENDING annotation-задачи, которые пользователь ещё не выполнил
+    # Есть ли pending annotation-задачи, которые пользователь ещё не выполнил
     pending_ann_for_user_sq = (
         select(AnnTask2.id)
         .where(AnnTask2.dataset_id == Dataset.id)
@@ -293,9 +292,6 @@ async def get_datasets(
     for row in result.all():
         dataset = row[0]
         dataset.labeled_count = row[1]
-        # row[2]: UUID или None — есть ли PENDING val-задачи для пользователя
-        # row[3]: UUID или None — есть ли непроверенные лейблы пользователя
-        # row[4]: UUID или None — есть ли PENDING ann-задачи для пользователя
         user_access = row[5]
         dataset.user_status = _get_user_status(
             dataset, user_access,
@@ -360,8 +356,7 @@ async def _assign_task(
     )).scalar_one_or_none()
 
     if existing:
-        # Единственный возможный случай: устаревший IN_PROGRESS (expires_at истёк, но не был
-        # сдан — active_assignments уже был посчитан при создании, не инкрементируем повторно)
+        # Устаревший IN_PROGRESS: active_assignments уже учтён при создании, повторно не инкрементируем
         existing.status = AssignmentStatus.IN_PROGRESS
         existing.expires_at = expires_at
         existing.assigned_at = datetime.utcnow()
@@ -382,8 +377,8 @@ def _resolve_url(task: Task, use_proxy: bool, direct_base: str | None) -> str | 
     if use_proxy:
         return None
     if direct_base is None:
-        return task.url  # URL-датасет: задача уже хранит прямую ссылку
-    # utility direct: публичный адрес + dataset_id + относительный путь (dataset_id разводит папки)
+        return task.url
+    # utility direct: dataset_id разводит папки разных датасетов
     return f"{direct_base.rstrip('/')}/{task.dataset_id}/{task.url.lstrip('/')}"
 
 
@@ -428,8 +423,6 @@ async def get_next_task(
 
     _check_dataset_access(dataset, current_user)
 
-    # Direct-режим: картинка идёт от источника к браузеру, минуя наш сервер.
-    # Для utility доступен только если у утилиты есть публичный HTTPS-адрес.
     use_proxy_setting: bool = (dataset.settings or {}).get('use_proxy', True)
     direct_base: str | None = None
     if dataset.source_type == SourceType.UTILITY:
@@ -440,7 +433,6 @@ async def get_next_task(
     else:
         use_proxy = use_proxy_setting
 
-    # Восстановление сессии: живые ассайнменты любого типа
     existing_stmt = (
         select(Task, Assignment.expires_at)
         .join(Assignment, Task.id == Assignment.task_id)
@@ -456,7 +448,6 @@ async def get_next_task(
             task.expires_at = exp
         return _build_task_responses([t for t, _ in existing_rows], use_proxy, direct_base)
 
-    # Upsert access-записи
     upsert_stmt = (
         pg_insert(UserDatasetAccess)
         .values(
@@ -481,7 +472,6 @@ async def get_next_task(
     user_busy_sq = _make_user_busy_subquery(current_user.id)
     result_tasks: list[Task] = []
 
-    # Validation-задачи в приоритете (только если пользователь не исчерпал лимит)
     if dataset.requires_validation and access.tasks_done < access.tasks_limit:
         val_task_stmt = (
             select(Task)
@@ -506,7 +496,6 @@ async def get_next_task(
 
     remaining_count = count - len(result_tasks)
 
-    # Annotation-задачи — только если валидации не нашлось
     if len(result_tasks) == 0 and access.can_label and access.tasks_done < access.tasks_limit:
         ann_task_stmt = (
             select(Task)
@@ -819,8 +808,7 @@ async def reset_user_progress(
         raise HTTPException(status_code=404, detail="Датасет не найден")
     ensure_can_manage_dataset(dataset, current_user)
 
-    # 1. Удаляем все validation-задачи, созданные из разметки этого пользователя.
-    #    DB CASCADE (tasks→assignments→labels) чистит дочерние записи автоматически.
+    # Удаляем validation-задачи этого пользователя (DB CASCADE уносит их ассайнменты/лейблы)
     await db.execute(
         delete(Task)
         .where(Task.dataset_id == dataset_id)
@@ -828,8 +816,7 @@ async def reset_user_progress(
         .where(Task.task_metadata['annotator_id'].astext == str(user_id))
     )
 
-    # 2. Перечитываем ассайнменты после bulk-delete, чтобы не видеть уже удалённые
-    #    ассайнменты валидаторов (cascade удалил их вместе с validation-задачами).
+    # Перечитываем ассайнменты после bulk-delete — часть уже удалена каскадом
     stmt = (
         select(Assignment)
         .join(Task, Assignment.task_id == Task.id)
@@ -881,16 +868,14 @@ async def reset_dataset_users_data(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
-    # 1. Удаляем все validation-задачи.
-    #    DB CASCADE (tasks → assignments → labels) чистит дочерние записи автоматически.
+    # Validation-задачи (DB CASCADE уносит их ассайнменты и лейблы)
     await db.execute(
         delete(Task)
         .where(Task.dataset_id == dataset_id)
         .where(Task.type == TaskType.VALIDATION)
     )
 
-    # 2. Удаляем все ассайнменты по annotation-задачам.
-    #    DB CASCADE (assignments → labels) чистит лейблы автоматически.
+    # Ассайнменты annotation-задач (DB CASCADE уносит лейблы)
     await db.execute(
         delete(Assignment)
         .where(
@@ -902,7 +887,6 @@ async def reset_dataset_users_data(
         )
     )
 
-    # 3. Сбрасываем счётчики и статусы annotation-задач.
     await db.execute(
         update(Task)
         .where(Task.dataset_id == dataset_id)
@@ -910,13 +894,12 @@ async def reset_dataset_users_data(
         .values(status=TaskStatus.PENDING, completed_answers=0, active_assignments=0)
     )
 
-    # 4. Удаляем все записи доступа пользователей к датасету.
     await db.execute(
         delete(UserDatasetAccess)
         .where(UserDatasetAccess.dataset_id == dataset_id)
     )
 
-    # 5. Пересчитываем tasks_count по факту — защита от рассинхрона счётчика.
+    # Пересчитываем tasks_count по факту — защита от рассинхрона счётчика
     actual_count = (await db.execute(
         select(func.count())
         .where(Task.dataset_id == dataset_id)
@@ -972,7 +955,6 @@ async def update_dataset(
         dataset.settings = update_data.settings
     if update_data.source_type is not None:
         dataset.source_type = SourceType(update_data.source_type)
-    # utility_id валидируем относительно итогового source_type
     if update_data.utility_id is not None or update_data.source_type is not None:
         dataset.utility_id = await _validate_utility(
             db, dataset.source_type,
@@ -985,9 +967,7 @@ async def update_dataset(
         tags_res = await db.execute(tags_stmt)
         dataset.tags = list(tags_res.scalars().all())
 
-    # При снижении required_answers: задачи с completed_answers >= нового порога
-    # застревают в PENDING и никогда не получают validation-задач.
-    # Завершаем их и создаём validation-задачи (если валидация включена).
+    # Иначе задачи с уже набранным новым порогом застрянут в PENDING без validation-задач
     if decreasing_required_answers:
         stuck_stmt = (
             select(Task)
@@ -1002,8 +982,6 @@ async def update_dataset(
             if dataset.requires_validation:
                 await _ensure_validation_tasks(db, ann_task, dataset)
 
-    # При первом включении валидации: создаём validation-задачи
-    # для уже завершённых annotation-задач, у которых их ещё нет.
     if enabling_validation:
         completed_ann_stmt = (
             select(Task)

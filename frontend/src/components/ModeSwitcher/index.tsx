@@ -26,8 +26,7 @@ function pathToMode(pathname: string): AppMode {
   return 'auth';
 }
 
-// Временный виджет для навигации между режимами в процессе разработки.
-// Отображается только в development-среде.
+// Dev-навигация между режимами; рендерится только в development-сборке
 export function ModeSwitcher() {
   if (!import.meta.env.DEV) return null;
 

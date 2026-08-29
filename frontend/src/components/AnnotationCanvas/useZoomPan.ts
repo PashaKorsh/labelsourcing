@@ -1,18 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// ─── Почему здесь нет CSS scale() ────────────────────────────────────────────
-//
-// Annotorious вычисляет координаты аннотаций через `event.offsetX/offsetY`.
-// Браузер вычисляет offsetX в собственном CSS-пространстве целевого элемента,
-// игнорируя CSS scale() у предков. Из-за этого при scale(2) на родителе:
-//   offsetX = 300  (половина CSS-ширины 600px)
-//   svgBCR.x = 200 (визуальная позиция с учётом scale)
-//   s.x = offsetX + svgBCR.x = 500  ← неверно, нужно clientX = 800
-//
-// Решение: масштабировать сам <img> (offsetWidth/offsetHeight меняются →
-// Annotorious получает корректные размеры через ResizeObserver).
-// Пан — только через translate(), который offsetX не затрагивает.
-// ─────────────────────────────────────────────────────────────────────────────
+// Масштабируем сам <img>, а не CSS scale() на родителе: Annotorious берёт координаты из
+// event.offsetX/offsetY, а браузер считает offsetX в CSS-пространстве элемента, игнорируя
+// scale() у предков — координаты уезжают. Меняем offsetWidth/offsetHeight <img> (Annotorious
+// ловит их через ResizeObserver), а пан делаем через translate(), который offsetX не трогает.
 
 export const ZOOM_MIN = 0.05;
 export const ZOOM_MAX = 20;
@@ -32,8 +23,6 @@ export function useZoomPan(
   leftButtonPanRef: React.RefObject<boolean>,
 ) {
   const [state, setState] = useState<ZoomPanState>({ zoom: 1, panX: 0, panY: 0 });
-  // Ref нужен, чтобы обработчики событий всегда видели актуальное состояние
-  // без перерегистрации при каждом рендере.
   const stateRef = useRef(state);
 
   const apply = useCallback((next: ZoomPanState) => {
@@ -41,7 +30,6 @@ export function useZoomPan(
     setState(next);
   }, []);
 
-  // Зум колесом мыши к курсору
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -49,7 +37,6 @@ export function useZoomPan(
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
-      // Позиция курсора относительно центра wrapper'а
       const mx = e.clientX - rect.left - rect.width / 2;
       const my = e.clientY - rect.top - rect.height / 2;
       const { zoom, panX, panY } = stateRef.current;
@@ -64,7 +51,6 @@ export function useZoomPan(
     return () => el.removeEventListener('wheel', onWheel);
   }, [wrapperRef, apply]);
 
-  // Пан средней кнопкой мыши (всегда) или левой (в режиме курсора)
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;

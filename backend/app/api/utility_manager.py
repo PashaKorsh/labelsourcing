@@ -20,8 +20,6 @@ from app.models import Utility
 from app.core.security import get_password_hash, verify_password
 
 
-# ── Токен утилиты (непрозрачный API-ключ вида "<utility_id>.<secret>") ──
-
 def create_utility_token(utility_id: uuid.UUID) -> tuple[str, str]:
     """Возвращает (токен для утилиты, bcrypt-хеш секрета для хранения в БД)."""
     secret = secrets.token_urlsafe(32)
@@ -43,8 +41,6 @@ async def authenticate_utility_token(token: str | None, db: AsyncSession) -> Uti
     return utility
 
 
-# ── Ошибки ──
-
 class UtilityOffline(Exception):
     """Утилита не подключена к серверу."""
 
@@ -56,8 +52,6 @@ class UtilityFileError(Exception):
         self.detail = detail
         super().__init__(detail)
 
-
-# ── Реестр соединений ──
 
 @dataclass
 class _Connection:

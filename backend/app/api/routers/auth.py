@@ -28,7 +28,6 @@ REFRESH_COOKIE_MAX_AGE = ACCESS_COOKIE_MAX_AGE + 2 * 24 * 60 * 60
 
 
 def _set_auth_cookies(response: Response, user_id: uuid):
-    """Вспомогательная функция для генерации токенов и записи их в Cookies"""
     access_token = create_access_token(
         data={"sub": str(user_id), "type": "access"},
         expires_delta=timedelta(seconds=ACCESS_COOKIE_MAX_AGE)
@@ -216,7 +215,6 @@ async def dev_login(
         await db.flush()
         existing_role_names: set[str] = set()
 
-    # Назначаем роли, которых ещё нет у пользователя
     for role_name in preset["roles"]:
         if role_name in existing_role_names:
             continue

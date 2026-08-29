@@ -40,13 +40,11 @@ async def _process_validation_verdict(
     if not annotation_label:
         return
 
-    # Одобряем только при большинстве голосов «за» (строго больше, чем «против»).
-    # При равенстве голосов разметка считается отклонённой.
+    # При равенстве голосов разметка отклоняется — нужно строгое большинство «за».
     if approve_count > reject_count:
         annotation_label.is_validated = True
         return
 
-    # Большинство «против» (или равенство голосов) — откатываем исходную разметку
     annotation_assignment = await db.get(Assignment, annotation_label.assignment_id)
     if not annotation_assignment:
         return
@@ -54,22 +52,20 @@ async def _process_validation_verdict(
     stmt_task = (
         select(Task)
         .where(Task.id == annotation_assignment.task_id)
-        .with_for_update()  # Ждем снятия блокировки, если кто-то другой тоже меняет счетчик
+        .with_for_update()
     )
     annotation_task = (await db.execute(stmt_task)).scalar_one_or_none()
     if not annotation_task:
         return
 
-    # Возвращаем задачу в пул
     annotation_task.completed_answers = max(0, annotation_task.completed_answers - 1)
     if annotation_task.completed_answers < dataset.required_answers:
         annotation_task.status = TaskStatus.PENDING
 
-    # Удаляем лейбл и ассайнмент (явный порядок: сначала child, потом parent)
+    # Явный порядок удаления: сначала child (label), потом parent (assignment)
     await db.delete(annotation_label)
     await db.delete(annotation_assignment)
 
-    # Возвращаем слот в счётчик разметки аннотатора
     access_stmt = select(UserDatasetAccess).where(
         UserDatasetAccess.user_id == annotation_assignment.user_id,
         UserDatasetAccess.dataset_id == annotation_task.dataset_id,
@@ -142,7 +138,6 @@ async def delete_task(
     if task.type == TaskType.VALIDATION:
         raise HTTPException(status_code=400, detail="Validation-задачи управляются автоматически и не могут быть удалены напрямую.")
 
-    # Корректируем tasks_done у всех, кто выполнил эту аннотационную задачу
     if task.type == TaskType.ANNOTATION:
         done_assignments = (await db.execute(
             select(Assignment).where(
@@ -164,7 +159,6 @@ async def delete_task(
         if dataset:
             dataset.tasks_count = max(0, dataset.tasks_count - 1)
 
-        # Удаляем validation-задачи
         val_tasks = (await db.execute(
             select(Task)
             .where(Task.dataset_id == task.dataset_id)
@@ -199,22 +193,19 @@ async def submit_label(
             detail="Нет активного задания для этой задачи. Сначала получите задачу через /next."
         )
 
-    # 1. БЛОКИРУЕМ ЗАДАЧУ (TASK) ПЕРЕД ЛЮБЫМИ ИЗМЕНЕНИЯМИ СЧЕТЧИКОВ
-    # Если кто-то другой сейчас тоже сдает эту задачу, наш запрос подождет здесь
+    # Блокируем задачу: сериализует параллельные сабмиты по одной задаче
     task_stmt = select(Task).where(Task.id == task_id).with_for_update()
     task = (await db.execute(task_stmt)).scalar_one_or_none()
 
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
 
-    # Ленивая проверка истечения
     if assignment.status == AssignmentStatus.IN_PROGRESS and assignment.expires_at < datetime.utcnow():
         task.active_assignments = max(0, task.active_assignments - 1)
         await db.delete(assignment)
         await db.commit()
         raise HTTPException(status_code=410, detail="Время на выполнение задания истекло. Получите новую задачу.")
 
-    # Повторная отправка запрещена
     label_stmt = select(Label).where(Label.assignment_id == assignment.id)
     existing_label = (await db.execute(label_stmt)).scalar_one_or_none()
 
@@ -225,7 +216,6 @@ async def submit_label(
     if not dataset:
         raise HTTPException(status_code=404, detail="Датасет не найден")
 
-    # Проверка разрешённых инструментов (только для аннотационных задач)
     if task.type == TaskType.ANNOTATION:
         allowed_tools: list | None = (dataset.settings or {}).get('allowed_tools')
         if allowed_tools:
@@ -237,7 +227,6 @@ async def submit_label(
                         detail=f"Инструмент '{tool}' не разрешён для этого датасета. Разрешены: {', '.join(str(t) for t in allowed_tools)}",
                     )
 
-    # Первый (и единственный) сабмит
     label = Label(assignment_id=assignment.id, result=label_in.data)
     db.add(label)
 
@@ -256,7 +245,6 @@ async def submit_label(
                 await db.flush()
                 await _process_validation_verdict(db, task, dataset)
 
-        # Засчитываем выполненную задачу в лимит (и аннотация, и валидация)
         access_stmt = select(UserDatasetAccess).where(
             UserDatasetAccess.user_id == current_user.id,
             UserDatasetAccess.dataset_id == task.dataset_id,

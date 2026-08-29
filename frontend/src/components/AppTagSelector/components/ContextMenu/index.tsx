@@ -4,7 +4,7 @@ import styles from './ContextMenu.module.css';
 interface ContextMenuProps {
   trigger: ReactElement<{ onClick?: React.MouseEventHandler }>;
   children: ReactNode;
-  /** Если true — меню отображается по центру экрана с затемнённым фоном. */
+  // true — меню по центру экрана с затемнённым фоном
   centered?: boolean;
 }
 

@@ -44,12 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiFetch(API.auth.logout(), { method: 'POST' });
     } catch {
-      // Даже при ошибке запроса — очищаем локальное состояние
+      // запрос logout мог не пройти — локальное состояние всё равно чистим ниже
     }
     setUser(null);
   }, [setUser]);
 
-  // Слушаем 401 от любого apiFetch-запроса — разлогиниваем
   useEffect(() => {
     const handle = () => setUser(null);
     window.addEventListener('auth:unauthorized', handle);

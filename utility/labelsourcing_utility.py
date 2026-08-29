@@ -98,8 +98,6 @@ def scan_folder(roots: list[Path], folder: str) -> tuple[str, list[str]]:
     return str(base), paths
 
 
-# ── commands ──
-
 def cmd_pair(args) -> None:
     server = args.server.rstrip("/")
     name = args.name or socket.gethostname()

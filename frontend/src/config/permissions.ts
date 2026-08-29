@@ -3,8 +3,7 @@ import { ROUTES } from './routes';
 export const ROLE_ADMIN     = 'admin';
 export const ROLE_MODERATOR  = 'moderator';
 
-/** Проверяет, есть ли хотя бы одна из требуемых ролей у пользователя.
- *  Пустой массив requiredRoles означает «доступно всем авторизованным». */
+// Пустой requiredRoles = доступно всем авторизованным
 export function hasRole(userRoles: string[], requiredRoles: string[]): boolean {
   if (requiredRoles.length === 0) return true;
   return requiredRoles.some(r => userRoles.includes(r));

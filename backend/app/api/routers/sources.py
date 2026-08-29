@@ -6,7 +6,6 @@ from app.schemas.source import SourceResponse
 
 router = APIRouter(prefix="/sources", tags=["Sources"])
 
-# Заглушка — реальная конфигурация источников будет реализована отдельно
 _SOURCES: list[SourceResponse] = []
 
 

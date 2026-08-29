@@ -12,11 +12,8 @@ import type { Tag } from '@/types/annotation';
 import type { ContextMenuState } from './types';
 import styles from './AnnotationCanvas.module.css';
 
-// ─── Контекстное меню ─────────────────────────────────────────────────────────
-// Рендерится через portal в document.body, чтобы не попасть под
-// CSS-трансформации канваса. Находится внутри <Annotorious>, поэтому
-// имеет доступ к useAnnotator.
-
+// Портал в document.body, чтобы не попасть под CSS-трансформации канваса.
+// Внутри <Annotorious>, поэтому есть доступ к useAnnotator.
 interface ContextMenuPortalProps {
   state: ContextMenuState;
   tags: Tag[];
@@ -27,7 +24,6 @@ export function ContextMenuPortal({ state, tags, onClose }: ContextMenuPortalPro
   const anno = useAnnotator<ImageAnnotatorInstance>();
   const [tagListOpen, setTagListOpen] = useState(false);
 
-  // Закрыть при клике вне меню
   useEffect(() => {
     window.addEventListener('mousedown', onClose);
     return () => window.removeEventListener('mousedown', onClose);
@@ -87,10 +83,6 @@ export function ContextMenuPortal({ state, tags, onClose }: ContextMenuPortalPro
   );
 }
 
-// ─── Контроллер ───────────────────────────────────────────────────────────────
-// Компонент без визуала, живёт внутри <Annotorious> и управляет его
-// экземпляром через useAnnotator(). Сюда вынесена вся императивная логика.
-
 export interface AnnotatorControllerProps {
   activeTool: string;
   activeTag: Tag | null;
@@ -98,7 +90,6 @@ export interface AnnotatorControllerProps {
   initialAnnotations: ImageAnnotation[];
   sizeReady: boolean;
   onAnnotationsChange: (annotations: ImageAnnotation[]) => void;
-  /** Колбэк для синхронизации hover-состояния с родительским компонентом */
   onHoverChange: (annotation: ImageAnnotation | null) => void;
   contextMenu: ContextMenuState | null;
   onContextMenuClose: () => void;
@@ -119,7 +110,6 @@ export function AnnotatorController({
 }: AnnotatorControllerProps) {
   const anno = useAnnotator<ImageAnnotatorInstance>();
 
-  // Refs для стабильного доступа к актуальным значениям внутри обработчиков событий
   const activeTagRef = useRef(activeTag);
   const onChangeRef = useRef(onAnnotationsChange);
   const onHoverRef = useRef(onHoverChange);
@@ -129,7 +119,6 @@ export function AnnotatorController({
   useEffect(() => { onHoverRef.current = onHoverChange; }, [onHoverChange]);
   useEffect(() => { onNextRef.current = onNext; }, [onNext]);
 
-  // Передаём наружу, какая аннотация под курсором (нужно для контекстного меню)
   const hovered = useHover<ImageAnnotation>();
   useEffect(() => { onHoverRef.current(hovered ?? null); }, [hovered]);
 
@@ -137,7 +126,6 @@ export function AnnotatorController({
   const selectionRef = useRef(selection);
   useEffect(() => { selectionRef.current = selection; }, [selection]);
 
-  // Переключение инструмента рисования
   useEffect(() => {
     if (!anno) return;
     if (activeTool === 'cursor') {
@@ -162,7 +150,6 @@ export function AnnotatorController({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anno, sizeReady]); // initialAnnotations стабильны благодаря key на родителе
 
-  // Привязка активного тега к только что нарисованной аннотации
   useEffect(() => {
     if (!anno) return;
     const handleCreate = (annotation: ImageAnnotation) => {
@@ -184,11 +171,9 @@ export function AnnotatorController({
     return () => anno.off('createAnnotation', handleCreate);
   }, [anno]);
 
-  // Реактивный список аннотаций → передаём в родитель для сохранения
   const annotations = useAnnotations<ImageAnnotation>();
   useEffect(() => { onChangeRef.current(annotations); }, [annotations]);
 
-  // Горячие клавиши
   useEffect(() => {
     if (!anno) return;
 
@@ -203,7 +188,6 @@ export function AnnotatorController({
       // Синтетический Delete от S-клавиши — пропускаем, Annotorious обработает сам
       if (skipNextDelete) { skipNextDelete = false; return; }
 
-      // Delete / Backspace / A — удалить выделенные аннотации целиком
       if (e.key === 'Delete' || e.key === 'Backspace' || e.code === 'KeyA' && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault();
         selectionRef.current.selected.forEach(({ annotation }) => anno.removeAnnotation(annotation));
@@ -222,18 +206,15 @@ export function AnnotatorController({
         return;
       }
 
-      // Z — отмена (+ Ctrl+Z как алиас)
       if ((e.code === 'KeyZ' && !e.ctrlKey && !e.shiftKey) || (e.ctrlKey && e.code === 'KeyZ' && !e.shiftKey)) {
         e.preventDefault(); anno.undo(); return;
       }
-      // X — повтор (+ Ctrl+Shift+Z / Ctrl+Y как алиасы)
       if ((e.code === 'KeyX' && !e.ctrlKey && !e.shiftKey)
         || (e.ctrlKey && e.code === 'KeyZ' && e.shiftKey)
         || (e.ctrlKey && e.code === 'KeyY')) {
         e.preventDefault(); anno.redo(); return;
       }
 
-      // F — следующая задача
       if (e.code === 'KeyF' && !e.ctrlKey && !e.shiftKey) {
         e.preventDefault(); onNextRef.current?.(); return;
       }

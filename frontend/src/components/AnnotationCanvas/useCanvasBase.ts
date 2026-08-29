@@ -16,9 +16,8 @@ export function useCanvasBase(
 
   const [originalSize, setOriginalSize] = useState<{ w: number; h: number } | null>(null);
 
-  // Измеряем натуральный размер через отдельный Image-объект — независимо от того,
-  // как Annotorious обращается с <img> внутри ImageAnnotator (клонирует, оборачивает и т.д.).
-  // Браузер отдаёт уже закэшированный ресурс, поэтому дублирующего запроса на сеть нет.
+  // Натуральный размер меряем отдельным Image — Annotorious внутри клонирует/оборачивает <img>.
+  // Ресурс уже в кэше браузера, лишнего сетевого запроса нет.
   useEffect(() => {
     setOriginalSize(null);
     let cancelled = false;
@@ -47,8 +46,6 @@ export function useCanvasBase(
       }
     : undefined;
 
-  // Аннотация под курсором — синхронизируется через ref для синхронного доступа
-  // в обработчике contextmenu без лишних ре-рендеров.
   const hoveredRef = useRef<ImageAnnotation | null>(null);
   const handleHoverChange = useCallback((ann: ImageAnnotation | null) => {
     hoveredRef.current = ann;

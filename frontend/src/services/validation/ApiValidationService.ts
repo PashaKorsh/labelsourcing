@@ -31,20 +31,12 @@ export class ApiValidationService implements ValidationService {
       .map(t => ({ taskId: t.id, verdict: this.verdicts.get(t.id)! }));
   }
 
-  // Отправляет вердикты через PATCH /api/labels/{id}/status.
-  // Требует, чтобы ValidationTask содержала labelId — появится после реализации загрузки.
+  // Отправка через PATCH /labels/{id}/status требует labelId, которого пока нет
   async submit(): Promise<void> {
     const results = this.getResults();
     console.warn('[ApiValidationService] submit() вызван, но labelId недоступен — вердикты не отправлены:', results);
 
-    // Будущая реализация (когда ValidationTask будет содержать labelId):
-    // await Promise.all(results.map(r =>
-    //   apiFetch(API.labels.updateStatus(r.labelId), {
-    //     method: 'PATCH',
-    //     body: JSON.stringify({ status: r.verdict }),
-    //   })
-    // ));
-    void apiFetch; // убирает warning о неиспользуемом импорте
+    void apiFetch;
     void API;
   }
 }

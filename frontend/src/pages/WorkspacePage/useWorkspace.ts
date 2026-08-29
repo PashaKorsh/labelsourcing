@@ -26,11 +26,8 @@ export function useWorkspace() {
   useEffect(() => {
     if (!datasetId) return;
 
-    // Сбрасываем весь стейт при смене датасета (или при монтировании).
-    // Зависимость [datasetId] критична: React Router v6 не размонтирует WorkspacePage
-    // при переходе между /dataset/123 и /dataset/456 — это тот же паттерн маршрута,
-    // компонент переиспользуется. Без [datasetId] кэш и стейт от старого датасета
-    // остались бы видны на новом, что даёт 400 при попытке повторной отправки.
+    // React Router переиспользует WorkspacePage между /dataset/A и /dataset/B (один паттерн
+    // маршрута), поэтому при смене датасета кэш и стейт от старого чистим вручную.
     setTasks([]);
     setHasMoreTasks(true);
     setSessionCompleted(0);
@@ -71,7 +68,6 @@ export function useWorkspace() {
       })
       .catch(err => {
         console.error('[WorkspacePage] init:', err);
-        // Показываем задачи даже при ошибке загрузки метаданных датасета
         setTasks(taskService.getTasks());
       });
   }, [datasetId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -81,7 +77,6 @@ export function useWorkspace() {
   const goNext = useCallback(async () => {
     if (!task) return;
 
-    // Удаляем текущую задачу из кэша — пути назад нет
     taskService.removeFromCache(task.id);
 
     if (isSaved) setSessionCompleted(prev => prev + 1);
@@ -91,7 +86,6 @@ export function useWorkspace() {
 
     if (remaining.length > 0) {
       setTasks(remaining);
-      // Фоновая догрузка, если в буфере осталась последняя задача
       if (remaining.length === 1 && hasMoreTasks) {
         taskService.loadNextTask(datasetId ?? '', TASK_BATCH_SIZE)
           .then(newTask => {
